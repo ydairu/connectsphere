@@ -1,6 +1,6 @@
 function RoleBadge({ role }) {
-  return <span className={`role-badge role-${role}`}>{role?.toUpperCase()}</span>
+  const label = role === 'organiser' ? 'Event Organiser' : 'Attendee'
+  return <span className={`role-badge role-${role}`}>{label.toUpperCase()}</span>
 }
 
 export default RoleBadge
-

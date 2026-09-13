@@ -49,7 +49,7 @@ function ProfilePage() {
           <div className="profile-details">
             <div className="profile-row"><span>Name</span><strong>{userProfile.name}</strong></div>
             <div className="profile-row"><span>Email</span><strong>{userProfile.email || user.email}</strong></div>
-            <div className="profile-row"><span>Role</span><div className="role-value"><strong>{userProfile.role === 'employee' ? 'Employee' : 'Attendee'}</strong><RoleBadge role={userProfile.role} /></div></div>
+            <div className="profile-row"><span>Role</span><div className="role-value"><strong>{userProfile.role === 'organiser' ? 'Event Organiser' : 'Attendee'}</strong><RoleBadge role={userProfile.role} /></div></div>
           </div>
         </Card>
       </main>

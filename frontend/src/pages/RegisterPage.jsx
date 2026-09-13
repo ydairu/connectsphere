@@ -74,12 +74,12 @@ function RegisterPage() {
                 <input type="radio" name="role" value="attendee" checked={form.role === 'attendee'} onChange={updateField} />
                 <span><strong>Attendee</strong><small>Access events and attendee resources.</small></span>
               </label>
-              <label className={form.role === 'employee' ? 'role-option selected' : 'role-option'}>
-                <input type="radio" name="role" value="employee" checked={form.role === 'employee'} onChange={updateField} />
-                <span><strong>Employee</strong><small>Support and coordinate event operations.</small></span>
+              <label className={form.role === 'organiser' ? 'role-option selected' : 'role-option'}>
+                <input type="radio" name="role" value="organiser" checked={form.role === 'organiser'} onChange={updateField} />
+                <span><strong>Event Organiser</strong><small>Plan and coordinate event operations.</small></span>
               </label>
             </fieldset>
-            <p className="form-note">Prototype note: employee self-registration is enabled. Production employee accounts should be provisioned or approved by an administrator.</p>
+            <p className="form-note">Prototype note: Event Organiser self-registration is enabled. Production Event Organiser accounts should be provisioned or approved by an administrator.</p>
             <Button className="button-full" type="submit" disabled={submitting}>{submitting ? 'Creating account…' : 'Create account'}</Button>
           </form>
           <p className="auth-footer">Already have an account? <Link to="/login">Log in</Link></p>
@@ -90,4 +90,3 @@ function RegisterPage() {
 }
 
 export default RegisterPage
-

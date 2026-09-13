@@ -95,7 +95,7 @@ a { color: inherit; }
 .role-value { display: flex; align-items: center; gap: 12px; }
 .role-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
 .role-attendee { color: #25578c; background: #e9f2fb; }
-.role-employee { color: #7b4d12; background: #fbf1df; }
+.role-organiser { color: #7b4d12; background: #fbf1df; }
 
 @media (max-width: 700px) {
   .container { width: min(100% - 28px, 1120px); }

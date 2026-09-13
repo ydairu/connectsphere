@@ -44,7 +44,7 @@ function LoginPage() {
       <main className="auth-page container">
         <Card className="auth-card">
           <div className="auth-heading">
-            <span className="eyebrow">Attendees + employees</span>
+            <span className="eyebrow">Attendees + Event Organisers</span>
             <h1>Welcome back</h1>
             <p>Log in to continue to your ConnectSphere account.</p>
           </div>
@@ -64,4 +64,3 @@ function LoginPage() {
 }
 
 export default LoginPage
-

@@ -1,6 +1,6 @@
 # ConnectSphere
 
-ConnectSphere is a full-stack event management foundation for attendees and event employees. It currently provides account registration, login, persistent sessions, Firestore-backed roles, a protected profile page, and an authenticated Express API. Event management features will be added in later iterations.
+ConnectSphere is a full-stack event management foundation for attendees and Event Organisers. It currently provides account registration, login, persistent sessions, Firestore-backed roles, a protected profile page, and an authenticated Express API. Event management features will be added in later iterations.
 
 ## Technology Stack
 
@@ -49,7 +49,7 @@ connectsphere/
 5. The frontend can send a Firebase ID token to the Express API.
 6. The backend verifies the token and reads the user's trusted role from Firestore.
 
-Supported roles are `attendee` and `employee`. Frontend role checks control presentation only; protected backend operations must enforce roles through authentication middleware.
+Supported roles are `attendee` and `organiser`. Frontend role checks control presentation only; protected backend operations must enforce roles through authentication middleware.
 
 ## Local Setup
 
@@ -113,9 +113,9 @@ You can also run either application separately with `npm run dev:frontend` or `n
 
 These credentials are for local prototype testing only:
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Attendee | `attendee1@gmail.com` | `Password123!` |
-| Employee | `employee1@gmail.com` | `Password123!` |
+| Role            | Email                   | Password         |
+| --------------- | ----------------------- | ---------------- |
+| Attendee        | `attendee1@gmail.com` | `Password123!` |
+| Event Organiser | `employee1@gmail.com` | `Password123!` |
 
-The accounts must exist in Firebase Authentication and have matching Firestore documents at `users/{uid}` with the appropriate `attendee` or `employee` role. Remove or change these shared credentials before any public deployment.
+The accounts must exist in Firebase Authentication and have matching Firestore documents at `users/{uid}` with the appropriate `attendee` or `organiser` role. Remove or change these shared credentials before any public deployment.
