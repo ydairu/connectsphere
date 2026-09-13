@@ -1,16 +1,16 @@
 # ConnectSphere
 
-ConnectSphere is the foundation for a full-stack event management platform for attendees and event employees. This first iteration includes Firebase email/password authentication, Firestore-backed user roles, protected frontend routing, and a token-protected Express API. Event management features are intentionally not included yet.
+ConnectSphere is a full-stack event management foundation for attendees and event employees. It currently provides account registration, login, persistent sessions, Firestore-backed roles, a protected profile page, and an authenticated Express API. Event management features will be added in later iterations.
 
-## Technology stack
+## Technology Stack
 
-- React 19, Vite, and React Router
-- Node.js and Express
-- Firebase Authentication and Cloud Firestore
-- Firebase Admin SDK for backend token verification
-- Custom responsive CSS
+- **Frontend:** React 19, Vite, React Router, and custom responsive CSS
+- **Backend:** Node.js and Express
+- **Authentication:** Firebase Authentication with email and password
+- **Database:** Firebase Cloud Firestore
+- **Server authentication:** Firebase Admin SDK
 
-## Project structure
+## Project Structure
 
 ```text
 connectsphere/
@@ -22,6 +22,7 @@ connectsphere/
 │   │   ├── pages/
 │   │   ├── services/
 │   │   └── utils/
+│   ├── index.html
 │   ├── package.json
 │   └── vite.config.js
 ├── backend/
@@ -35,46 +36,45 @@ connectsphere/
 │   └── package.json
 ├── .env.example
 ├── .gitignore
-└── package.json
+├── package.json
+└── README.md
 ```
 
-## Installation
+## How the App Works
 
-Requires Node.js 20.19+ or 22.12+.
+1. A user registers or logs in through Firebase Authentication.
+2. The user's Firebase UID identifies their document at `users/{uid}` in Firestore.
+3. That document stores their name, email, role, and creation timestamp.
+4. `AuthContext` restores sessions and loads the Firestore profile before protected pages render.
+5. The frontend can send a Firebase ID token to the Express API.
+6. The backend verifies the token and reads the user's trusted role from Firestore.
 
-Install each application independently:
+Supported roles are `attendee` and `employee`. Frontend role checks control presentation only; protected backend operations must enforce roles through authentication middleware.
 
-```bash
-cd frontend
-npm install
+## Local Setup
 
-cd ../backend
-npm install
-```
+Requirements:
 
-To use the combined root development command, also install the root dependency:
+- Node.js 20.19+ or 22.12+
+- A Firebase project with Email/Password Authentication enabled
+- A Cloud Firestore database
+- A Firebase service account for the backend
 
-```bash
-cd ..
-npm install
-```
-
-Alternatively, install everything from the repository root:
+Install all dependencies from the repository root:
 
 ```bash
 npm run install:all
 ```
 
-## Firebase configuration
+Copy the sample configuration and replace its placeholders locally:
 
-1. Create a Firebase project in the Firebase console.
-2. Add a web app and copy its configuration values.
-3. Enable **Email/Password** under Authentication > Sign-in method.
-4. Create a Cloud Firestore database.
-5. Create a Firebase service account and copy its project ID, client email, and private key.
-6. Copy `.env.example` to `.env` at the repository root and replace every placeholder.
+```bash
+cp .env.example .env
+```
 
-Only one root `.env` is used. Vite loads it through `frontend/vite.config.js`, while the backend loads the same file through `dotenv`. Never prefix backend secrets with `VITE_`; Vite-prefixed values are exposed to the browser bundle.
+The application uses one root `.env` file. It is ignored by Git and must never be committed.
+
+## Environment Example
 
 ```env
 VITE_FIREBASE_API_KEY=xxx
@@ -93,54 +93,29 @@ PORT=5000
 CLIENT_ORIGIN=http://localhost:5173
 ```
 
-The private key may contain escaped newlines (`\\n`); the backend converts these to real newline characters before initializing Firebase Admin.
+Only variables prefixed with `VITE_` are available to the browser. Never add the Admin SDK email, private key, passwords, or other server secrets to a `VITE_` variable. If the private key contains line breaks, store them as escaped `\\n` sequences.
 
-## Run locally
+## Start the App
 
-Start both applications from the repository root:
+Start the frontend and backend together:
 
 ```bash
 npm run dev
 ```
 
-Or run them separately:
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:5000`
+- Health check: `http://localhost:5000/api/health`
 
-```bash
-npm run dev:frontend
-npm run dev:backend
-```
+You can also run either application separately with `npm run dev:frontend` or `npm run dev:backend`.
 
-The frontend runs at `http://localhost:5173` and the API defaults to `http://localhost:5000`. Verify the API with `GET http://localhost:5000/api/health`.
+## Seed Accounts
 
-## Authentication and roles
+These credentials are for local prototype testing only:
 
-Registration creates a Firebase Authentication account and a matching `users/{uid}` Firestore document containing `name`, `email`, `role`, and `createdAt`. The supported roles are `attendee` and `employee`.
+| Role | Email | Password |
+| --- | --- | --- |
+| Attendee | `attendee1@gmail.com` | `Password123!` |
+| Employee | `employee1@gmail.com` | `Password123!` |
 
-`AuthContext` listens for persisted Firebase sessions and loads the authenticated user's Firestore profile before protected routes render. Frontend role helpers are intended for presentation and routing only; they are not a security boundary.
-
-For backend requests, `frontend/src/services/api.js` obtains the current user's Firebase ID token and sends it as `Authorization: Bearer <firebase-id-token>`. The authentication middleware verifies the token using Firebase Admin, retrieves `users/{uid}`, and places the trusted UID and Firestore role on `req.user`. Future protected endpoints can combine `authenticate` with `requireRole('employee')` or `requireRole('attendee')`.
-
-For this prototype, users may self-register as employees. In production, employee accounts should normally be provisioned or approved by an administrator.
-
-## Firestore rules
-
-Start with rules that allow users to create and read only their own profile. Role-based data access for future event collections should be enforced separately in Firestore rules and in backend middleware.
-
-```text
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      allow create: if request.auth != null
-                    && request.auth.uid == userId
-                    && request.resource.data.role in ['attendee', 'employee'];
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null
-                    && request.auth.uid == userId
-                    && request.resource.data.role == resource.data.role;
-    }
-  }
-}
-```
-
-The backend never trusts a role supplied with an API request. It always reads the role from the authenticated user's Firestore document.
+The accounts must exist in Firebase Authentication and have matching Firestore documents at `users/{uid}` with the appropriate `attendee` or `employee` role. Remove or change these shared credentials before any public deployment.
