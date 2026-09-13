@@ -1,0 +1,308 @@
+# Effective Requirements
+
+## 1. Purpose and Status Labels
+
+This document reconciles the Week 1 Customer Briefing, Week 4 Project Instructions, Clarification Sessions 1 and 2, and current team decisions. It is the practical requirement reference for implementation, while the Product Backlog workbook remains the operational source of record for story wording, estimates, status, and Sprint assignment.
+
+Labels used below:
+
+- **[Customer-confirmed]** — supported by the briefing or clarification sessions.
+- **[Course-required]** — required by the Week 4 Project Instructions or rubric.
+- **[Team decision]** — chosen where the customer allowed discretion.
+- **[Unresolved]** — source conflict or unanswered question.
+- **[Deferred/KIV]** — retained but not committed now.
+
+## 2. Course Scope and Delivery Constraints
+
+**[Course-required]** The Week 12 first release must implement these 20 core functionality areas as coherent workflows rather than isolated screens:
+
+1. User Authorisation and Authentication
+2. Event Request Creation
+3. Draft Event Requests
+4. Event Review and Approval
+5. Coordinator Assignment
+6. Event Status Management
+7. Event Information Management
+8. Venue Catalogue
+9. Venue Availability Calendar
+10. Venue Search and Filtering
+11. Venue Suitability Checking
+12. Venue Booking Request
+13. Venue Booking Approval
+14. Booking Conflict Detection
+15. Equipment Request Management
+16. Equipment Availability Checking
+17. Equipment Reservation
+18. Attendee Registration
+19. Event Change Requests
+20. Notification System
+
+**[Course-required]** The team must preserve Sprint evidence, estimation records, Sprint/task boards, burndowns, retrospectives, traceable tests, C4 system design, working code, README instructions, and any used CI pipeline. The final Sprint must end by Friday Week 12. The final evidence deck must use the Week 11 template.
+
+**[Team decision]** The team uses an Excel Product Backlog/Scrum workbook rather than Jira.
+
+## 3. Cross-Cutting Domain Model
+
+### Roles and Accounts
+
+**[Customer-confirmed]** The roles are:
+
+- Event Organiser — external
+- Event Coordinator — internal
+- Venue Staff — internal
+- Technical Support Staff — internal
+- Attendee — external
+
+**[Customer-confirmed]** There is no System Administrator role.
+
+**[Customer-confirmed]** Event Organisers and Attendees self-register. Internal staff accounts are managed or defined through system defaults.
+
+**[Customer-confirmed]** One user may hold multiple roles. Effective permissions combine assigned roles.
+
+**[Customer-confirmed]** Authentication must provide secure role-based access, but no specific technology, SSO requirement, password length, complexity, expiry, history, or lockout rule was prescribed.
+
+**[Team decision]** The current Product Backlog selects email/password authentication. If the current six-character minimum is retained, record it as a team security choice rather than a customer requirement.
+
+### Ownership and Relationships
+
+**[Customer-confirmed]** One event request normally has exactly one Event Organiser owner.
+
+**[Customer-confirmed]** Organisers cannot see unrelated client data.
+
+**[Unresolved]** Whether two Organisers in the same organisation may view each other's events beyond the owner-specific edit rule is a team design choice. Current SPM-42 permits viewing organisation events but editing only owned requests.
+
+### Audit and Security Enforcement
+
+**[Customer-confirmed]** Important actions must retain what changed, who changed it, and when, visible to authorised users where appropriate.
+
+**[Customer-confirmed]** Access depends on role and relationship to the event.
+
+**[Team decision / acceptance behaviour]** Authorisation must also deny unauthorised direct-link and API attempts; hiding UI controls is not sufficient.
+
+## 4. Sprint 1 Effective Scope
+
+Sprint 1 focuses on the first three functionality areas and contains seven stories.
+
+### SPM-1 — Sign In and Access Only My Role's Area
+
+**[Customer-confirmed]** Users authenticate and receive access according to their assigned role(s) and event relationship.
+
+**[Current backlog]** Required login fields are email and password. Successful authentication grants role-based access. Unauthenticated protected-route access redirects to login. Logout terminates the session.
+
+**[Boundary]** SPM-1 does not replace the detailed record/field permission work in SPM-42.
+
+### SPM-2 — Register for an Account
+
+**[Customer-confirmed]** Eligible external users are Event Organisers and Attendees. Internal staff do not use public self-registration.
+
+**[Current backlog]** A registering user selects Event Organiser or Attendee. Common fields are name, email, and password. Organisation is additionally required for Event Organiser. Duplicate email is rejected. Successful registration creates the selected permitted role and permits sign-in.
+
+**[Team decision]** SPM-2 is the 3-point reference story.
+
+### SPM-42 — View and Edit Information According to My Role's Permissions
+
+**[Customer-confirmed]**:
+
+- users only view records permitted by role and event relationship;
+- users only edit fields/sections permitted by role;
+- Event Organisers view their own requests and organisation events, but edit only owned requests;
+- Event Coordinators view relevant assigned events and edit main event details;
+- Venue Staff update venue sections for relevant events;
+- Technical Support Staff update equipment/technical sections for relevant events;
+- Attendees see attendee-facing information but not internal planning information;
+- multi-role users receive combined permissions.
+
+**[Boundary]** SPM-42 cannot be Done until all named roles and their relevant information surfaces exist and are tested. If Sprint 1 implements only Event Organiser behaviour, the story must be split or remain incomplete.
+
+### SPM-7 — Create an Event Request
+
+**[Customer-confirmed]** An Event Organiser can start a request and enter:
+
+- title/name;
+- purpose and description;
+- expected attendance;
+- duration;
+- preferred date/time;
+- venue/layout preferences;
+- accessibility needs;
+- equipment requirements;
+- registration needs.
+
+One request represents one event date and has one Organiser owner. Entering or editing data does not submit the request or start staff review.
+
+### SPM-3 — Submit an Event Request
+
+**[Customer-confirmed]** The minimum combined submission fields are:
+
+- event title;
+- purpose;
+- expected attendance/pax;
+- duration;
+- preferred date/time;
+- primary venue/layout requirements.
+
+Missing mandatory information blocks submission and identifies each missing field. Previously entered data is retained, the request remains editable, and staff review does not start. A successful submission sets status to Submitted and makes the request eligible for the later staff workflow.
+
+**[Boundary]** Sprint 1 should not claim that the downstream Coordinator review workflow is complete unless later functionality has actually been implemented.
+
+### SPM-4 — Save an Event Request as a Draft
+
+**[Customer-confirmed]** A draft:
+
+- may be saved while mandatory submission fields are incomplete;
+- retains entered data;
+- remains editable by its creating Organiser;
+- is private and single-owner before submission;
+- is not visible to staff, other Organisers, or Attendees;
+- does not expire automatically;
+- does not start submission or review;
+- changes to Submitted when validly submitted.
+
+The current backlog says a draft remains until submitted or deleted. Deletion itself is not customer-mandated and is deferred; therefore do not make deletion necessary for SPM-4 completion.
+
+### SPM-24 — View My Saved Draft Requests
+
+**[Customer-confirmed]** Organisers must be able to return to and continue editing saved drafts, and drafts must remain distinguishable from submitted requests.
+
+**[Team decision]** Use a dedicated Drafts page/section. Selecting an owned draft opens it in edit mode with retained data. Submitted requests show their current status and are not editable as drafts. Unsubmitted drafts remain invisible to staff.
+
+**[Team decision]** Filtering is optional convenience, not a customer requirement.
+
+### Overlap and Deferred Records
+
+- **[Team decision]** SPM-22 remains recorded as `Removed — Overlap` because SPM-2 covers external registration.
+- **[Team decision]** SPM-23 remains recorded as `Removed — Overlap` because SPM-3 includes mandatory-field validation and failure recovery.
+- **[Team decision]** SPM-43 remains recorded as `Removed — Overlap` because SPM-7 includes equipment and accessibility inputs.
+- **[Deferred/KIV]** SPM-44, deleting a saved draft, is not a customer requirement and is outside Sprint 1.
+
+## 5. Remaining Core Functionality Areas
+
+### 4. Event Review and Approval
+
+**[Customer-confirmed]** Event Coordinators review submitted requests, seek clarification, return for amendment, approve/allow planning, or reject. Returned requests are edited and resubmitted; rejected unfulfillable requests close. Initial feasibility considers attendance, date/time, venue, and equipment availability.
+
+### 5. Coordinator Assignment
+
+**[Customer-confirmed]** Assignment is automatic with exactly one Coordinator per event. Round-robin or load-based are acceptable examples. The assigned Coordinator may initiate reassignment following offline agreement.
+
+**[Team decision pending]** Select and document the actual assignment algorithm.
+
+### 6. Event Status Management
+
+**[Customer-confirmed]** Draft, Submitted, Under Review, Planning, Confirmed, Completed, Cancelled, Rejected, and a returned/amendment condition are required concepts.
+
+**[Unresolved]** Approved and Confirmed are inconsistent across answers. Do not implement a final transition model until the team documents one interpretation and its rationale.
+
+**[Customer-confirmed]** Under Review means evaluation/clarification; Planning means arrangements are underway; Completed follows the event date/time; returned requests may be edited/resubmitted; rejected requests close.
+
+### 7. Event Information Management
+
+**[Customer-confirmed]** Field and section permissions follow role and ownership. Routine contact or descriptive edits are normal. Significant date/time, duration, attendance, venue/layout, or equipment changes trigger formal re-review and may alter Planning/confirmation status.
+
+### 8. Venue Catalogue
+
+**[Customer-confirmed]** Maintain location, capacity, facilities, accessibility, supported layouts, operating information, and availability-related characteristics. Venue Staff can use catalogue information to identify suitable spaces.
+
+### 9. Venue Availability Calendar
+
+**[Customer-confirmed]** Show bookings, tentative holds, and maintenance/unavailable periods. One venue may be treated as one event for simplicity. Turnaround may be zero.
+
+### 10. Venue Search and Filtering
+
+**[Customer-confirmed]** Event Coordinators search/filter by relevant date/time, capacity, location, accessibility, layout, and facilities.
+
+**[Team decision pending]** If no exact match exists, either return no results or show partial matches with clear suitability warnings.
+
+### 11. Venue Suitability Checking
+
+**[Customer-confirmed]** Evaluate attendance versus capacity, date/time availability, layout, accessibility, and required facilities. Capacity overflow is blocking. Numeric accessibility scoring is not required; tags/booleans are acceptable.
+
+**[Unresolved]** Missing-facility block versus warning behaviour is not fully specified.
+
+### 12. Venue Booking Request
+
+**[Customer-confirmed]** Event Coordinators request suitable venues during Planning. Tentative holds prevent another event holding the same venue/time.
+
+### 13. Venue Booking Approval
+
+**[Customer-confirmed]** Venue Staff approve, reject, or suggest alternatives; no partial approval. Rejection keeps/returns the event to Planning. There is no fixed SLA.
+
+### 14. Booking Conflict Detection
+
+**[Customer-confirmed]** Any overlap, even one second, is incompatible and blocked. There is no override. Simultaneous conflicts are first-come, first-served.
+
+### 15. Equipment Request Management
+
+**[Customer-confirmed]** Organisers record preliminary equipment needs. Coordinators and Technical Support Staff review/refine them. Technical staff approve or reject according to requested staff/equipment availability.
+
+### 16. Equipment Availability Checking
+
+**[Customer-confirmed]** Check requested type/quantity for the event time. Equipment modelling by quantity/type versus individual asset ID is a team choice.
+
+### 17. Equipment Reservation
+
+**[Customer-confirmed]** Fulfilment is all-or-nothing. Conflicts or breakdowns are flagged for manual resolution; automatic substitutes are not required. Transit/setup buffers may be zero.
+
+### 18. Attendee Registration
+
+**[Customer-confirmed]** The Organiser configures whether/when registration is open. A person must register to attend, though attendee-facing information may remain visible without registration. Capacity is capped at the event/venue maximum. Waiting-list priority is first-come, first-served; the next person is invited to apply rather than automatically registered.
+
+**[Team decision pending]** Registration form fields, QR/link/form mechanism, withdrawal rules, waitlist acceptance window, and detailed consent flow.
+
+### 19. Event Change Requests
+
+**[Customer-confirmed]** Significant changes—date/time, duration, attendance, venue/layout, or equipment—trigger re-review. If essential changes cannot be met, return for modification or reject. Post-confirmation changes do not automatically unbook existing arrangements.
+
+### 20. Notification System
+
+**[Customer-confirmed]** Notify affected users about material changes, cancellations, availability failures, waiting-list opportunities, and relevant actions.
+
+**[Team decision pending]** Select channels, delivery preferences, acknowledgement, and optional mentions. Offline communication may be manually recorded as event comments.
+
+## 6. Cancellation and Reservation Release
+
+**[Customer-confirmed]** Rejection applies when requirements cannot be met before confirmation. Cancellation applies to an approved/confirmed event. An Organiser may request cancellation and the Coordinator may approve or reject it. Session 2 also permits Coordinator-initiated cancellation for a stated reason. No fixed time boundary exists.
+
+**[Customer-confirmed]** Cancellation releases committed venue/equipment reservations and notifies registered Attendees.
+
+## 7. Quality and Non-Functional Requirements
+
+- **[Customer-confirmed]** Desktop- and mobile-friendly UI.
+- **[Customer-confirmed]** Clear status, arrangements, and outstanding actions for appropriate users.
+- **[Customer-confirmed]** Common operations complete in a reasonable time; no numeric target exists.
+- **[Customer-confirmed]** Consistent information across events, bookings, equipment, and registration.
+- **[Customer-confirmed]** Support anticipated three-year growth; no numeric sizing target exists.
+- **[Customer-confirmed]** Important actions are auditable.
+- **[Customer-confirmed]** Future functionality and rules should be addable without rebuilding the system.
+- **[Course-required]** Tests must be traceable to stories/acceptance criteria and cover appropriate normal, boundary, conflict, and failure scenarios.
+- **[Course-required]** Maintain modular code and a working CI pipeline where used.
+
+## 8. Explicitly Out of Scope or Not Required
+
+- System Administrator role
+- financial transactions, pricing, invoices, and cancellation fees
+- predictive machine learning or external surveys
+- detailed Technical Support schedules, specialisation, and workload planning
+- automatic venue/equipment replacement
+- staff override of booking conflicts or mandatory readiness approvals
+- transport/setup/turnaround calculations
+- fixed workflow SLAs unless adopted as a team decision
+- Google SSO unless explicitly restored by the team
+- draft deletion in Sprint 1
+- ADRs as a current documentation requirement
+- Jira
+
+## 9. Decisions Still Required
+
+Before implementing affected functionality, resolve and record:
+
+1. Approved versus Confirmed state model.
+2. Official Sprint 1 start date: 13 or 14 September 2026.
+3. Same-organisation Organiser visibility.
+4. Exact multi-role storage and permission evaluation model.
+5. Coordinator assignment algorithm.
+6. Missing venue-facility block/warning policy.
+7. Venue partial-match behaviour.
+8. Notification channels and preferences.
+9. Whether to retain the six-character password minimum as a team security choice.
+10. Whether SPM-42 should be split if all five role surfaces cannot be delivered in Sprint 1.
