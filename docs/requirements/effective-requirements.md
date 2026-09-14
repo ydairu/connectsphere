@@ -105,12 +105,27 @@ Sprint 1 focuses on the first three functionality areas and contains seven stori
 
 - users only view records permitted by role and event relationship;
 - users only edit fields/sections permitted by role;
-- Event Organisers view their own requests and organisation events, but edit only owned requests;
-- Event Coordinators view relevant assigned events and edit main event details;
-- Venue Staff update venue sections for relevant events;
-- Technical Support Staff update equipment/technical sections for relevant events;
+- direct-link and API attempts to reach unauthorised information are denied; an interface-level restriction alone does not satisfy this;
+- Event Organisers view their own requests and their organisation's events, matched on the **company ID** supplied at registration, and cannot view another organisation's events (Clarification 1, Accounts & Registration: organisers register with "name, company name, and company ID");
+- Event Organisers edit only requests they own, and **cannot edit a request they own once it has been submitted**, unless the Event Coordinator returned it for clarification or changes (Clarification 2, Role Permissions & Access);
+- Event Coordinators have **full system visibility and can edit the full event** (Clarification 1: "Event coordinator: full system visibility"; Clarification 2: "Can edit the full event"), with one exception — a draft that has never been submitted;
+- Venue Staff view and update the venue section of relevant events and cannot see the equipment section; Technical Support Staff view and update the equipment/technical section and cannot see the venue section (Clarification 1: the two "operate independently"; the restriction is stated there on view, not only update);
 - Attendees see attendee-facing information but not internal planning information;
-- multi-role users receive combined permissions.
+- multi-role users receive combined permissions — the union of what each assigned role independently permits, evaluated per role rather than by combining roles before the record and status checks.
+
+**Correction note (14 Sep 2026, Shaun):** two bullets previously in this section were the SPM-42
+backlog card's original wording rather than the clarification record, and were narrower than the
+customer's ruling — "Event Coordinators view relevant assigned events and edit main event details"
+(the customer granted full visibility and full edit), and an Organiser edit rule carrying no status
+condition (the customer barred editing after submission). Corrected under AGENTS.md §2, where a later
+customer clarification outranks a backlog record. The chronological session records are unchanged, per
+§8.
+
+**[Unresolved ambiguity]** Two rulings that bear on this story have no home in this document yet, and
+belong to sections this story does not own:
+
+- **§6 Event Status Management** presents the lifecycle as settled at "Draft, Submitted". Clarification 1's transcript is explicit that the status on submission is *Requested*; Clarification 2's summary says *Submitted*. Both written course documents — the Week 1 Customer Briefing and the Week 4 Project Instructions — list "submitted" in their status examples, so *Submitted* is the better-supported reading, but the team has not ratified it. SPM-42's state gate and SPM-24's queries are both written to test only `draft`, so neither breaks either way; the workbook and §6 should still record the decision.
+- **§5 Coordinator Assignment** does not record that after a handover "the previous coordinator retains read-only access" (Clarification 2, Event Coordinator Assignment). This is a record-scope rule and shapes the assignment data model SPM-42 reads, so a single `coordinatorUid` field would need migrating later.
 
 **[Boundary]** SPM-42 cannot be Done until all named roles and their relevant information surfaces exist and are tested. If Sprint 1 implements only Event Organiser behaviour, the story must be split or remain incomplete.
 
@@ -164,9 +179,13 @@ The current backlog says a draft remains until submitted or deleted. Deletion it
 
 **[Customer-confirmed]** Organisers must be able to return to and continue editing saved drafts, and drafts must remain distinguishable from submitted requests.
 
-**[Team decision]** Use a dedicated Drafts page/section. Selecting an owned draft opens it in edit mode with retained data. Submitted requests show their current status and are not editable as drafts. Unsubmitted drafts remain invisible to staff.
+**[Customer-confirmed]** Drafts are strictly private until submitted and do not expire. An unsubmitted draft is not visible to **any** other user — Event Coordinators included, and also other Event Organisers in the same organisation (Clarification 2, Drafts: "strictly private until submitted"; transcript: "it's not visible to anyone unless I submit it"). Enforcement is SPM-42's record-scope predicate; this story covers the observable behaviour of the drafts list.
+
+**[Team decision]** Use a dedicated Drafts page/section rather than a combined list — the customer left list-versus-page to the team, so only one is built. Selecting an owned draft opens it for editing. Submitted requests show their current status and are not editable as drafts. An Organiser with no saved drafts is told so rather than shown a blank screen.
 
 **[Team decision]** Filtering is optional convenience, not a customer requirement.
+
+**[Boundary]** That reopening a draft retains all previously entered data is SPM-4's acceptance criterion, not this story's. SPM-24 covers navigation from the list into the draft; duplicating the retention claim here would restate a sibling story.
 
 ### Overlap and Deferred Records
 
