@@ -22,6 +22,7 @@ export function createApp({ authenticate = firebaseAuthenticate, eventRequestSto
   })
 
   app.use('/api/health', healthRoutes)
+  app.use('/api/event-requests', eventRequestRoutes)
   app.use('/api/profile', profileRoutes)
   app.use('/api/requests', createRequestRoutes({ authenticate, store: eventRequestStore }))
 
