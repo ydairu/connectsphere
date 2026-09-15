@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ORGANISER } from '../../../shared/permissions.js'
 import { normaliseEventRequestInput } from '../../../shared/eventRequest.js'
@@ -79,10 +79,21 @@ function CreateEventRequestPage() {
   const [form, setForm] = useState(initialForm)
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState({ type: null, message: '' })
+  const [toast, setToast] = useState({ title: '', message: '' })
   const [saving, setSaving] = useState(false)
   const [savedRequestId, setSavedRequestId] = useState(null)
 
   const isOrganiser = useMemo(() => roles.includes(ORGANISER), [roles])
+
+  useEffect(() => {
+    if (!toast.message) return undefined
+
+    const timer = window.setTimeout(() => {
+      setToast({ title: '', message: '' })
+    }, 5000)
+
+    return () => window.clearTimeout(timer)
+  }, [toast.message])
 
   function updateField(event) {
     const { name, type, checked, value } = event.target
@@ -113,11 +124,12 @@ function CreateEventRequestPage() {
         : await createEventRequest(user, payload)
 
       setSavedRequestId(eventRequest.id)
-      setStatus({
-        type: 'success',
+      setStatus({ type: null, message: '' })
+      setToast({
+        title: savedRequestId ? 'Changes saved' : 'Draft saved',
         message: savedRequestId
           ? 'Your draft changes have been saved.'
-          : 'Your event request has been saved as an unsubmitted draft. You can keep editing it here.',
+          : 'Your event request has been saved as a draft. You can continue editing it on this page.',
       })
     } catch (error) {
       const apiErrors = error.details?.errors
@@ -194,6 +206,15 @@ function CreateEventRequestPage() {
           </div>
         </form>
       </main>
+      {toast.message && (
+        <div className="toast" role="status" aria-live="polite">
+          <div>
+            <strong>{toast.title}</strong>
+            <span>{toast.message}</span>
+          </div>
+          <button type="button" aria-label="Dismiss notification" onClick={() => setToast({ title: '', message: '' })}>Close</button>
+        </div>
+      )}
     </div>
   )
 }

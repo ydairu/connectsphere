@@ -109,6 +109,11 @@ a { color: inherit; }
 .checkbox-field { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; color: var(--ink); font-weight: 600; }
 .checkbox-field input { width: 18px; height: 18px; accent-color: var(--accent); }
 .form-actions { display: flex; justify-content: flex-end; padding-top: 8px; }
+.toast { position: fixed; right: 24px; bottom: 24px; z-index: 10; display: flex; align-items: flex-start; gap: 18px; width: min(420px, calc(100% - 40px)); padding: 16px; border: 1px solid #c8e4d0; border-radius: 14px; background: #f3fbf5; color: var(--ink); box-shadow: 0 16px 40px rgba(23, 32, 28, 0.14); }
+.toast div { display: flex; flex-direction: column; gap: 4px; }
+.toast strong { color: #1f6b4f; }
+.toast span { color: var(--muted); line-height: 1.45; }
+.toast button { margin-left: auto; border: 0; background: transparent; color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
 
 @media (max-width: 700px) {
   .container { width: min(100% - 28px, 1120px); }
@@ -124,4 +129,5 @@ a { color: inherit; }
   .profile-heading { align-items: flex-start; flex-direction: column; }
   .profile-card { grid-template-columns: 1fr; padding: 24px; }
   .profile-row { grid-template-columns: 1fr; gap: 6px; }
+  .toast { right: 14px; bottom: 14px; width: calc(100% - 28px); }
 }
