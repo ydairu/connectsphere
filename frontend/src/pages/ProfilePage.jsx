@@ -5,9 +5,10 @@ import Card from '../components/Card.jsx'
 import Navbar from '../components/Navbar.jsx'
 import RoleBadge from '../components/RoleBadge.jsx'
 import { useAuth } from '../hooks/useAuth.js'
+import { roleLabel } from '../utils/roleLabels.js'
 
 function ProfilePage() {
-  const { user, userProfile, logout } = useAuth()
+  const { user, userProfile, roles, logout } = useAuth()
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -40,7 +41,7 @@ function ProfilePage() {
           <div>
             <span className="eyebrow">Your account</span>
             <h1>Profile</h1>
-            <p>Your account details and access role.</p>
+            <p>Your account details and access roles.</p>
           </div>
           <Button variant="secondary" onClick={handleLogout} disabled={loggingOut}>{loggingOut ? 'Logging out…' : 'Log out'}</Button>
         </div>
@@ -49,7 +50,19 @@ function ProfilePage() {
           <div className="profile-details">
             <div className="profile-row"><span>Name</span><strong>{userProfile.name}</strong></div>
             <div className="profile-row"><span>Email</span><strong>{userProfile.email || user.email}</strong></div>
-            <div className="profile-row"><span>Role</span><div className="role-value"><strong>{userProfile.role === 'organiser' ? 'Event Organiser' : 'Attendee'}</strong><RoleBadge role={userProfile.role} /></div></div>
+            <div className="profile-row">
+              <span>{roles.length === 1 ? 'Role' : 'Roles'}</span>
+              <div className="role-value">
+                {roles.length === 0 ? (
+                  <strong>No role assigned</strong>
+                ) : (
+                  <>
+                    <strong>{roles.map(roleLabel).join(', ')}</strong>
+                    {roles.map((role) => <RoleBadge key={role} role={role} />)}
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </Card>
       </main>

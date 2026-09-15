@@ -1,3 +1,4 @@
+import { rolesOf } from '../../../shared/permissions.js'
 import { getAdminAuth, getAdminDb } from '../config/firebaseAdmin.js'
 
 export async function authenticate(req, res, next) {
@@ -22,7 +23,12 @@ export async function authenticate(req, res, next) {
     req.user = {
       uid: decodedToken.uid,
       email: profile.email || decodedToken.email,
-      role: profile.role,
+      // SPM-42: a user may hold several roles. rolesOf() reads `roles ?? [role]`, so single-role
+      // profiles written before the migration keep working. There is deliberately no singular `role`.
+      roles: rolesOf(profile),
+      // Organisation scoping reads the company ID, never the name (SPM-42, Clarification 1).
+      organisationId: profile.organisationId ?? null,
+      organisationName: profile.organisationName ?? null,
       name: profile.name,
     }
     return next()
@@ -33,4 +39,3 @@ export async function authenticate(req, res, next) {
     return res.status(401).json({ message: 'Unauthorized' })
   }
 }
-
