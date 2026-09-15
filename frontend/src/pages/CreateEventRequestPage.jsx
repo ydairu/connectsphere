@@ -7,7 +7,7 @@ import Card from '../components/Card.jsx'
 import Input from '../components/Input.jsx'
 import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
-import { createEventRequest } from '../services/api.js'
+import { createEventRequest, updateEventRequest } from '../services/api.js'
 
 const initialForm = {
   title: '',
@@ -80,6 +80,7 @@ function CreateEventRequestPage() {
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState({ type: null, message: '' })
   const [saving, setSaving] = useState(false)
+  const [savedRequestId, setSavedRequestId] = useState(null)
 
   const isOrganiser = useMemo(() => roles.includes(ORGANISER), [roles])
 
@@ -107,10 +108,16 @@ function CreateEventRequestPage() {
     setErrors({})
     setSaving(true)
     try {
-      const { eventRequest } = await createEventRequest(user, payload)
+      const { eventRequest } = savedRequestId
+        ? await updateEventRequest(user, savedRequestId, payload)
+        : await createEventRequest(user, payload)
+
+      setSavedRequestId(eventRequest.id)
       setStatus({
         type: 'success',
-        message: `Request saved as draft. Reference: ${eventRequest.id}`,
+        message: savedRequestId
+          ? 'Your draft changes have been saved.'
+          : 'Your event request has been saved as an unsubmitted draft. You can keep editing it here.',
       })
     } catch (error) {
       const apiErrors = error.details?.errors
@@ -183,7 +190,7 @@ function CreateEventRequestPage() {
           </Card>
 
           <div className="form-actions">
-            <Button type="submit" disabled={saving}>{saving ? 'Saving request...' : 'Save unsubmitted request'}</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Saving request...' : savedRequestId ? 'Save changes' : 'Save unsubmitted request'}</Button>
           </div>
         </form>
       </main>

@@ -46,3 +46,10 @@ export function createEventRequest(user, eventRequest) {
     body: JSON.stringify(eventRequest),
   })
 }
+
+export function updateEventRequest(user, id, eventRequest) {
+  return authenticatedRequest(user, `/api/event-requests/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(eventRequest),
+  })
+}
