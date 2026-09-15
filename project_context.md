@@ -65,9 +65,9 @@ Observed facts:
 - Public employee self-registration is currently enabled in the prototype.
 - A Firestore user profile currently stores one `role` value.
 - Frontend role checks and backend `requireRole` middleware evaluate one role.
-- The only protected frontend product route is `/profile`.
-- The backend currently exposes an authenticated profile route.
-- No event request, draft, submission, or five-role workflow was found in the inspected tracked files.
+- The protected frontend product routes include `/profile` and `/event-requests/new`.
+- The backend exposes authenticated profile and event-request create/update routes.
+- SPM-7 event request creation has an implemented draft-based create path; SPM-3 submission, SPM-4 draft workflow completion, SPM-24 draft listing/resume, and the full five-role workflow remain separate Sprint 1 scope items.
 
 Required correction before claiming full Sprint 1 completion:
 

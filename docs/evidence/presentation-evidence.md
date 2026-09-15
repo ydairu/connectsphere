@@ -71,6 +71,18 @@ Add a row only when there is an inspectable artefact. If the artefact is incompl
 - Sprint scope, estimates, ownership, capacity reasoning, decisions, and known inconsistencies: [`project_context.md`](../../project_context.md)
 - Repository operating and evidence rules: [`AGENTS.md`](../../AGENTS.md)
 - Existing implementation baseline: [`frontend/src/`](../../frontend/src/) and [`backend/src/`](../../backend/src/)
+- SPM-7 create event request implementation: [`shared/eventRequest.js`](../../shared/eventRequest.js), [`backend/src/services/eventRequestService.js`](../../backend/src/services/eventRequestService.js), [`backend/src/routes/eventRequestRoutes.js`](../../backend/src/routes/eventRequestRoutes.js), [`frontend/src/pages/CreateEventRequestPage.jsx`](../../frontend/src/pages/CreateEventRequestPage.jsx)
+- SPM-7 test evidence: [`shared/eventRequest.test.js`](../../shared/eventRequest.test.js), [`backend/src/services/eventRequestService.test.js`](../../backend/src/services/eventRequestService.test.js)
+
+**SPM-7 acceptance evidence**
+
+- Event Organisers can create an unsubmitted event request with core, venue/layout, accessibility, equipment, and registration fields.
+- Created requests are stored with `status: draft`, authenticated `ownerUid`, organisation metadata where available, and no staff assignment.
+- Create/edit actions do not submit the request or start staff review; `SPM-3` submission and downstream staff workflow remain outside this evidence item.
+- Format validation covers positive attendance, positive duration, and valid date/time while allowing incomplete unsubmitted requests.
+- Ownership and role checks are enforced in the backend route/service; a user cannot create or edit a request as another owner.
+- Manual check completed on the running app: an Event Organiser saved a request, changed a field on the same page, saved again, and confirmed the same draft was updated rather than creating a duplicate.
+- Verification commands run: `npm test`, `npm run lint --prefix frontend`, and `npm run build --prefix frontend`.
 
 **Evidence still required before Sprint 1 can be represented as completed**
 

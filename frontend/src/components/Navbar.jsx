@@ -1,8 +1,10 @@
 import { Link, NavLink } from 'react-router-dom'
+import { ORGANISER } from '../../../shared/permissions.js'
 import { useAuth } from '../hooks/useAuth.js'
 
 function Navbar() {
-  const { user } = useAuth()
+  const { user, roles } = useAuth()
+  const isOrganiser = roles.includes(ORGANISER)
 
   return (
     <header className="site-header">
@@ -13,7 +15,10 @@ function Navbar() {
         </Link>
         <div className="nav-actions">
           {user ? (
-            <NavLink className="button button-secondary button-small" to="/profile">Profile</NavLink>
+            <>
+              {isOrganiser && <NavLink className="nav-link" to="/event-requests/new">Create request</NavLink>}
+              <NavLink className="button button-secondary button-small" to="/profile">Profile</NavLink>
+            </>
           ) : (
             <>
               <NavLink className="nav-link" to="/login">Log in</NavLink>
@@ -27,4 +32,3 @@ function Navbar() {
 }
 
 export default Navbar
-

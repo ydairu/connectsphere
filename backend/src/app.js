@@ -1,6 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import { env } from './config/env.js'
+import eventRequestRoutes from './routes/eventRequestRoutes.js'
 import { authenticate as firebaseAuthenticate } from './middleware/authenticate.js'
 import healthRoutes from './routes/healthRoutes.js'
 import profileRoutes from './routes/profileRoutes.js'
