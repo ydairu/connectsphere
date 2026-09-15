@@ -8,6 +8,7 @@ import {
   updateProfile,
 } from 'firebase/auth'
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { rolesOf } from '../../../shared/permissions.js'
 import { auth, db } from '../services/firebase.js'
 import { AuthContext } from './auth-context.js'
 
@@ -61,7 +62,9 @@ export function AuthProvider({ children }) {
     try {
       await updateProfile(credential.user, { displayName: name })
 
-      const profile = { name, email, role }
+      // `roles` is the SPM-42 shape; `role` is still written so branches that read it keep working
+      // until the roles migration has run everywhere.
+      const profile = { name, email, role, roles: [role] }
       await setDoc(doc(db, 'users', credential.user.uid), {
         ...profile,
         createdAt: serverTimestamp(),
@@ -82,7 +85,8 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       userProfile,
-      role: userProfile?.role ?? null,
+      // A user may hold several roles (SPM-42). Presentation only — the API enforces access.
+      roles: rolesOf(userProfile),
       loading,
       login,
       register,

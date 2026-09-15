@@ -53,8 +53,12 @@ const SECTION_ACCESS = Object.freeze({
   [ATTENDEE]: { view: [CORE], edit: [] },
 })
 
-// "Venue / Technical staff — planning onwards" — plan, "State gate".
-const STAFF_EDITABLE_STATUSES = Object.freeze([PLANNING, CONFIRMED, COMPLETED, CANCELLED, REJECTED])
+// Finished events are read-only for every role. Not a customer ruling: proposed by Shaun (14 Sep 2026)
+// and pending team ratification — effective-requirements.md, SPM-42 "[Team decision pending]".
+const FINISHED_STATUSES = Object.freeze([COMPLETED, CANCELLED, REJECTED])
+
+// "Venue / Technical staff — planning onwards" — plan, "State gate" — up to, not past, a finished event.
+const STAFF_EDITABLE_STATUSES = Object.freeze([PLANNING, CONFIRMED])
 
 // --- Role set -------------------------------------------------------------------------------------
 
@@ -126,7 +130,9 @@ function roleInScope(role, user, request) {
     case TECHNICAL_STAFF:
       return (request.assignedStaffUids ?? []).includes(user.uid)
     case ATTENDEE:
-      return request.registration?.enabled === true
+      // Confirmed events only — proposed by Shaun (14 Sep 2026), pending team ratification. The
+      // registration condition is kept as it was; how registration works is deferred (SPM-42 section).
+      return request.status === CONFIRMED && request.registration?.enabled === true
     default:
       return false
   }
@@ -141,7 +147,8 @@ function roleInScope(role, user, request) {
  *  - Organisers see their own organisation's events only, by company ID. — Clarification 1
  *  - Coordinator: full system visibility, drafts excepted. — Clarification 1 & 2
  *  - Venue/technical staff: assigned events, never drafts. — plan, "Role capability"
- *  - Attendee: events with registration enabled. — plan, "Role capability"
+ *  - Attendee: confirmed events with registration enabled. — plan, "Role capability", narrowed to
+ *    confirmed by team decision pending ratification (effective-requirements.md, SPM-42)
  */
 export function inScope(user, request) {
   return rolesOf(user).some((role) => roleInScope(role, user, request))
@@ -150,6 +157,10 @@ export function inScope(user, request) {
 // --- State gate -----------------------------------------------------------------------------------
 
 function roleGateOpen(role, user, request) {
+  // Applies to every role, the coordinator included. Status transitions are separate actions and never
+  // pass through this gate.
+  if (FINISHED_STATUSES.includes(request.status)) return false
+
   switch (role) {
     case ORGANISER:
       // "After an event is submitted, the organizer cannot edit it unless the coordinator requests
@@ -157,7 +168,7 @@ function roleGateOpen(role, user, request) {
       // Owner only: a same-organisation colleague is view-only ("can modify only their own").
       return isOwner(user, request) && (request.status === DRAFT || request.status === RETURNED)
     case COORDINATOR:
-      // "Coordinator — anything but draft." — plan, "State gate"
+      // "Coordinator — anything but draft." — plan, "State gate". Finished events are closed above.
       return request.status !== DRAFT
     case VENUE_STAFF:
     case TECHNICAL_STAFF:
@@ -172,6 +183,8 @@ function roleGateOpen(role, user, request) {
  *
  * Implements the status criterion the plan adds to SPM-42 (Correction 1): an organiser cannot edit
  * their own request once submitted, unless it was returned for clarification. — Clarification 2
+ * Also: completed, cancelled and rejected events are read-only for every role — team decision pending
+ * ratification (effective-requirements.md, SPM-42).
  */
 export function stateGateOpen(user, request) {
   return rolesOf(user).some((role) => roleGateOpen(role, user, request))

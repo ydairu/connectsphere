@@ -44,12 +44,27 @@ connectsphere/
 
 1. A user registers or logs in through Firebase Authentication.
 2. The user's Firebase UID identifies their document at `users/{uid}` in Firestore.
-3. That document stores their name, email, role, and creation timestamp.
+3. That document stores their name, email, roles, and creation timestamp. Organiser accounts also store `organisationId` and `organisationName`.
 4. `AuthContext` restores sessions and loads the Firestore profile before protected pages render.
 5. The frontend can send a Firebase ID token to the Express API.
-6. The backend verifies the token and reads the user's trusted role from Firestore.
+6. The backend verifies the token and reads the user's trusted roles from Firestore.
 
-Supported roles are `attendee` and `organiser`. Frontend role checks control presentation only; protected backend operations must enforce roles through authentication middleware.
+The five roles are `organiser`, `coordinator`, `venue_staff`, `technical_staff` and `attendee`, defined in `shared/permissions.js`. A user may hold several (`roles: string[]`) and receives the union of what each role permits. Profiles written before the roles migration hold a single `role` string and are still read correctly. Frontend role checks control presentation only; protected backend operations must enforce roles through authentication middleware.
+
+## Tests
+
+```bash
+npm test
+```
+
+Runs the `node:test` suites in `shared/`, `backend/src/` and `backend/scripts/`. No test dependencies are required.
+
+## Data Scripts
+
+Both scripts write to the Firebase project in the root `.env`. They print that project ID first, default to a dry run, and write only with `--write --project=<projectId>`, where the ID must match the configured project.
+
+- **Roles migration** — `node backend/scripts/migrate-user-roles.js [--organisations=<file.json>]` backfills `users/{uid}`: `role` → `roles[]`, plus `organisationId`/`organisationName` for organisers, taken from an organisations file the team supplies (see the script header). It never invents an organisation and never removes `role`. Idempotent.
+- **Seed** — `node backend/scripts/seed.js` creates demonstration accounts for all five roles (plus a venue + technical staff account), two organisations, and event requests in every status. Requires `SEED_ACCOUNT_PASSWORD` for `--write`. Idempotent. Every seeded Auth user and document has an ID starting `seed-` and a `seedTag` field, so seeded data can be found and removed without touching real accounts.
 
 ## Local Setup
 

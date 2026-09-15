@@ -10,6 +10,9 @@ export default defineConfig({
   envDir: path.resolve(directoryName, '..'),
   server: {
     port: 5173,
+    // shared/ (permissions, statuses) sits beside frontend/, outside Vite's default allow list.
+    // Vite's server.fs.deny (.env, .env.*, *.{crt,pem}, .git) still applies on top of this.
+    fs: { allow: [path.resolve(directoryName, '..')] },
   },
 })
 
