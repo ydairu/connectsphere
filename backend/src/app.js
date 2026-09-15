@@ -1,6 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import { env } from './config/env.js'
+import eventRequestRoutes from './routes/eventRequestRoutes.js'
 import healthRoutes from './routes/healthRoutes.js'
 import profileRoutes from './routes/profileRoutes.js'
 
@@ -15,6 +16,7 @@ app.use('/api', (_req, res, next) => {
 })
 
 app.use('/api/health', healthRoutes)
+app.use('/api/event-requests', eventRequestRoutes)
 app.use('/api/profile', profileRoutes)
 
 app.use((_req, res) => {
