@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ORGANISER } from '../../../shared/permissions.js'
 import { normaliseEventRequestInput } from '../../../shared/eventRequest.js'
 import Button from '../components/Button.jsx'
@@ -99,6 +99,7 @@ function Checkbox({ id, label, ...props }) {
 
 function CreateEventRequestPage() {
   const { user, roles } = useAuth()
+  const navigate = useNavigate()
   const { id: routeRequestId } = useParams()
   const [form, setForm] = useState(initialForm)
   const [errors, setErrors] = useState({})
@@ -179,15 +180,19 @@ function CreateEventRequestPage() {
     setErrors({})
     setSaving(true)
     try {
+      const wasEditingSavedDraft = Boolean(savedRequestId)
       const { eventRequest } = savedRequestId
         ? await updateEventRequest(user, savedRequestId, payload)
         : await createEventRequest(user, payload)
 
       setSavedRequestId(eventRequest.id)
+      if (!wasEditingSavedDraft) {
+        navigate(`/event-requests/${eventRequest.id}/edit`, { replace: true })
+      }
       setStatus({ type: null, message: '' })
       setToast({
-        title: savedRequestId ? 'Changes saved' : 'Draft saved',
-        message: savedRequestId
+        title: wasEditingSavedDraft ? 'Changes saved' : 'Draft saved',
+        message: wasEditingSavedDraft
           ? 'Your draft changes have been saved.'
           : 'Your event request has been saved as a draft. You can continue editing it on this page.',
       })
