@@ -15,6 +15,7 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/event-requests/new" element={<CreateEventRequestPage />} />
+        <Route path="/event-requests/:id/edit" element={<CreateEventRequestPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
