@@ -47,6 +47,10 @@ export function createEventRequest(user, eventRequest) {
   })
 }
 
+export function getEventRequest(user, id) {
+  return authenticatedRequest(user, `/api/event-requests/${id}`)
+}
+
 export function updateEventRequest(user, id, eventRequest) {
   return authenticatedRequest(user, `/api/event-requests/${id}`, {
     method: 'PATCH',

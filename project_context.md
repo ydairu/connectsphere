@@ -52,7 +52,7 @@ Tracked application routes currently include:
 - `/register`
 - protected `/profile`
 
-The root package provides development and frontend build commands. The frontend package provides build and lint commands. No automated test scripts or CI workflow are currently present in the tracked repository.
+The root package provides development, frontend build, and shared/backend test commands. The frontend package provides build and lint commands. No CI workflow is currently present in the tracked repository.
 
 ## Independently Observed Implementation State
 
@@ -65,9 +65,11 @@ Observed facts:
 - Public employee self-registration is currently enabled in the prototype.
 - A Firestore user profile currently stores one `role` value.
 - Frontend role checks and backend `requireRole` middleware evaluate one role.
-- The protected frontend product routes include `/profile` and `/event-requests/new`.
-- The backend exposes authenticated profile and event-request create/update routes.
-- SPM-7 event request creation has an implemented draft-based create path; SPM-3 submission, SPM-4 draft workflow completion, SPM-24 draft listing/resume, and the full five-role workflow remain separate Sprint 1 scope items.
+- The protected frontend product routes include `/profile`, `/event-requests/new`, and `/event-requests/:id/edit`.
+- The backend exposes authenticated profile and event-request create/update/load routes.
+- SPM-7 event request creation has an implemented draft-based create path.
+- SPM-4 draft saving and same-draft editing has been implemented for owned unsubmitted drafts through the direct edit route; the full SPM-24 draft list/page remains a separate Sprint 1 scope item.
+- SPM-3 submission and downstream staff review remain separate Sprint 1 scope items.
 
 Required correction before claiming full Sprint 1 completion:
 
@@ -77,7 +79,7 @@ Required correction before claiming full Sprint 1 completion:
 - the five customer roles must replace the generic `employee` model;
 - multiple roles per user and the union of their permissions must be supported if SPM-42 remains unchanged;
 - record-, ownership-, and field/section-level authorisation must be enforced and tested;
-- event request and draft flows must be implemented for SPM-3, SPM-4, SPM-7, and SPM-24.
+- event request submission and draft listing/resume navigation must still be completed for SPM-3 and SPM-24.
 
 README statements about completed authentication behaviour should therefore be treated as prototype claims until they are reconciled with the current backlog and verified through tests.
 

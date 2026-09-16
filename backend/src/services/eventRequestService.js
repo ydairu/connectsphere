@@ -32,6 +32,19 @@ export async function createDraftEventRequest(input, organiser, db = getAdminDb(
   return { id: docRef.id, ...request }
 }
 
+export async function getOwnedDraftEventRequest(id, organiser, db = getAdminDb()) {
+  const docRef = db.collection('eventRequests').doc(id)
+  const snapshot = await docRef.get()
+
+  if (!snapshot.exists) throw new EventRequestNotFoundError()
+
+  const existing = snapshot.data()
+  if (existing.ownerUid !== organiser.uid) throw new EventRequestForbiddenError()
+  if (existing.status !== DRAFT) throw new EventRequestForbiddenError('Only unsubmitted draft requests can be opened.')
+
+  return { id, ...existing }
+}
+
 export async function updateDraftEventRequest(id, input, organiser, db = getAdminDb()) {
   const docRef = db.collection('eventRequests').doc(id)
   const snapshot = await docRef.get()
