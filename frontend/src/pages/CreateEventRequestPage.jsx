@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ORGANISER } from '../../../shared/permissions.js'
 import { normaliseEventRequestInput } from '../../../shared/eventRequest.js'
 import Button from '../components/Button.jsx'
@@ -7,7 +7,7 @@ import Card from '../components/Card.jsx'
 import Input from '../components/Input.jsx'
 import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
-import { createEventRequest, updateEventRequest } from '../services/api.js'
+import { createEventRequest, getEventRequest, updateEventRequest } from '../services/api.js'
 
 const initialForm = {
   title: '',
@@ -51,6 +51,29 @@ function toPayload(form) {
   }
 }
 
+function listToText(value) {
+  if (Array.isArray(value)) return value.join('\n')
+  return value ?? ''
+}
+
+function toForm(eventRequest) {
+  return {
+    title: eventRequest.core?.title ?? '',
+    purpose: eventRequest.core?.purpose ?? '',
+    description: eventRequest.core?.description ?? '',
+    expectedAttendees: eventRequest.core?.expectedAttendees?.toString() ?? '',
+    durationHours: eventRequest.core?.durationHours?.toString() ?? '',
+    preferredDateTime: eventRequest.core?.preferredDateTime ?? '',
+    layoutPreference: eventRequest.venue?.layoutPreference ?? '',
+    accessibilityRequired: eventRequest.venue?.accessibilityRequired ?? false,
+    accessibilityNeeds: eventRequest.venue?.accessibilityNeeds ?? '',
+    equipmentRequirements: listToText(eventRequest.equipment?.requirements),
+    technicalSupportNeeded: eventRequest.equipment?.technicalSupportNeeded ?? false,
+    registrationEnabled: eventRequest.registration?.enabled ?? false,
+    registrationNotes: eventRequest.registration?.notes ?? '',
+  }
+}
+
 function fieldError(errors, path) {
   return errors[path]
 }
@@ -76,14 +99,18 @@ function Checkbox({ id, label, ...props }) {
 
 function CreateEventRequestPage() {
   const { user, roles } = useAuth()
+  const navigate = useNavigate()
+  const { id: routeRequestId } = useParams()
   const [form, setForm] = useState(initialForm)
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState({ type: null, message: '' })
   const [toast, setToast] = useState({ title: '', message: '' })
   const [saving, setSaving] = useState(false)
-  const [savedRequestId, setSavedRequestId] = useState(null)
+  const [loadingDraft, setLoadingDraft] = useState(Boolean(routeRequestId))
+  const [savedRequestId, setSavedRequestId] = useState(routeRequestId ?? null)
 
   const isOrganiser = useMemo(() => roles.includes(ORGANISER), [roles])
+  const isEditingDraft = Boolean(routeRequestId)
 
   useEffect(() => {
     if (!toast.message) return undefined
@@ -94,6 +121,40 @@ function CreateEventRequestPage() {
 
     return () => window.clearTimeout(timer)
   }, [toast.message])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadDraft() {
+      if (!routeRequestId || !isOrganiser) return
+
+      setLoadingDraft(true)
+      setStatus({ type: null, message: '' })
+      try {
+        const { eventRequest } = await getEventRequest(user, routeRequestId)
+        if (!active) return
+        setForm(toForm(eventRequest))
+        setSavedRequestId(eventRequest.id)
+      } catch (error) {
+        if (!active) return
+        setStatus({
+          type: 'error',
+          message:
+            error.status === 403 || error.status === 404
+              ? 'This draft could not be opened. It may not exist, may already be submitted, or may belong to another organiser.'
+              : 'Could not load this draft. Please try again.',
+        })
+      } finally {
+        if (active) setLoadingDraft(false)
+      }
+    }
+
+    loadDraft()
+
+    return () => {
+      active = false
+    }
+  }, [isOrganiser, routeRequestId, user])
 
   function updateField(event) {
     const { name, type, checked, value } = event.target
@@ -119,15 +180,19 @@ function CreateEventRequestPage() {
     setErrors({})
     setSaving(true)
     try {
+      const wasEditingSavedDraft = Boolean(savedRequestId)
       const { eventRequest } = savedRequestId
         ? await updateEventRequest(user, savedRequestId, payload)
         : await createEventRequest(user, payload)
 
       setSavedRequestId(eventRequest.id)
+      if (!wasEditingSavedDraft) {
+        navigate(`/event-requests/${eventRequest.id}/edit`, { replace: true })
+      }
       setStatus({ type: null, message: '' })
       setToast({
-        title: savedRequestId ? 'Changes saved' : 'Draft saved',
-        message: savedRequestId
+        title: wasEditingSavedDraft ? 'Changes saved' : 'Draft saved',
+        message: wasEditingSavedDraft
           ? 'Your draft changes have been saved.'
           : 'Your event request has been saved as a draft. You can continue editing it on this page.',
       })
@@ -164,15 +229,20 @@ function CreateEventRequestPage() {
       <main className="request-page container">
         <div className="profile-heading">
           <div>
-            <span className="eyebrow">SPM-7</span>
-            <h1>Create Event Request</h1>
-            <p>Start an unsubmitted event request. Saving here does not submit it for staff review.</p>
+            <span className="eyebrow">{isEditingDraft ? 'SPM-4' : 'SPM-7'}</span>
+            <h1>{isEditingDraft ? 'Edit Draft Event Request' : 'Create Event Request'}</h1>
+            <p>
+              {isEditingDraft
+                ? 'Continue editing your unsubmitted draft. Saving here does not submit it for staff review.'
+                : 'Start an unsubmitted event request. Saving here does not submit it for staff review.'}
+            </p>
           </div>
           <Link className="button button-secondary" to="/profile">Back to profile</Link>
         </div>
 
         <form onSubmit={handleSubmit}>
           {status.message && <div className={`alert alert-${status.type}`}>{status.message}</div>}
+          {loadingDraft && <div className="alert alert-info">Loading saved draft...</div>}
 
           <Card className="request-form-section">
             <h2>Core Details</h2>
@@ -202,7 +272,9 @@ function CreateEventRequestPage() {
           </Card>
 
           <div className="form-actions">
-            <Button type="submit" disabled={saving}>{saving ? 'Saving request...' : savedRequestId ? 'Save changes' : 'Save unsubmitted request'}</Button>
+            <Button type="submit" disabled={saving || loadingDraft}>
+              {saving ? 'Saving request...' : savedRequestId ? 'Save changes' : 'Save unsubmitted request'}
+            </Button>
           </div>
         </form>
       </main>

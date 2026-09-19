@@ -9,6 +9,7 @@ import {
   createDraftEventRequest,
   EventRequestForbiddenError,
   EventRequestValidationError,
+  getOwnedDraftEventRequest,
   updateDraftEventRequest,
 } from './eventRequestService.js'
 
@@ -86,6 +87,58 @@ describe('SPM-7 — Event request service', () => {
     )
 
     assert.equal(db.store.size, 0)
+  })
+
+  test('loads an owned unsubmitted draft with all saved values retained', async () => {
+    const db = fakeDb({
+      'request-1': {
+        status: DRAFT,
+        ownerUid: organiser.uid,
+        organisationId: organiser.organisationId,
+        core: {
+          title: 'Saved draft',
+          purpose: 'Planning session',
+          expectedAttendees: 20,
+        },
+        venue: { layoutPreference: 'Classroom' },
+        equipment: { requirements: 'Projector' },
+        registration: { required: true, notes: 'Collect dietary notes' },
+      },
+    })
+
+    const draft = await getOwnedDraftEventRequest('request-1', organiser, db)
+
+    assert.equal(draft.id, 'request-1')
+    assert.equal(draft.status, DRAFT)
+    assert.equal(draft.ownerUid, organiser.uid)
+    assert.equal(draft.core.title, 'Saved draft')
+    assert.equal(draft.venue.layoutPreference, 'Classroom')
+    assert.equal(draft.equipment.requirements, 'Projector')
+    assert.equal(draft.registration.notes, 'Collect dietary notes')
+  })
+
+  test('rejects loading a draft owned by another organiser', async () => {
+    const db = fakeDb({
+      'request-1': {
+        status: DRAFT,
+        ownerUid: 'other-organiser',
+        core: { title: 'Private draft' },
+      },
+    })
+
+    await assert.rejects(() => getOwnedDraftEventRequest('request-1', organiser, db), EventRequestForbiddenError)
+  })
+
+  test('rejects loading a request that is no longer an unsubmitted draft', async () => {
+    const db = fakeDb({
+      'request-1': {
+        status: SUBMITTED,
+        ownerUid: organiser.uid,
+        core: { title: 'Submitted request' },
+      },
+    })
+
+    await assert.rejects(() => getOwnedDraftEventRequest('request-1', organiser, db), EventRequestForbiddenError)
   })
 
   test('allows the owner to update an unsubmitted draft without changing protected fields', async () => {
