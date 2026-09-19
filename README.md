@@ -1,6 +1,8 @@
 # ConnectSphere
 
-ConnectSphere is a full-stack event management foundation for attendees and Event Organisers. It currently provides account registration, login, persistent sessions, Firestore-backed roles, a protected profile page, and an authenticated Express API. Event management features will be added in later iterations.
+ConnectSphere is a full-stack event management foundation. It currently provides account registration, login, persistent sessions, Firestore-backed multi-role profiles, a protected profile page, and an authenticated Express API.
+
+Event requests are created through the API and stored in Firestore. The five-role permission model lives in `shared/permissions.js` and is enforced by the API, and Firestore security rules keep the browser out of the `eventRequests` collection. The pages for listing, opening and editing existing requests are not built yet.
 
 ## Technology Stack
 
@@ -26,16 +28,24 @@ connectsphere/
 │   ├── package.json
 │   └── vite.config.js
 ├── backend/
+│   ├── scripts/
 │   ├── src/
 │   │   ├── config/
 │   │   ├── controllers/
 │   │   ├── middleware/
 │   │   ├── routes/
 │   │   ├── services/
+│   │   ├── testing/
 │   │   └── utils/
 │   └── package.json
+├── shared/
+│   ├── eventRequest.js
+│   ├── permissions.js
+│   └── status.js
 ├── .env.example
 ├── .gitignore
+├── firebase.json
+├── firestore.rules
 ├── package.json
 └── README.md
 ```
@@ -51,13 +61,53 @@ connectsphere/
 
 The five roles are `organiser`, `coordinator`, `venue_staff`, `technical_staff` and `attendee`, defined in `shared/permissions.js`. A user may hold several (`roles: string[]`) and receives the union of what each role permits. Profiles written before the roles migration hold a single `role` string and are still read correctly. Frontend role checks control presentation only; protected backend operations must enforce roles through authentication middleware.
 
+## API
+
+All routes are under `/api` and, except the health check, require a Firebase ID token in an `Authorization: Bearer <token>` header.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Health check; no token required |
+| `GET` | `/api/profile` | The signed-in user's profile and roles |
+| `POST` | `/api/event-requests` | Event Organiser creates a draft request |
+| `PATCH` | `/api/event-requests/:id` | Event Organiser updates their own draft |
+| `GET` | `/api/requests` | Lists the requests in the user's scope |
+| `GET` | `/api/requests/:id` | One request, reduced to the sections the user may view |
+| `PATCH` | `/api/requests/:id` | Edits the sections the user's roles permit right now |
+
+`/api/requests` applies `shared/permissions.js` in `backend/src/middleware/authorise.js`: records outside a user's scope are not returned, sections a role may not view are absent from the response body rather than hidden, and a forbidden write is rejected with 403 naming each field. Status values are never editable through `PATCH`; status transitions will be separate routes.
+
+There are currently two route sets over the same collection, `/api/event-requests` for creation and `/api/requests` for permission-checked reads and edits. Merging them is an open item recorded in `AGENTS.md`.
+
+## Firestore Security Rules
+
+`firestore.rules` is deployed to the Firebase project. It:
+
+- denies the browser all access to `eventRequests`, so every read and edit goes through the API, which uses the Admin SDK and bypasses rules;
+- allows a signed-in user to read and update only their own `users/{uid}` document;
+- allows a profile to be created only with the `organiser` or `attendee` role, and blocks later changes to `roles`, `role`, `organisationId` and `organisationName`, so no user can grant themselves access.
+
+Editing the file changes nothing until it is deployed:
+
+```bash
+firebase deploy --only firestore:rules --project <FIREBASE_PROJECT_ID>
+```
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-Runs the `node:test` suites in `shared/`, `backend/src/` and `backend/scripts/`. No test dependencies are required.
+Runs the `node:test` suites in `shared/`, `backend/src/` and `backend/scripts/`. No test dependencies are required. The API suites send real HTTP requests to the Express app, with Firebase token verification and Firestore replaced by in-memory equivalents, so they are not database verification.
+
+The same API cases can also run against the real Firebase project, using real sign-ins for the seeded accounts:
+
+```bash
+LIVE_API_PROJECT=<FIREBASE_PROJECT_ID> npm run test:api:live --prefix backend
+```
+
+This needs the seed applied, plus `VITE_FIREBASE_API_KEY` and `SEED_ACCOUNT_PASSWORD`. It edits seeded requests and restores them; re-run the seed script after an interrupted run.
 
 ## Data Scripts
 
@@ -104,6 +154,9 @@ FIREBASE_PROJECT_ID=xxx
 FIREBASE_CLIENT_EMAIL=xxx
 FIREBASE_PRIVATE_KEY=xxx
 
+# Only needed to run the seed script with --write (backend/scripts/seed.js)
+SEED_ACCOUNT_PASSWORD=
+
 PORT=5000
 CLIENT_ORIGIN=http://localhost:5173
 ```
@@ -126,11 +179,21 @@ You can also run either application separately with `npm run dev:frontend` or `n
 
 ## Seed Accounts
 
-These credentials are for local prototype testing only:
+`backend/scripts/seed.js` creates these accounts for local testing and demonstrations. They all share the password in `SEED_ACCOUNT_PASSWORD`, which is never committed. The `.test` domain is reserved by RFC 6761, so no seeded address can reach a real inbox.
 
-| Role            | Email                   | Password         |
-| --------------- | ----------------------- | ---------------- |
-| Attendee        | `attendee1@gmail.com` | `Password123!` |
-| Event Organiser | `employee1@gmail.com` | `Password123!` |
+| Role | Email | Organisation |
+| --- | --- | --- |
+| Event Coordinator | `coordinator@seed.connectsphere.test` | — |
+| Venue Staff | `venue-staff@seed.connectsphere.test` | — |
+| Technical Support Staff | `technical-staff@seed.connectsphere.test` | — |
+| Venue + Technical Staff | `venue-technical-staff@seed.connectsphere.test` | — |
+| Attendee | `attendee@seed.connectsphere.test` | — |
+| Event Organiser | `organiser-a1@seed.connectsphere.test` | SEED-ORG-A |
+| Event Organiser | `organiser-a2@seed.connectsphere.test` | SEED-ORG-A |
+| Event Organiser | `organiser-b1@seed.connectsphere.test` | SEED-ORG-B |
 
-The accounts must exist in Firebase Authentication and have matching Firestore documents at `users/{uid}` with the appropriate `attendee` or `organiser` role. Remove or change these shared credentials before any public deployment.
+The venue + technical account demonstrates combined permissions from two roles. The two organisations demonstrate that an Organiser sees their own organisation's events and not another's.
+
+The seed also creates 13 event requests covering every status in `shared/status.js`, owned by the three Organiser accounts.
+
+These are demonstration credentials sharing one password. Remove them, with the `seedTag` field and the `seed-` ID prefix, before any public deployment.

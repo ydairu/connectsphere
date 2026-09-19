@@ -86,6 +86,39 @@ External Event Organisers and Attendees self-register. Internal staff accounts a
 
 The customer did not prescribe password length, complexity, expiry, history, lockout, SSO, or a specific authentication technology. Any such rule is a team decision and must be labelled accordingly.
 
+### Event request data access
+
+`firestore.rules` is deployed to the Firebase project (15 September 2026). It blocks the browser from the `eventRequests` collection entirely, for every role. This applies to SPM-3, SPM-4, SPM-7, SPM-24 and SPM-42 alike.
+
+- **Never use the Firebase client SDK on `eventRequests` from the frontend.** `getDoc`, `getDocs`, `addDoc`, `setDoc`, `updateDoc` and `onSnapshot` all fail with "Missing or insufficient permissions". Do not copy the pattern `AuthContext.jsx` uses for `users/{uid}`.
+- **Every event request operation goes through the Express API.** The frontend calls it with `authenticatedRequest` in `frontend/src/services/api.js`. The backend uses the Admin SDK, which bypasses the rules. Two route sets currently exist:
+
+  | Prefix | Routes | Story | Files |
+  |---|---|---|---|
+  | `/api/event-requests` | `POST /` creates a draft; `PATCH /:id` updates the owner's own draft | SPM-7 | `backend/src/routes/eventRequestRoutes.js`, `backend/src/services/eventRequestService.js`, validation in `shared/eventRequest.js` |
+  | `/api/requests` | `GET /` scoped list; `GET /:id`; `PATCH /:id` role-based section edit | SPM-42 | `backend/src/routes/requestRoutes.js`, `backend/src/middleware/authorise.js`, `backend/src/services/eventRequestStore.js` |
+
+- **[Unresolved] Merging the two route sets.** They give different answers on the same collection:
+  - The SPM-7 draft update checks owner and `status === DRAFT` in its own code, so an Organiser cannot edit a request returned for clarification there.
+  - The SPM-42 PATCH allows that edit, but does not validate field values.
+
+  The SPM-7 and SPM-42 owners (Jian Yong and Shaun) should agree one prefix and one PATCH. Do not add a third route set in the meantime.
+- **Take read and edit authorisation from `shared/permissions.js`**, as `backend/src/middleware/authorise.js` does.
+  - Use `canEdit`, `forbiddenFields` and `projectRequest`.
+  - Never decide an edit by combining `inScope()` with `stateGateOpen()`. Permissions are evaluated per role and then combined. Combining the two any-role predicates lets one role's open status gate unlock another role's sections.
+  - Pass every response body a non-owner can receive through `projectRequest()`, so sections a role may not view are absent, not hidden.
+  - If you extend the SPM-42 store, give `backend/src/testing/memoryEventRequestStore.js` the same method, because the two stores share one contract.
+- **Ownership comes from the server.** On create, `ownerUid`, `organisationId` and `organisationName` are set from `req.user` (`buildDraftEventRequest` in `shared/eventRequest.js`). Never take them from the request body.
+- **Requests are stored by section.** Section data lives under `core`, `venue`, `equipment`, `registration` or `internal`, and a field's section is its top-level key. A field stored outside a section cannot be permission-checked. Record metadata stays at the top level: `status`, `ownerUid`, `organisationId`, `organisationName` and `assignedStaffUids`. Field names within each section are defined by `normaliseEventRequestInput` in `shared/eventRequest.js`.
+- **Statuses come from `shared/status.js`,** never string literals. Draft queries test `status === DRAFT` only, because the name of the submitted status is not yet ratified.
+- **Status changes are not section edits.** `PATCH /api/requests/:id` rejects `status` with 403. Submit (SPM-3) needs its own route. `shared/permissions.js` has no status-transition predicate yet, so agree one with the SPM-42 owner (Shaun) rather than writing the check inside a route.
+- **`users/{uid}` rules:**
+  - The browser may read and update only the signed-in user's own profile.
+  - A profile may be created only with the `organiser` or `attendee` role.
+  - `roles`, `role`, `organisationId` and `organisationName` cannot be changed after creation.
+  - Staff roles are provisioned through Admin SDK scripts (`backend/scripts/`).
+- **Editing `firestore.rules` changes nothing until it is deployed** with `firebase deploy --only firestore:rules --project <FIREBASE_PROJECT_ID>`. When reporting, state whether rules were deployed or only edited.
+
 ## 7. Verification and Reporting
 
 Run the smallest meaningful checks first, then the relevant full project checks available in the repository. At minimum, consider:
@@ -104,6 +137,11 @@ Be exact about the verification environment:
 - in-memory or emulator tests are not production database verification;
 - Firebase emulator verification is not verification against a deployed Firebase project;
 - a passing frontend build is not evidence that backend security rules are correct.
+
+This repository has two event request API harnesses. They run the same cases in `backend/src/routes/requestRoutes.cases.js`:
+
+- `npm test` runs `requestRoutes.test.js`. It sends real HTTP to the real middleware, with mocked token verification and in-memory persistence, so it is not database verification.
+- `LIVE_API_PROJECT=<FIREBASE_PROJECT_ID> npm run test:api:live --prefix backend` runs against the real Firebase project with real sign-ins. It edits seeded requests and restores them; re-run `backend/scripts/seed.js` after an interrupted run.
 
 State what was tested, what was not tested, and any remaining risk.
 

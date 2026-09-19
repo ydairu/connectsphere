@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// SPM-42 — the browser is locked out of event requests. Every read and write goes through the Express
+// API, where backend/src/middleware/authorise.js applies shared/permissions.js. These rules deliberately
+// do not replicate that permission matrix: the same logic in two languages drifts, and rules do not
+// trace to a test (.claude/sprint1-permissions-plan.md, Phase 2).
+//
+// The Admin SDK (backend, seed and migration scripts) bypasses these rules.
+// Anything not matched below is denied by default.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedInAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // authenticate.js reads roles and organisationId from users/{uid}, and they decide what the API
+    // lets a user see and edit. A user who could write them could grant themselves the coordinator
+    // role or another company's ID. Public registration may only create Organiser and Attendee
+    // accounts; internal staff roles are provisioned through the Admin SDK (effective-requirements.md,
+    // Roles and Accounts). Role values mirror ORGANISER and ATTENDEE in shared/permissions.js.
+    function selfRegistrable(profile) {
+      return profile.roles is list
+        && profile.roles.size() > 0
+        && profile.roles.hasOnly(['organiser', 'attendee'])
+        && (!('role' in profile) || profile.role in profile.roles);
+    }
+
+    match /users/{uid} {
+      allow read: if signedInAs(uid);
+      allow create: if signedInAs(uid) && selfRegistrable(request.resource.data);
+      allow update: if signedInAs(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['roles', 'role', 'organisationId', 'organisationName', 'seedTag']);
+      allow delete: if false;
+    }
+
+    match /eventRequests/{requestId=**} {
+      allow read, write: if false;
+    }
+  }
+}
