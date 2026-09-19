@@ -44,12 +44,16 @@ connectsphere/
 
 1. A user registers or logs in through Firebase Authentication.
 2. The user's Firebase UID identifies their document at `users/{uid}` in Firestore.
-3. That document stores their name, email, roles, and creation timestamp. Organiser accounts also store `organisationId` and `organisationName`.
+3. That document stores their name, email, roles, and creation timestamp. Organiser registration also requires `organisationName`. An `organisationId` may already exist on seeded or migrated accounts; registration does not assign one.
 4. `AuthContext` restores sessions and loads the Firestore profile before protected pages render.
 5. The frontend can send a Firebase ID token to the Express API.
 6. The backend verifies the token and reads the user's trusted roles from Firestore.
 
 The five roles are `organiser`, `coordinator`, `venue_staff`, `technical_staff` and `attendee`, defined in `shared/permissions.js`. A user may hold several (`roles: string[]`) and receives the union of what each role permits. Profiles written before the roles migration hold a single `role` string and are still read correctly. Frontend role checks control presentation only; protected backend operations must enforce roles through authentication middleware.
+
+Organisers can view and edit their organisation name on `/profile`, including adding a name to an older account. Saving requires the backend to be running. Names are trimmed and cannot be blank. Matching names do not link accounts or grant organisation access; changing a name does not alter an existing organisation ID or any event request. Shared organisation records and invitation codes are deferred.
+
+`PATCH /api/profile` accepts only `{ "organisationName": "Example Organisation" }` with a Firebase bearer token and returns the saved name in the same shape. It updates the authenticated organiser's profile only (including multi-role organisers). Unauthenticated requests receive 401, non-organisers 403, and invalid names or additional fields 400. Unexpected persistence failures return 500. Login remains email/password.
 
 ## Tests
 
@@ -57,7 +61,9 @@ The five roles are `organiser`, `coordinator`, `venue_staff`, `technical_staff` 
 npm test
 ```
 
-Runs the `node:test` suites in `shared/`, `backend/src/` and `backend/scripts/`. No test dependencies are required.
+Runs the `node:test` suites in `shared/`, `backend/src/` and `backend/scripts/`, followed by the frontend Vitest suites. Install frontend development dependencies before running. `npm test --prefix frontend` runs only the Vitest suites.
+
+The organisation tests cover registration data, DOM form interactions, session restoration, profile updates, and failure paths. HTTP tests in `frontend/tests/api/` exercise the Express routes on an ephemeral localhost port with Firebase token verification and Firestore mocked. These are not live Firebase integration or deployed security-rule checks. Firestore rules are not tracked in this repository, so direct database access protection remains unverified.
 
 ## Data Scripts
 

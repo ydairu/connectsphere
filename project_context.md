@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 13 September 2026
+Last reviewed: 19 September 2026 (organisation profile increment)
 
 ## Project Purpose
 
@@ -61,10 +61,10 @@ The current code provides a useful authentication prototype, but it does **not**
 Observed facts:
 
 - Registration uses Firebase email/password authentication.
-- The registration UI currently offers `attendee` and `employee` account types.
-- Public employee self-registration is currently enabled in the prototype.
-- A Firestore user profile currently stores one `role` value.
-- Frontend role checks and backend `requireRole` middleware evaluate one role.
+- The registration UI offers `attendee` and `organiser` account types; public registration does not offer internal staff roles.
+- Organiser registration requires an organisation name. Organisers, including multi-role accounts, can view/add/edit that name on their profile through an authenticated backend update.
+- Registration writes `roles: [role]` and retains the legacy `role` field. Frontend role checks and backend `requireRole` support multiple roles.
+- Organisation name edits change only the user's descriptive `organisationName`; matching names do not link accounts. Existing organisation IDs and event records are preserved. Company-ID assignment and shared organisation membership remain outside this increment.
 - The protected frontend product routes include `/profile`, `/event-requests/new`, and `/event-requests/:id/edit`.
 - The backend exposes authenticated profile and event-request create/update/load routes.
 - SPM-7 event request creation has an implemented draft-based create path.
@@ -74,7 +74,7 @@ Observed facts:
 Required correction before claiming full Sprint 1 completion:
 
 - public registration must be limited to Event Organiser and Attendee;
-- Event Organiser registration must collect organisation;
+- Event Organiser registration now collects organisation name; company-ID assignment/membership remains incomplete;
 - internal staff accounts must not be created through public registration;
 - the five customer roles must replace the generic `employee` model;
 - multiple roles per user and the union of their permissions must be supported if SPM-42 remains unchanged;
@@ -150,8 +150,8 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
 4. **Approved versus Confirmed:** customer sources sometimes treat these as the same and elsewhere describe Approved as initial feasibility and Confirmed as completed venue/technical arrangements. Resolve the lifecycle before implementing status transitions.
 5. **Same-organisation visibility:** Organisers must not see unrelated client data, but visibility across different Organisers in the same organisation remains a team design choice.
 6. **Password policy:** no customer rule exists. The current frontend enforces six characters; record this as a team decision if retained.
-7. **Role model:** the current single-role `attendee`/`employee` prototype conflicts with the five-role, multi-role effective requirement.
-8. **Testing and CI:** no tracked automated test suite or CI workflow is currently present. Course evidence requires traceable tests and any utilised CI script.
+7. **Role model:** roles arrays and shared permission checks exist, but complete five-role workflows and organisation membership still require verification before SPM-42 can be Done.
+8. **Testing and CI:** automated shared/backend and frontend tests exist; no CI workflow is currently present. On 19 Sep, `npm test` passed 68 Node tests and 17 Vitest tests; frontend lint and production build passed (build reports a bundle-size warning). Organisation persistence/authentication checks use mocks or in-memory storage, including real Express HTTP routing with mocked Firebase. No live Firebase, emulator, deployed security-rule, or manual browser verification was performed for this increment. Firestore rules and the operational workbook/Sprint record remain absent from the repository.
 
 ## Documentation Boundaries
 

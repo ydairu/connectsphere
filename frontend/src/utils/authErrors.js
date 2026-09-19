@@ -1,4 +1,5 @@
 const errorMessages = {
+  'profile/invalid-organisation': 'Organisation name is required.',
   'auth/email-already-in-use': 'An account with this email already exists.',
   'auth/invalid-credential': 'Invalid email or password.',
   'auth/invalid-email': 'Please enter a valid email address.',
@@ -10,4 +11,3 @@ const errorMessages = {
 export function getAuthErrorMessage(error) {
   return errorMessages[error?.code] || 'Something went wrong. Please try again.'
 }
-
