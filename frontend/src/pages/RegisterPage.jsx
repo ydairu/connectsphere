@@ -6,8 +6,9 @@ import Input from '../components/Input.jsx'
 import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getAuthErrorMessage } from '../utils/authErrors.js'
+import { organisationNameError } from '../../../shared/userProfile.js'
 
-const initialForm = { name: '', email: '', password: '', confirmPassword: '', role: 'attendee' }
+const initialForm = { name: '', email: '', password: '', confirmPassword: '', role: 'attendee', organisationName: '' }
 
 function validate(form) {
   const errors = {}
@@ -15,6 +16,10 @@ function validate(form) {
   if (!/^\S+@\S+\.\S+$/.test(form.email)) errors.email = 'Enter a valid email address.'
   if (form.password.length < 6) errors.password = 'Password must contain at least 6 characters.'
   if (form.password !== form.confirmPassword) errors.confirmPassword = 'Passwords do not match.'
+  if (form.role === 'organiser') {
+    const error = organisationNameError(form.organisationName)
+    if (error) errors.organisationName = error
+  }
   return errors
 }
 
@@ -41,7 +46,7 @@ function RegisterPage() {
 
     setSubmitting(true)
     try {
-      await register({ name: form.name.trim(), email: form.email.trim(), password: form.password, role: form.role })
+      await register({ name: form.name.trim(), email: form.email.trim(), password: form.password, role: form.role, organisationName: form.organisationName })
       navigate('/profile', { replace: true })
     } catch (registrationError) {
       setSubmitError(getAuthErrorMessage(registrationError))
@@ -58,7 +63,7 @@ function RegisterPage() {
           <div className="auth-heading">
             <span className="eyebrow">Join ConnectSphere</span>
             <h1>Create your account</h1>
-            <p>Choose how you will use the platform. You can update your details later.</p>
+            <p>Choose how you will use the platform.</p>
           </div>
           <form onSubmit={handleSubmit} noValidate>
             {submitError && <div className="alert" role="alert">{submitError}</div>}
@@ -79,7 +84,9 @@ function RegisterPage() {
                 <span><strong>Event Organiser</strong><small>Plan and coordinate event operations.</small></span>
               </label>
             </fieldset>
-            <p className="form-note">Prototype note: Event Organiser self-registration is enabled. Production Event Organiser accounts should be provisioned or approved by an administrator.</p>
+            {form.role === 'organiser' && (
+              <Input id="organisationName" name="organisationName" label="Organisation name" autoComplete="organization" value={form.organisationName} onChange={updateField} error={errors.organisationName} required />
+            )}
             <Button className="button-full" type="submit" disabled={submitting}>{submitting ? 'Creating account…' : 'Create account'}</Button>
           </form>
           <p className="auth-footer">Already have an account? <Link to="/login">Log in</Link></p>

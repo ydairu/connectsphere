@@ -40,6 +40,13 @@ export function getApiProfile(user) {
   return authenticatedRequest(user, '/api/profile')
 }
 
+export function updateApiProfile(user, { organisationName }) {
+  return authenticatedRequest(user, '/api/profile', {
+    method: 'PATCH',
+    body: JSON.stringify({ organisationName }),
+  })
+}
+
 export function createEventRequest(user, eventRequest) {
   return authenticatedRequest(user, '/api/event-requests', {
     method: 'POST',

@@ -99,6 +99,8 @@ Sprint 1 focuses on the first three functionality areas and contains seven stori
 
 **[Team decision]** SPM-2 is the 3-point reference story.
 
+**[Team decision, 19 Sep 2026]** This increment collects a required organisation name at organiser registration and lets organisers view/add/edit that name on their own profile. The name is descriptive profile information: matching names do not link users or grant access, and edits do not change any existing organisation ID or event record. Shared organisation records, unique-ID assignment, and invitation codes are deferred from this increment. This does not satisfy the outstanding company-ID/membership requirements in SPM-42 or establish completion of SPM-2.
+
 ### SPM-42 — View and Edit Information According to My Role's Permissions
 
 **[Customer-confirmed]**:

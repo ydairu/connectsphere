@@ -4,11 +4,13 @@ import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Navbar from '../components/Navbar.jsx'
 import RoleBadge from '../components/RoleBadge.jsx'
+import OrganisationProfileField from '../components/OrganisationProfileField.jsx'
+import { ORGANISER } from '../../../shared/permissions.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { roleLabel } from '../utils/roleLabels.js'
 
 function ProfilePage() {
-  const { user, userProfile, roles, logout } = useAuth()
+  const { user, userProfile, roles, logout, updateOrganisationName } = useAuth()
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -50,6 +52,9 @@ function ProfilePage() {
           <div className="profile-details">
             <div className="profile-row"><span>Name</span><strong>{userProfile.name}</strong></div>
             <div className="profile-row"><span>Email</span><strong>{userProfile.email || user.email}</strong></div>
+            {roles.includes(ORGANISER) && (
+              <OrganisationProfileField key={user.uid} organisationName={userProfile.organisationName} onSave={updateOrganisationName} />
+            )}
             <div className="profile-row">
               <span>{roles.length === 1 ? 'Role' : 'Roles'}</span>
               <div className="role-value">

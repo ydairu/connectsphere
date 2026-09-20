@@ -9,7 +9,9 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { rolesOf } from '../../../shared/permissions.js'
+import { buildRegistrationProfile } from '../../../shared/userProfile.js'
 import { auth, db } from '../services/firebase.js'
+import { updateApiProfile } from '../services/api.js'
 import { AuthContext } from './auth-context.js'
 
 async function fetchUserProfile(uid) {
@@ -57,14 +59,12 @@ export function AuthProvider({ children }) {
     return profile
   }
 
-  async function register({ name, email, password, role }) {
+  async function register({ name, email, password, role, organisationName }) {
+    const profile = buildRegistrationProfile({ name, email, role, organisationName })
     const credential = await createUserWithEmailAndPassword(auth, email, password)
     try {
       await updateProfile(credential.user, { displayName: name })
 
-      // `roles` is the SPM-42 shape; `role` is still written so branches that read it keep working
-      // until the roles migration has run everywhere.
-      const profile = { name, email, role, roles: [role] }
       await setDoc(doc(db, 'users', credential.user.uid), {
         ...profile,
         createdAt: serverTimestamp(),
@@ -74,6 +74,15 @@ export function AuthProvider({ children }) {
     } catch (error) {
       await deleteUser(credential.user).catch(() => {})
       throw error
+    }
+  }
+
+  async function updateOrganisationName(organisationName) {
+    const currentUser = auth.currentUser
+    if (!currentUser) throw Object.assign(new Error('UNAUTHORIZED'), { status: 401 })
+    const { organisationName: savedName } = await updateApiProfile(currentUser, { organisationName })
+    if (auth.currentUser?.uid === currentUser.uid) {
+      setUserProfile((current) => current ? { ...current, organisationName: savedName } : current)
     }
   }
 
@@ -90,6 +99,7 @@ export function AuthProvider({ children }) {
       loading,
       login,
       register,
+      updateOrganisationName,
       logout,
     }),
     [user, userProfile, loading],
