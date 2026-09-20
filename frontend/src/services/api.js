@@ -64,3 +64,9 @@ export function updateEventRequest(user, id, eventRequest) {
     body: JSON.stringify(eventRequest),
   })
 }
+
+// SPM-42 list route: returns only the requests in the caller's scope, each reduced to the sections
+// their roles may view. Drafts come back only to their owner, which is what SPM-24's page relies on.
+export function listRequests(user) {
+  return authenticatedRequest(user, '/api/requests')
+}

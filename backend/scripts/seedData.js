@@ -64,13 +64,15 @@ export const SEED_ACCOUNTS = Object.freeze({
   organiserA1: account('organiser-a1', 'Seed Organiser A1', [ORGANISER], SEED_ORGANISATIONS.A),
   organiserA2: account('organiser-a2', 'Seed Organiser A2', [ORGANISER], SEED_ORGANISATIONS.A),
   organiserB1: account('organiser-b1', 'Seed Organiser B1', [ORGANISER], SEED_ORGANISATIONS.B),
+  // SPM-24: "an Organiser with no saved drafts is told so rather than shown a blank screen". Owns nothing.
+  organiserA3: account('organiser-a3', 'Seed Organiser A3', [ORGANISER], SEED_ORGANISATIONS.A),
 })
 
 const { venueStaff, technicalStaff, venueTechnicalStaff, organiserA1, organiserA2, organiserB1 } = SEED_ACCOUNTS
 
-function eventRequest({ slug, status, owner, title, assigned = [], registrationEnabled = false, draft = false, createdAt }) {
+function eventRequest({ slug, status, owner, title, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, createdAt }) {
   const core = draft
-    ? { title, purpose: null, description: null, preferredDateTime: null, durationHours: null, expectedAttendees: null }
+    ? { title, purpose: null, description: null, preferredDateTime: null, durationHours: null, expectedAttendees: null, ...draftCore }
     : {
         title,
         purpose: `Seeded ${status} request for permission demonstrations`,
@@ -108,6 +110,12 @@ export const SEED_REQUESTS = Object.freeze([
   eventRequest({ slug: 'a1-completed', status: COMPLETED, owner: organiserA1, title: 'A1 completed', assigned: bothStaffTeams, createdAt: '2026-09-07T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-cancelled', status: CANCELLED, owner: organiserA1, title: 'A1 cancelled', assigned: bothStaffTeams, createdAt: '2026-09-08T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-rejected', status: REJECTED, owner: organiserA1, title: 'A1 rejected', createdAt: '2026-09-09T10:00:00+08:00' }),
+
+  // Further A1 drafts. A draft may be incomplete (Clarification 2, Drafts), so these cover the states the
+  // drafts list has to render: a title with a date, a title without one, and no title at all.
+  eventRequest({ slug: 'a1-draft-summit', status: DRAFT, owner: organiserA1, title: 'Annual partner summit', draft: true, draftCore: { preferredDateTime: '2026-12-03T09:30:00+08:00', expectedAttendees: 240 }, createdAt: '2026-09-17T09:00:00+08:00' }),
+  eventRequest({ slug: 'a1-draft-rehearsal', status: DRAFT, owner: organiserA1, title: 'Product launch rehearsal', draft: true, draftCore: { expectedAttendees: 60 }, createdAt: '2026-09-18T14:20:00+08:00' }),
+  eventRequest({ slug: 'a1-draft-untitled', status: DRAFT, owner: organiserA1, title: '', draft: true, draftCore: { preferredDateTime: '2027-01-15T18:00:00+08:00' }, createdAt: '2026-09-19T08:05:00+08:00' }),
 
   // Organisation A, organiser A2 — the colleague.
   eventRequest({ slug: 'a2-draft', status: DRAFT, owner: organiserA2, title: 'A2 draft (private to A2, hidden from A1)', draft: true, createdAt: '2026-09-10T10:00:00+08:00' }),

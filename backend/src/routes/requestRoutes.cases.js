@@ -231,4 +231,61 @@ export function registerRequestApiCases(harness) {
       })
     })
   })
+
+  // The drafts page reads GET /api/requests and keeps status === DRAFT. These cases prove the data it
+  // receives, so the page's behaviour rests on the API rather than on a filter in the browser.
+  describe('SPM-24 — View My Saved Draft Requests and Distinguish Them from Submitted Requests (API)', () => {
+    test('Every draft the Organiser owns is listed, and no draft belonging to another Organiser appears', async () => {
+      const response = await list('organiserA1')
+      assert.equal(response.status, 200)
+      const drafts = response.json.requests.filter((request) => request.status === DRAFT)
+      const ownDraftIds = SEED_REQUESTS.filter((request) => request.status === DRAFT && request.ownerUid === 'seed-organiser-a1').map((request) => request.id)
+      assert.ok(ownDraftIds.length > 1, 'precondition: the seed holds several drafts for this Organiser')
+      assert.deepEqual(drafts.map((draft) => draft.id).sort(), ownDraftIds.sort())
+    })
+
+    test('The drafts list is ordered newest first', async () => {
+      const response = await list('organiserA1')
+      const drafts = response.json.requests.filter((request) => request.status === DRAFT)
+      const expected = SEED_REQUESTS
+        .filter((request) => request.status === DRAFT && request.ownerUid === 'seed-organiser-a1')
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+        .map((request) => request.id)
+      assert.deepEqual(drafts.map((draft) => draft.id), expected)
+    })
+
+    test('An Organiser in another organisation sees only their own draft', async () => {
+      const response = await list('organiserB1')
+      assert.equal(response.status, 200)
+      const drafts = response.json.requests.filter((request) => request.status === DRAFT)
+      assert.deepEqual(drafts.map((draft) => draft.id), ['seed-req-b1-draft'])
+    })
+
+    test('An Organiser with no saved drafts receives none — the drafts page shows its empty state', async () => {
+      const response = await list('organiserA3')
+      assert.equal(response.status, 200)
+      assert.deepEqual(response.json.requests.filter((request) => request.status === DRAFT), [])
+    })
+
+    test('A submitted request is listed with its current status, not as a draft', async () => {
+      const response = await list('organiserA1')
+      const submitted = response.json.requests.find((request) => request.id === A1_SUBMITTED)
+      assert.ok(submitted, 'the submitted request is listed')
+      assert.notEqual(submitted.status, DRAFT)
+    })
+
+    test('A draft that has never been submitted is not visible to an Event Coordinator', async () => {
+      const listed = await list('coordinator')
+      assert.ok(!listed.json.requests.some((request) => request.id === A1_DRAFT), 'not in the list')
+      const direct = await get('coordinator', A1_DRAFT)
+      assert.equal(direct.status, 403, 'not reachable by direct id either')
+    })
+
+    test('A draft that has never been submitted is not visible to another Organiser in the same organisation', async () => {
+      const listed = await list('organiserA1')
+      assert.ok(!listed.json.requests.some((request) => request.id === A2_DRAFT), 'not in the list')
+      const direct = await get('organiserA1', A2_DRAFT)
+      assert.equal(direct.status, 403, 'not reachable by direct id either')
+    })
+  })
 }
