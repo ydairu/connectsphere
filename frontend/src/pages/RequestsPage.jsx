@@ -8,10 +8,12 @@ import Navbar from '../components/Navbar.jsx'
 import StatusPill from '../components/StatusPill.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { listRequests } from '../services/api.js'
+import { requestListCopy } from '../utils/requestListCopy.js'
 
 // SPM-24 — submitted requests are shown with their current status and are not editable as drafts.
 // SPM-42 — the same page serves every role: the API returns only the records in the caller's scope,
-// already reduced to the sections their roles may view, so nothing is filtered by role here.
+// already reduced to the sections their roles may view, so nothing is filtered by role here. Roles
+// change only the wording (requestListCopy), never the data or the code path.
 //
 // Drafts are excluded because they have their own page. Only `status === DRAFT` is tested; the
 // submitted-side status names are never enumerated.
@@ -35,6 +37,7 @@ function RequestsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const isOrganiser = roles.includes(ORGANISER)
+  const copy = requestListCopy(roles)
 
   useEffect(() => {
     let active = true
@@ -62,9 +65,9 @@ function RequestsPage() {
       <main className="request-page container">
         <div className="page-heading">
           <div>
-            <span className="eyebrow">Your requests</span>
-            <h1>Event requests</h1>
-            <p>Requests you have access to, with their current status. These are not editable as drafts.</p>
+            <span className="eyebrow">{copy.eyebrow}</span>
+            <h1>{copy.title}</h1>
+            <p>{copy.description}</p>
           </div>
           {isOrganiser && <Link className="button button-secondary button-small" to="/requests/drafts">Saved drafts</Link>}
         </div>
@@ -75,8 +78,8 @@ function RequestsPage() {
 
         {!loading && !error && requests.length === 0 && (
           <Card className="empty-state">
-            <h2>No requests to show</h2>
-            <p>Requests appear here once they are submitted and you have access to them.</p>
+            <h2>{copy.emptyTitle}</h2>
+            <p>{copy.emptyBody}</p>
             {isOrganiser && <Link className="button button-primary" to="/requests/drafts">Go to your drafts</Link>}
           </Card>
         )}

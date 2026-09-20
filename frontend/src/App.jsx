@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { ORGANISER } from '../../shared/permissions.js'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import CreateEventRequestPage from './pages/CreateEventRequestPage.jsx'
 import DraftRequestsPage from './pages/DraftRequestsPage.jsx'
@@ -16,7 +17,12 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<ProfilePage />} />
+        {/* Every role may list requests; the API decides which records they receive (SPM-42). */}
         <Route path="/requests" element={<RequestsPage />} />
+      </Route>
+      {/* Drafts and the request form belong to Event Organisers. The API enforces this too:
+          requireRole(ORGANISER) on /api/event-requests, and owner-only scope on drafts. */}
+      <Route element={<ProtectedRoute allowedRoles={[ORGANISER]} />}>
         <Route path="/requests/drafts" element={<DraftRequestsPage />} />
         <Route path="/event-requests/new" element={<CreateEventRequestPage />} />
         <Route path="/event-requests/:id/edit" element={<CreateEventRequestPage />} />
