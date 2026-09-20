@@ -98,7 +98,7 @@ The customer did not prescribe password length, complexity, expiry, history, loc
   | `/api/event-requests` | `POST /` creates a draft; `PATCH /:id` updates the owner's own draft | SPM-7 | `backend/src/routes/eventRequestRoutes.js`, `backend/src/services/eventRequestService.js`, validation in `shared/eventRequest.js` |
   | `/api/requests` | `GET /` scoped list; `GET /:id`; `PATCH /:id` role-based section edit | SPM-42 | `backend/src/routes/requestRoutes.js`, `backend/src/middleware/authorise.js`, `backend/src/services/eventRequestStore.js` |
 
-- **[Team decision] Which route set to use, by the request's status.** Proposed by Shaun on 20 September 2026; Jian Yong to confirm as the SPM-7/SPM-4 owner. Until then it is a working split, not a ratified rule.
+- **[Team decision] Which route set to use, by the request's status.** Proposed by Shaun and confirmed with the SPM-7/SPM-4 owner on 20 September 2026.
   - **A draft** is created and edited through `/api/event-requests` (SPM-7, SPM-4). It validates field values with `shared/eventRequest.js`, and its own owner-and-draft check matches what `shared/permissions.js` permits at that status. The UI sends drafts to `/event-requests/:id/edit`.
   - **Everything after submission** is read and edited through `/api/requests` (SPM-42), which is the only route set that evaluates every role, record scope and status gate. The UI sends non-drafts to `/requests/:id`.
   - Neither route set is being removed, and no third one may be added.

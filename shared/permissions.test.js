@@ -142,8 +142,8 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     assert.deepEqual(body.equipment, { projector: true })
   })
 
-  // Finished events are read-only for every role. Proposed by Shaun (14 Sep 2026), pending team
-  // ratification — effective-requirements.md, SPM-42 "[Team decision pending]".
+  // Finished events are read-only for every role. Team decision, proposed by Shaun (14 Sep 2026) and
+  // ratified 20 Sep 2026 — effective-requirements.md, SPM-42 "[Team decision]".
   test('Coordinator PATCHes a completed, cancelled or rejected event', () => {
     for (const status of FINISHED) {
       const finished = request({ status })
@@ -164,7 +164,8 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     assert.equal(canEdit(venueStaff, confirmed, VENUE), true, 'confirmed stays editable for assigned staff')
   })
 
-  // Attendees see confirmed events only. Proposed by Shaun (14 Sep 2026), pending team ratification.
+  // Attendees see confirmed events only. Team decision, proposed by Shaun (14 Sep 2026) and ratified
+  // 20 Sep 2026.
   test('Attendee requests an event with registration enabled before it is confirmed or after it has finished', () => {
     for (const status of STATUSES.filter((s) => s !== CONFIRMED)) {
       const notConfirmed = request({ status, registration: { enabled: true } })

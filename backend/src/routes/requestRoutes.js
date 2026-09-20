@@ -5,7 +5,7 @@ import { authoriseList, authoriseRead, authoriseWrite } from '../middleware/auth
 // SPM-42's minimum API surface: list, read and section edit. No create, submit or draft-save routes —
 // those are SPM-7, SPM-3 and SPM-4.
 //
-// Route split by status (AGENTS.md §6, team decision pending Jian Yong's confirmation): drafts are
+// Route split by status (AGENTS.md §6, team decision of 20 Sep 2026): drafts are
 // created and edited through /api/event-requests, which validates field values; everything after
 // submission goes through these routes, which evaluate role, record scope and the status gate.
 export function createRequestRoutes({ authenticate, store }) {

@@ -53,8 +53,8 @@ const SECTION_ACCESS = Object.freeze({
   [ATTENDEE]: { view: [CORE], edit: [] },
 })
 
-// Finished events are read-only for every role. Not a customer ruling: proposed by Shaun (14 Sep 2026)
-// and pending team ratification — effective-requirements.md, SPM-42 "[Team decision pending]".
+// Finished events are read-only for every role. Not a customer ruling: team decision, proposed by
+// Shaun (14 Sep 2026) and ratified 20 Sep 2026 — effective-requirements.md, SPM-42 "[Team decision]".
 const FINISHED_STATUSES = Object.freeze([COMPLETED, CANCELLED, REJECTED])
 
 // "Venue / Technical staff — planning onwards" — plan, "State gate" — up to, not past, a finished event.
@@ -130,8 +130,8 @@ function roleInScope(role, user, request) {
     case TECHNICAL_STAFF:
       return (request.assignedStaffUids ?? []).includes(user.uid)
     case ATTENDEE:
-      // Confirmed events only — proposed by Shaun (14 Sep 2026), pending team ratification. The
-      // registration condition is kept as it was; how registration works is deferred (SPM-42 section).
+      // Confirmed events only — team decision, proposed by Shaun (14 Sep 2026) and ratified 20 Sep 2026.
+      // The registration condition is kept as it was; how registration works is deferred (SPM-42 section).
       return request.status === CONFIRMED && request.registration?.enabled === true
     default:
       return false
@@ -148,7 +148,7 @@ function roleInScope(role, user, request) {
  *  - Coordinator: full system visibility, drafts excepted. — Clarification 1 & 2
  *  - Venue/technical staff: assigned events, never drafts. — plan, "Role capability"
  *  - Attendee: confirmed events with registration enabled. — plan, "Role capability", narrowed to
- *    confirmed by team decision pending ratification (effective-requirements.md, SPM-42)
+ *    confirmed by team decision of 20 Sep 2026 (effective-requirements.md, SPM-42)
  */
 export function inScope(user, request) {
   return rolesOf(user).some((role) => roleInScope(role, user, request))
@@ -183,8 +183,8 @@ function roleGateOpen(role, user, request) {
  *
  * Implements the status criterion the plan adds to SPM-42 (Correction 1): an organiser cannot edit
  * their own request once submitted, unless it was returned for clarification. — Clarification 2
- * Also: completed, cancelled and rejected events are read-only for every role — team decision pending
- * ratification (effective-requirements.md, SPM-42).
+ * Also: completed, cancelled and rejected events are read-only for every role — team decision of
+ * 20 Sep 2026 (effective-requirements.md, SPM-42).
  */
 export function stateGateOpen(user, request) {
   return rolesOf(user).some((role) => roleGateOpen(role, user, request))

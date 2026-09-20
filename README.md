@@ -81,7 +81,7 @@ All routes are under `/api` and, except the health check, require a Firebase ID 
 
 `/api/requests` applies `shared/permissions.js` in `backend/src/middleware/authorise.js`: records outside a user's scope are not returned, sections a role may not view are absent from the response body rather than hidden, and a forbidden write is rejected with 403 naming each field. Status values are never editable through `PATCH`; status transitions will be separate routes.
 
-Two route sets cover the same collection, split by status: drafts are created and edited through `/api/event-requests`, which validates field values, and everything after submission is read and edited through `/api/requests`, which applies the full role, record and status rules. This split is a team decision recorded in `AGENTS.md`, awaiting confirmation by the SPM-7 owner.
+Two route sets cover the same collection, split by status: drafts are created and edited through `/api/event-requests`, which validates field values, and everything after submission is read and edited through `/api/requests`, which applies the full role, record and status rules. This split is a team decision of 20 September 2026, recorded in `AGENTS.md`.
 
 `PATCH /api/profile` accepts only `{ "organisationName": "Example Organisation" }` with a Firebase bearer token and returns the saved name in the same shape. It updates only the authenticated organiser's profile, including for a multi-role organiser. Unauthenticated requests receive 401, non-organisers 403, and invalid names or additional fields 400. Unexpected persistence failures return 500.
 

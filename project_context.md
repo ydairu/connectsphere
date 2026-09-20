@@ -65,11 +65,16 @@ Observed facts:
 - Organiser registration requires an organisation name. Organisers, including multi-role accounts, can view/add/edit that name on their profile through an authenticated backend update.
 - Registration writes `roles: [role]` and retains the legacy `role` field. Frontend role checks and backend `requireRole` support multiple roles.
 - Organisation name edits change only the user's descriptive `organisationName`; matching names do not link accounts. Existing organisation IDs and event records are preserved. Company-ID assignment and shared organisation membership remain outside this increment.
-- The protected frontend product routes include `/profile`, `/event-requests/new`, and `/event-requests/:id/edit`.
-- The backend exposes authenticated profile and event-request create/update/load routes.
+- The protected frontend product routes include `/profile`, `/event-requests/new`, `/event-requests/:id/edit`, `/requests`, `/requests/drafts`, and `/requests/:id`. Routes may now carry `allowedRoles`; a signed-in user without the role receives a 403 page rather than a redirect to login.
+- The backend exposes authenticated profile and event-request create/update/load routes, plus a permission-enforced request API: `GET /api/requests`, `GET /api/requests/:id`, and `PATCH /api/requests/:id`.
+- SPM-42 record, section and status rules are enforced in `backend/src/middleware/authorise.js`, which delegates every decision to `shared/permissions.js`. Records outside a user's scope are not returned, sections a role may not view are absent from the response body, and a forbidden write is rejected with 403 naming each field.
+- `firestore.rules` is deployed to the Firebase project. The browser has no access to `eventRequests`, and a user may read and update only their own `users/{uid}` document without changing its role or organisation fields. Verified on 15 September 2026 with signed-in client requests.
+- A seed script populates nine demonstration accounts, including a venue + technical dual-role account and an Organiser owning nothing, plus sixteen event requests covering every status in `shared/status.js`.
 - SPM-7 event request creation has an implemented draft-based create path.
-- SPM-4 draft saving and same-draft editing has been implemented for owned unsubmitted drafts through the direct edit route; the full SPM-24 draft list/page remains a separate Sprint 1 scope item.
+- SPM-4 draft saving and same-draft editing has been implemented for owned unsubmitted drafts through the direct edit route.
+- SPM-24 presents saved drafts on a dedicated page and submitted requests, with their current status, on a separate page.
 - SPM-3 submission and downstream staff review remain separate Sprint 1 scope items.
+- Automated tests now exist on both sides: `node:test` for `shared/`, `backend/src/` and `backend/scripts/`, and Vitest with Testing Library for the frontend. An opt-in suite runs the same API cases against the real Firebase project. No CI workflow is present.
 
 Required correction before claiming full Sprint 1 completion:
 
@@ -78,8 +83,8 @@ Required correction before claiming full Sprint 1 completion:
 - internal staff accounts must not be created through public registration;
 - the five customer roles must replace the generic `employee` model;
 - multiple roles per user and the union of their permissions must be supported if SPM-42 remains unchanged;
-- record-, ownership-, and field/section-level authorisation must be enforced and tested;
-- event request submission and draft listing/resume navigation must still be completed for SPM-3 and SPM-24.
+- record-, ownership-, and field/section-level authorisation is enforced and tested at the API level, and is presented for all five roles in the request pages; the two supporting rules in `effective-requirements.md` were ratified by the team on 20 Sep 2026;
+- event request submission must still be completed for SPM-3.
 
 README statements about completed authentication behaviour should therefore be treated as prototype claims until they are reconciled with the current backlog and verified through tests.
 
@@ -151,7 +156,7 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
 5. **Same-organisation visibility:** Organisers must not see unrelated client data, but visibility across different Organisers in the same organisation remains a team design choice.
 6. **Password policy:** no customer rule exists. The current frontend enforces six characters; record this as a team decision if retained.
 7. **Role model:** roles arrays and shared permission checks exist, but complete five-role workflows and organisation membership still require verification before SPM-42 can be Done.
-8. **Testing and CI:** automated shared/backend and frontend tests exist; no CI workflow is currently present. On 19 Sep, `npm test` passed 68 Node tests and 17 Vitest tests; frontend lint and production build passed (build reports a bundle-size warning). Organisation persistence/authentication checks use mocks or in-memory storage, including real Express HTTP routing with mocked Firebase. No live Firebase, emulator, deployed security-rule, or manual browser verification was performed for this increment. Firestore rules and the operational workbook/Sprint record remain absent from the repository.
+8. **Testing and CI:** automated shared/backend and frontend tests exist; no CI workflow is currently present. On 19 Sep, `npm test` passed 68 Node tests and 17 Vitest tests; frontend lint and production build passed (build reports a bundle-size warning). Organisation persistence/authentication checks use mocks or in-memory storage, including real Express HTTP routing with mocked Firebase. No live Firebase, emulator, deployed security-rule, or manual browser verification was performed for this increment. On 20 Sep, `npm test` passed 107 Node tests and 53 Vitest tests; frontend lint and production build passed with the same bundle-size warning; an opt-in API suite passed 28 tests against the real Firebase project using real sign-ins. `firestore.rules` is now in the repository and deployed. The operational workbook/Sprint record remains absent from the repository.
 
 ## Documentation Boundaries
 
