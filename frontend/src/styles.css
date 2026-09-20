@@ -132,3 +132,25 @@ a { color: inherit; }
   .profile-row { grid-template-columns: 1fr; gap: 6px; }
   .toast { right: 14px; bottom: 14px; width: calc(100% - 28px); }
 }
+
+/* SPM-24 drafts list */
+.page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 32px; flex-wrap: wrap; }
+.page-heading h1 { margin: 10px 0 8px; font-size: 34px; letter-spacing: -0.04em; }
+.page-heading p { margin: 0; max-width: 620px; color: var(--muted); line-height: 1.55; }
+
+.request-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.request-item { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 22px 26px; transition: border-color 150ms, box-shadow 150ms; }
+.request-item:hover { border-color: #b9c4bd; box-shadow: 0 14px 40px rgba(23, 32, 28, 0.08); }
+.request-item-main { min-width: 0; display: grid; gap: 6px; }
+.request-item-main h2 { margin: 0; font-size: 19px; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.request-meta { margin: 0; color: var(--muted); font-size: 14px; }
+
+.empty-state { display: grid; gap: 12px; justify-items: center; padding: 56px 36px; text-align: center; }
+.empty-state h2 { margin: 0; font-size: 22px; letter-spacing: -0.03em; }
+.empty-state p { margin: 0 0 6px; max-width: 420px; color: var(--muted); line-height: 1.55; }
+
+@media (max-width: 640px) {
+  .page-heading { align-items: flex-start; }
+  .request-item { align-items: flex-start; }
+  .request-item .button { width: 100%; }
+}
