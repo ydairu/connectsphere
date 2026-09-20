@@ -95,6 +95,10 @@ a { color: inherit; }
 .profile-row:last-child { padding-bottom: 0; border: 0; }
 .profile-row > span { color: var(--muted); font-size: 14px; }
 .profile-row strong { overflow-wrap: anywhere; }
+.organisation-profile { min-width: 0; }
+.organisation-value, .organisation-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.organisation-value strong { min-width: 0; }
+.organisation-saved { margin: 10px 0 0; color: var(--accent); font-size: 14px; }
 .role-value { display: flex; align-items: center; gap: 12px; }
 .role-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
 .role-attendee { color: #25578c; background: #e9f2fb; }

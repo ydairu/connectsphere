@@ -8,6 +8,10 @@ const directoryName = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   plugins: [react()],
   envDir: path.resolve(directoryName, '..'),
+  test: {
+    environment: 'jsdom',
+    clearMocks: true,
+  },
   server: {
     port: 5173,
     // shared/ (permissions, statuses) sits beside frontend/, outside Vite's default allow list.
@@ -15,4 +19,3 @@ export default defineConfig({
     fs: { allow: [path.resolve(directoryName, '..')] },
   },
 })
-

@@ -1,26 +1,25 @@
 // Every status in shared/status.js has a display name (SPM-24: a submitted request is shown with its
-// current status). Run with the root `npm test`.
+// current status). Run with `npm test` (Vitest, via the root script).
 
-import { describe, test } from 'node:test'
-import assert from 'node:assert/strict'
+import { describe, expect, it } from 'vitest'
 
 import { RETURNED, STATUSES } from '../../../shared/status.js'
 import { statusLabel } from './statusLabels.js'
 
 describe('SPM-24 — submitted requests are shown with their current status', () => {
-  test('Every status in shared/status.js has a display name', () => {
+  it('Every status in shared/status.js has a display name', () => {
     for (const status of STATUSES) {
       const label = statusLabel(status)
-      assert.notEqual(label, status, `${status} has no display name`)
-      assert.match(label, /^[A-Z]/, `${status} label should read as a sentence`)
+      expect(label, `${status} has no display name`).not.toBe(status)
+      expect(label, `${status} label should read as a sentence`).toMatch(/^[A-Z]/)
     }
   })
 
-  test('The multi-word status reads as words, not as its stored value', () => {
-    assert.equal(statusLabel(RETURNED), 'Returned for clarification')
+  it('The multi-word status reads as words, not as its stored value', () => {
+    expect(statusLabel(RETURNED)).toBe('Returned for clarification')
   })
 
-  test('An unrecognised status is shown as stored rather than mislabelled', () => {
-    assert.equal(statusLabel('some_future_status'), 'some_future_status')
+  it('An unrecognised status is shown as stored rather than mislabelled', () => {
+    expect(statusLabel('some_future_status')).toBe('some_future_status')
   })
 })

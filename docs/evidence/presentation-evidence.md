@@ -1,6 +1,6 @@
 # Presentation Evidence Tracker
 
-Last reviewed: 13 September 2026
+Last reviewed: 19 September 2026 (organisation profile increment)
 
 ## Purpose
 
@@ -140,6 +140,19 @@ Create a subsection for each Sprint containing:
 | Final-Sprint ceremony recordings | Sprint Planning, Sprint Review, Sprint Retrospective, and one Daily Scrum are retained as required evidence. | Store only an approved repository-accessible reference or submission reference. | Planned |
 | Repository-access evidence | Assessors can access the correct repository/version and contribution history. | Record the approved submission reference when available. | Planned |
 | Week 11 slide deck | Uses the released template; self-contained; concise; every completion claim is supported by this register. | Add the final deck path here. | Planned |
+
+## 19 September 2026 — Organisation name increment
+
+Implemented the SPM-2 organisation-name registration criterion and the team's approved profile-name editing scope. This is partial story evidence, not a Done claim for SPM-2 or SPM-42. Matching names do not establish membership; company-ID collection and membership remain gaps.
+
+| Behaviour | Implementation | Executable evidence |
+|---|---|---|
+| Require a trimmed organisation name for organiser registration; exclude it for attendees | `shared/userProfile.js`, `frontend/src/pages/RegisterPage.jsx`, `frontend/src/context/AuthContext.jsx` | `shared/userProfile.test.js`, `frontend/src/pages/organisationProfile.test.jsx`, `frontend/src/context/AuthContext.test.jsx` |
+| View/add/edit/cancel a profile organisation name, including older and multi-role organiser accounts | `frontend/src/components/OrganisationProfileField.jsx`, `frontend/src/pages/ProfilePage.jsx` | `frontend/src/pages/organisationProfile.test.jsx` |
+| Persist changes and restore the saved name after session restoration or logout/login; retain state on failed saves | `frontend/src/context/AuthContext.jsx`, `frontend/src/services/api.js` | `frontend/src/context/AuthContext.test.jsx` (mocked Firebase and HTTP) |
+| Restrict profile updates to the authenticated organiser; reject protected fields, invalid input, and unauthorised direct API requests | `backend/src/routes/profileRoutes.js`, `backend/src/services/profileService.js` | `backend/src/services/profileService.test.js`, `frontend/tests/api/profile.test.js` |
+
+Verification: `npm test` passed 68 Node tests and 17 Vitest tests; `npm run lint --prefix frontend` and `npm run build` passed. Build reported a bundle-size warning. HTTP tests exercised real Express routing on localhost with Firebase verification/storage mocked; service tests used in-memory storage and UI tests used jsdom. No live Firebase/emulator, deployed Firestore rules, manual browser flow, or CI verification is claimed. The operational backlog and Sprint records were unavailable and were not updated.
 
 ## Evidence Entry Template
 

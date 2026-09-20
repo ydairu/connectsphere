@@ -2,7 +2,7 @@
 
 ConnectSphere is a full-stack event management foundation. It currently provides account registration, login, persistent sessions, Firestore-backed multi-role profiles, a protected profile page, and an authenticated Express API.
 
-Event requests are created through the API and stored in Firestore. The five-role permission model lives in `shared/permissions.js` and is enforced by the API, and Firestore security rules keep the browser out of the `eventRequests` collection. The pages for listing, opening and editing existing requests are not built yet.
+Event requests are created through the API and stored in Firestore. The five-role permission model lives in `shared/permissions.js` and is enforced by the API, and Firestore security rules keep the browser out of the `eventRequests` collection. Organisers can create and directly reopen their own unsubmitted drafts for editing; the dedicated drafts list and request-submission flow are not built yet.
 
 ## Technology Stack
 
@@ -54,12 +54,14 @@ connectsphere/
 
 1. A user registers or logs in through Firebase Authentication.
 2. The user's Firebase UID identifies their document at `users/{uid}` in Firestore.
-3. That document stores their name, email, roles, and creation timestamp. Organiser accounts also store `organisationId` and `organisationName`.
+3. That document stores their name, email, roles, and creation timestamp. Organiser registration also requires `organisationName`. An `organisationId` may already exist on seeded or migrated accounts; registration does not assign one.
 4. `AuthContext` restores sessions and loads the Firestore profile before protected pages render.
 5. The frontend can send a Firebase ID token to the Express API.
 6. The backend verifies the token and reads the user's trusted roles from Firestore.
 
 The five roles are `organiser`, `coordinator`, `venue_staff`, `technical_staff` and `attendee`, defined in `shared/permissions.js`. A user may hold several (`roles: string[]`) and receives the union of what each role permits. Profiles written before the roles migration hold a single `role` string and are still read correctly. Frontend role checks control presentation only; protected backend operations must enforce roles through authentication middleware.
+
+Organisers can view and edit their organisation name on `/profile`, including adding a name to an older account. Saving requires the backend to be running. Names are trimmed and cannot be blank. Matching names do not link accounts or grant organisation access; changing a name does not alter an existing organisation ID or any event request. Shared organisation records, company-ID assignment, membership, and invitation codes remain outside this increment.
 
 ## API
 
@@ -69,7 +71,9 @@ All routes are under `/api` and, except the health check, require a Firebase ID 
 | --- | --- | --- |
 | `GET` | `/api/health` | Health check; no token required |
 | `GET` | `/api/profile` | The signed-in user's profile and roles |
+| `PATCH` | `/api/profile` | Event Organiser updates their own organisation name |
 | `POST` | `/api/event-requests` | Event Organiser creates a draft request |
+| `GET` | `/api/event-requests/:id` | Event Organiser loads their own unsubmitted draft |
 | `PATCH` | `/api/event-requests/:id` | Event Organiser updates their own draft |
 | `GET` | `/api/requests` | Lists the requests in the user's scope |
 | `GET` | `/api/requests/:id` | One request, reduced to the sections the user may view |
@@ -79,13 +83,15 @@ All routes are under `/api` and, except the health check, require a Firebase ID 
 
 Two route sets cover the same collection, split by status: drafts are created and edited through `/api/event-requests`, which validates field values, and everything after submission is read and edited through `/api/requests`, which applies the full role, record and status rules. This split is a team decision recorded in `AGENTS.md`, awaiting confirmation by the SPM-7 owner.
 
+`PATCH /api/profile` accepts only `{ "organisationName": "Example Organisation" }` with a Firebase bearer token and returns the saved name in the same shape. It updates only the authenticated organiser's profile, including for a multi-role organiser. Unauthenticated requests receive 401, non-organisers 403, and invalid names or additional fields 400. Unexpected persistence failures return 500.
+
 ## Firestore Security Rules
 
 `firestore.rules` is deployed to the Firebase project. It:
 
 - denies the browser all access to `eventRequests`, so every read and edit goes through the API, which uses the Admin SDK and bypasses rules;
-- allows a signed-in user to read and update only their own `users/{uid}` document;
-- allows a profile to be created only with the `organiser` or `attendee` role, and blocks later changes to `roles`, `role`, `organisationId` and `organisationName`, so no user can grant themselves access.
+- allows a signed-in browser user to read and update only their own `users/{uid}` document;
+- allows a profile to be created only with the `organiser` or `attendee` role, and blocks browser-side changes to `roles`, `role`, `organisationId`, `organisationName`, and `seedTag`, so users cannot grant themselves access or bypass the profile API. The backend's Admin SDK performs the validated organisation-name update.
 
 Editing the file changes nothing until it is deployed:
 
@@ -99,7 +105,9 @@ firebase deploy --only firestore:rules --project <FIREBASE_PROJECT_ID>
 npm test
 ```
 
-Runs the `node:test` suites in `shared/`, `backend/src/` and `backend/scripts/`. No test dependencies are required. The API suites send real HTTP requests to the Express app, with Firebase token verification and Firestore replaced by in-memory equivalents, so they are not database verification.
+Runs the `node:test` suites in `shared/`, `backend/src/` and `backend/scripts/`, followed by the frontend Vitest suites. Install the repository dependencies first; `npm test --prefix frontend` runs only the Vitest suites.
+
+The automated tests cover shared validation and permissions, backend services and scripts, registration and profile UI behavior, session restoration, profile updates, and failure paths. API suites send real HTTP requests to the Express app with Firebase token verification and persistence replaced by mocks or in-memory equivalents. They are not live Firebase, deployed-rule, or production-database verification.
 
 The same API cases can also run against the real Firebase project, using real sign-ins for the seeded accounts:
 
