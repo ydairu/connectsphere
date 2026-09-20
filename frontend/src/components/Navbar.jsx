@@ -16,6 +16,7 @@ function Navbar() {
         <div className="nav-actions">
           {user ? (
             <>
+              <NavLink className="nav-link" to="/requests">Requests</NavLink>
               {isOrganiser && <NavLink className="nav-link" to="/requests/drafts">My drafts</NavLink>}
               {isOrganiser && <NavLink className="nav-link" to="/event-requests/new">Create request</NavLink>}
               <NavLink className="button button-secondary button-small" to="/profile">Profile</NavLink>

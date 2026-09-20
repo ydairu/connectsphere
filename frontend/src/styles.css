@@ -154,3 +154,13 @@ a { color: inherit; }
   .request-item { align-items: flex-start; }
   .request-item .button { width: 100%; }
 }
+
+/* SPM-24 status pills — class carries the stored status value, see StatusPill.jsx */
+.status-pill { display: inline-flex; align-items: center; min-height: 26px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; color: var(--muted); background: #eef1ef; }
+.status-submitted { color: #25578c; background: #e9f2fb; }
+.status-under_review { color: #7b4d12; background: #fbf1df; }
+.status-planning { color: #5a3a8c; background: #f1ebfb; }
+.status-confirmed { color: #1f6b4f; background: #e6f5ee; }
+.status-returned_for_clarification { color: #8a4a12; background: #fdefe2; }
+.status-completed { color: #35414a; background: #eaeef1; }
+.status-cancelled, .status-rejected { color: #8c2f39; background: #fbeaec; }

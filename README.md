@@ -77,7 +77,7 @@ All routes are under `/api` and, except the health check, require a Firebase ID 
 
 `/api/requests` applies `shared/permissions.js` in `backend/src/middleware/authorise.js`: records outside a user's scope are not returned, sections a role may not view are absent from the response body rather than hidden, and a forbidden write is rejected with 403 naming each field. Status values are never editable through `PATCH`; status transitions will be separate routes.
 
-There are currently two route sets over the same collection, `/api/event-requests` for creation and `/api/requests` for permission-checked reads and edits. Merging them is an open item recorded in `AGENTS.md`.
+Two route sets cover the same collection, split by status: drafts are created and edited through `/api/event-requests`, which validates field values, and everything after submission is read and edited through `/api/requests`, which applies the full role, record and status rules. This split is a team decision recorded in `AGENTS.md`, awaiting confirmation by the SPM-7 owner.
 
 ## Firestore Security Rules
 

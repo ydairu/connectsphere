@@ -5,6 +5,7 @@ import DraftRequestsPage from './pages/DraftRequestsPage.jsx'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
+import RequestsPage from './pages/RequestsPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/requests" element={<RequestsPage />} />
         <Route path="/requests/drafts" element={<DraftRequestsPage />} />
         <Route path="/event-requests/new" element={<CreateEventRequestPage />} />
         <Route path="/event-requests/:id/edit" element={<CreateEventRequestPage />} />

@@ -7,7 +7,7 @@
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",
     "build": "npm run build --prefix frontend",
-    "test": "node --test \"shared/**/*.test.js\" \"backend/src/**/*.test.js\" \"backend/scripts/**/*.test.js\"",
+    "test": "node --test \"shared/**/*.test.js\" \"backend/src/**/*.test.js\" \"backend/scripts/**/*.test.js\" \"frontend/src/**/*.test.js\"",
     "install:all": "npm install && npm install --prefix frontend && npm install --prefix backend"
   },
   "devDependencies": {
