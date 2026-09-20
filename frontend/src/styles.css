@@ -168,3 +168,12 @@ a { color: inherit; }
 .status-returned_for_clarification { color: #8a4a12; background: #fdefe2; }
 .status-completed { color: #35414a; background: #eaeef1; }
 .status-cancelled, .status-rejected { color: #8c2f39; background: #fbeaec; }
+
+/* SPM-42 request detail */
+.request-item-actions { display: flex; align-items: center; gap: 12px; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+.section-heading h2 { margin: 0; font-size: 22px; letter-spacing: -0.03em; }
+.section-readonly { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 999px; background: #eef1ef; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.value-list { margin: 0; padding-left: 18px; }
+.value-empty { color: var(--muted); font-weight: 500; }
+.page-heading .eyebrow a { text-decoration: none; }
