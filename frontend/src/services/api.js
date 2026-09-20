@@ -70,3 +70,15 @@ export function updateEventRequest(user, id, eventRequest) {
 export function listRequests(user) {
   return authenticatedRequest(user, '/api/requests')
 }
+
+// SPM-42 single request: the body carries only the sections this user may view, plus the sections
+// they may edit right now.
+export function getRequest(user, id) {
+  return authenticatedRequest(user, `/api/requests/${id}`)
+}
+
+// Section-keyed patch, e.g. { venue: { layoutPreference: 'banquet' } }. A forbidden field comes back
+// as 403 with forbiddenFields naming it.
+export function updateRequest(user, id, patch) {
+  return authenticatedRequest(user, `/api/requests/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+}

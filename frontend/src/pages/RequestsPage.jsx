@@ -97,7 +97,10 @@ function RequestsPage() {
                         {[request.organisationName, date].filter(Boolean).join(' · ') || 'No preferred date yet'}
                       </p>
                     </div>
-                    <StatusPill status={request.status} />
+                    <div className="request-item-actions">
+                      <StatusPill status={request.status} />
+                      <Link className="button button-secondary button-small" to={`/requests/${request.id}`}>View</Link>
+                    </div>
                   </Card>
                 </li>
               )
