@@ -81,6 +81,8 @@ Add a row only when there is an inspectable artefact. If the artefact is incompl
 - SPM-42 / SPM-24 interface: [`frontend/src/pages/DraftRequestsPage.jsx`](../../frontend/src/pages/DraftRequestsPage.jsx), [`frontend/src/pages/RequestsPage.jsx`](../../frontend/src/pages/RequestsPage.jsx), [`frontend/src/pages/RequestDetailPage.jsx`](../../frontend/src/pages/RequestDetailPage.jsx), [`frontend/src/components/ProtectedRoute.jsx`](../../frontend/src/components/ProtectedRoute.jsx)
 - SPM-42 / SPM-24 test evidence: [`shared/permissions.test.js`](../../shared/permissions.test.js), [`backend/src/routes/requestRoutes.cases.js`](../../backend/src/routes/requestRoutes.cases.js), [`backend/src/routes/requestRoutes.test.js`](../../backend/src/routes/requestRoutes.test.js), [`frontend/src/pages/requestDetail.test.jsx`](../../frontend/src/pages/requestDetail.test.jsx), [`frontend/src/pages/draftRequests.test.jsx`](../../frontend/src/pages/draftRequests.test.jsx)
 - Demonstration data: [`backend/scripts/seedData.js`](../../backend/scripts/seedData.js), [`backend/scripts/seed.js`](../../backend/scripts/seed.js)
+- SPM-42 / SPM-24 permission matrix, criterion-to-test traceability and Definition of Done status: [`spm42-spm24-traceability.md`](spm42-spm24-traceability.md)
+- Deployed security-rule verification: [`backend/scripts/check-firestore-rules.js`](../../backend/scripts/check-firestore-rules.js)
 
 **SPM-7 acceptance evidence**
 

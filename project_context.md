@@ -165,3 +165,4 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
 - `effective-requirements.md` is the current reconciled interpretation.
 - The backlog and Sprint records control operational status and estimates.
 - [`docs/evidence/presentation-evidence.md`](docs/evidence/presentation-evidence.md) tracks verified work, evidence locations, gaps, and candidate Week 11 slide content against the course rubric.
+- [`docs/evidence/spm42-spm24-traceability.md`](docs/evidence/spm42-spm24-traceability.md) holds the SPM-42 permission matrix, the criterion-to-test mapping for SPM-42 and SPM-24, and their Definition of Done status.

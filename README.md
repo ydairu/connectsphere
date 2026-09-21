@@ -93,7 +93,7 @@ Two route sets cover the same collection, split by status: drafts are created an
 - allows a signed-in browser user to read and update only their own `users/{uid}` document;
 - allows a profile to be created only with the `organiser` or `attendee` role, and blocks browser-side changes to `roles`, `role`, `organisationId`, `organisationName`, and `seedTag`, so users cannot grant themselves access or bypass the profile API. The backend's Admin SDK performs the validated organisation-name update.
 
-Editing the file changes nothing until it is deployed:
+Editing the file changes nothing until it is deployed. After deploying, run `node backend/scripts/check-firestore-rules.js --project=<projectId>` to confirm what the rules actually do:
 
 ```bash
 firebase deploy --only firestore:rules --project <FIREBASE_PROJECT_ID>
@@ -123,6 +123,7 @@ Both scripts write to the Firebase project in the root `.env`. They print that p
 
 - **Roles migration** — `node backend/scripts/migrate-user-roles.js [--organisations=<file.json>]` backfills `users/{uid}`: `role` → `roles[]`, plus `organisationId`/`organisationName` for organisers, taken from an organisations file the team supplies (see the script header). It never invents an organisation and never removes `role`. Idempotent.
 - **Seed** — `node backend/scripts/seed.js` creates demonstration accounts for all five roles (plus a venue + technical staff account), two organisations, and event requests in every status. Requires `SEED_ACCOUNT_PASSWORD` for `--write`. Idempotent. Every seeded Auth user and document has an ID starting `seed-` and a `seedTag` field, so seeded data can be found and removed without touching real accounts.
+- **Security-rule check** — `node backend/scripts/check-firestore-rules.js --project=<projectId>` signs in as seeded accounts and calls Firestore directly, the way the browser can, to prove the deployed rules deny it. Read-only apart from one temporary account it creates and removes. Needs `VITE_FIREBASE_API_KEY` and `SEED_ACCOUNT_PASSWORD`.
 
 ## Local Setup
 
