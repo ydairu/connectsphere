@@ -4,6 +4,7 @@ import {
   EventRequestNotFoundError,
   EventRequestValidationError,
   getOwnedDraftEventRequest,
+  submitDraftEventRequest,
   updateDraftEventRequest,
 } from '../services/eventRequestService.js'
 
@@ -41,6 +42,15 @@ export async function getEventRequest(req, res, next) {
 export async function updateEventRequest(req, res, next) {
   try {
     const eventRequest = await updateDraftEventRequest(req.params.id, req.body, req.user)
+    return res.json({ eventRequest })
+  } catch (error) {
+    return sendEventRequestError(error, res, next)
+  }
+}
+
+export async function submitEventRequest(req, res, next) {
+  try {
+    const eventRequest = await submitDraftEventRequest(req.params.id, req.user)
     return res.json({ eventRequest })
   } catch (error) {
     return sendEventRequestError(error, res, next)

@@ -1,5 +1,10 @@
-import { DRAFT } from '../../../shared/status.js'
-import { buildDraftEventRequest, buildDraftEventRequestUpdate, hasValidationErrors } from '../../../shared/eventRequest.js'
+import { DRAFT, SUBMITTED } from '../../../shared/status.js'
+import {
+  buildDraftEventRequest,
+  buildDraftEventRequestUpdate,
+  hasValidationErrors,
+  validateEventRequestSubmission,
+} from '../../../shared/eventRequest.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 
 export class EventRequestValidationError extends Error {
@@ -57,6 +62,28 @@ export async function updateDraftEventRequest(id, input, organiser, db = getAdmi
 
   const { update, errors } = buildDraftEventRequestUpdate(input)
   if (hasValidationErrors(errors)) throw new EventRequestValidationError(errors)
+
+  await docRef.update(update)
+  return { id, ...existing, ...update }
+}
+
+export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), now = new Date()) {
+  const docRef = db.collection('eventRequests').doc(id)
+  const snapshot = await docRef.get()
+
+  if (!snapshot.exists) throw new EventRequestNotFoundError()
+
+  const existing = snapshot.data()
+  if (existing.ownerUid !== organiser.uid) throw new EventRequestForbiddenError()
+  if (existing.status !== DRAFT) throw new EventRequestForbiddenError('Only unsubmitted draft requests can be submitted.')
+
+  const { errors } = validateEventRequestSubmission(existing)
+  if (hasValidationErrors(errors)) throw new EventRequestValidationError(errors)
+
+  const update = {
+    status: SUBMITTED,
+    updatedAt: now.toISOString(),
+  }
 
   await docRef.update(update)
   return { id, ...existing, ...update }
