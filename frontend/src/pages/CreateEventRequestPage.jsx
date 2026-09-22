@@ -108,8 +108,9 @@ function CreateEventRequestPage() {
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [loadingDraft, setLoadingDraft] = useState(Boolean(routeRequestId))
+  const [draftLoadFailed, setDraftLoadFailed] = useState(false)
   const [savedRequestId, setSavedRequestId] = useState(routeRequestId ?? null)
-  const [submittedRequestId, setSubmittedRequestId] = useState(null)
+  const [submitted, setSubmitted] = useState(false)
 
   const isOrganiser = useMemo(() => roles.includes(ORGANISER), [roles])
   const isEditingDraft = Boolean(routeRequestId)
@@ -131,6 +132,7 @@ function CreateEventRequestPage() {
       if (!routeRequestId || !isOrganiser) return
 
       setLoadingDraft(true)
+      setDraftLoadFailed(false)
       setStatus({ type: null, message: '' })
       try {
         const { eventRequest } = await getEventRequest(user, routeRequestId)
@@ -139,6 +141,7 @@ function CreateEventRequestPage() {
         setSavedRequestId(eventRequest.id)
       } catch (error) {
         if (!active) return
+        setDraftLoadFailed(true)
         setStatus({
           type: 'error',
           message:
@@ -228,9 +231,9 @@ function CreateEventRequestPage() {
       })
       if (!draft) return
 
-      const { eventRequest } = await submitEventRequest(user, draft.id)
+      await submitEventRequest(user, draft.id)
       setErrors({})
-      setSubmittedRequestId(eventRequest.id)
+      setSubmitted(true)
       setStatus({
         type: 'success',
         message: 'Your event request has been submitted. It is no longer editable as a draft.',
@@ -285,11 +288,16 @@ function CreateEventRequestPage() {
           <Link className="button button-secondary" to="/profile">Back to profile</Link>
         </div>
 
-        {submittedRequestId ? (
+        {draftLoadFailed ? (
+          <Card className="empty-profile">
+            {status.message && <div className={`alert alert-${status.type}`}>{status.message}</div>}
+            <Link className="button button-primary" to="/requests">Back to requests</Link>
+          </Card>
+        ) : submitted ? (
           <Card className="empty-profile">
             <h2>Submitted for review</h2>
             <p>Your event request has been submitted and can no longer be edited as a draft.</p>
-            <Link className="button button-primary" to={`/requests/${submittedRequestId}`}>View submitted request</Link>
+            <Link className="button button-primary" to="/requests">Back to requests</Link>
           </Card>
         ) : (
         <form onSubmit={handleSaveDraft}>
