@@ -1,0 +1,151 @@
+// In-memory Firebase double for the Playwright suites, serving:
+//   /__double__/...   the Firebase Auth + Firestore behaviour the browser app depends on
+//   /api/...          the REAL Express application (createApp) with token verification and profile
+//                     loading pointed at the double, and event requests in the in-memory store.
+//
+// Not Firebase: error codes and flows mirror what the application relies on, nothing more. Security
+// rules are not evaluated here (see tests/spm-2/integration/firestoreRules.static.test.js).
+
+import cors from 'cors'
+import express from 'express'
+import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
+import { createApp } from '../../../backend/src/app.js'
+import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
+import { createMemoryEventRequestStore } from '../../../backend/src/testing/memoryEventRequestStore.js'
+import { ALL_ROLE_USERS, TEST_PASSWORD, profileOf } from '../fixtures/testUsers.js'
+
+const TOKEN_PREFIX = 'test-token:'
+const EMAIL_PATTERN = /^\S+@\S+\.\S+$/
+
+export function createDouble() {
+  const state = { accounts: new Map(), profiles: new Map(), nextUid: 1 }
+
+  function reset() {
+    state.accounts.clear()
+    state.profiles.clear()
+    state.nextUid = 1
+    for (const account of ALL_ROLE_USERS) {
+      state.accounts.set(account.email.toLowerCase(), {
+        uid: account.uid,
+        email: account.email,
+        password: TEST_PASSWORD,
+        displayName: account.name,
+      })
+      state.profiles.set(account.uid, { ...profileOf(account), createdAt: new Date(0).toISOString() })
+    }
+  }
+
+  const accountByUid = (uid) => [...state.accounts.values()].find((account) => account.uid === uid)
+  const publicUser = ({ uid, email, displayName }) => ({ uid, email, displayName })
+  const tokenFor = (uid) => `${TOKEN_PREFIX}${uid}`
+  const fail = (res, status, code) => res.status(status).json({ code })
+
+  function uidFromRequest(req) {
+    const header = req.get('authorization') ?? ''
+    if (!header.startsWith('Bearer ')) return null
+    const token = header.slice(7).trim()
+    if (!token.startsWith(TOKEN_PREFIX)) return null
+    const uid = token.slice(TOKEN_PREFIX.length)
+    return accountByUid(uid) ? uid : null
+  }
+
+  // Mirrors signedInAs(uid) in firestore.rules: a user may only touch their own records.
+  function requireSelf(req, res, next) {
+    const uid = uidFromRequest(req)
+    if (!uid) return fail(res, 401, 'unauthenticated')
+    if (uid !== req.params.uid) return fail(res, 403, 'permission-denied')
+    return next()
+  }
+
+  function replaceSentinels(value) {
+    if (Array.isArray(value)) return value.map(replaceSentinels)
+    if (value && typeof value === 'object') {
+      if (value.__serverTimestamp) return new Date().toISOString()
+      return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, replaceSentinels(inner)]))
+    }
+    return value
+  }
+
+  const router = express.Router()
+
+  router.get('/health', (_req, res) => res.json({ status: 'ok' }))
+  router.post('/reset', (_req, res) => {
+    reset()
+    res.status(204).end()
+  })
+  router.get('/state', (_req, res) => {
+    res.json({
+      accounts: [...state.accounts.values()].map(publicUser),
+      profiles: Object.fromEntries(state.profiles),
+    })
+  })
+
+  router.post('/auth/signUp', (req, res) => {
+    const { email, password } = req.body ?? {}
+    if (typeof email !== 'string' || !EMAIL_PATTERN.test(email)) return fail(res, 400, 'auth/invalid-email')
+    if (!password) return fail(res, 400, 'auth/missing-password')
+    if (password.length < 6) return fail(res, 400, 'auth/weak-password')
+    if (state.accounts.has(email.toLowerCase())) return fail(res, 400, 'auth/email-already-in-use')
+    const account = { uid: `e2e-uid-${state.nextUid++}`, email, password, displayName: null }
+    state.accounts.set(email.toLowerCase(), account)
+    return res.status(201).json({ user: publicUser(account), idToken: tokenFor(account.uid) })
+  })
+
+  router.post('/auth/signInWithPassword', (req, res) => {
+    const { email, password } = req.body ?? {}
+    if (typeof email !== 'string' || !EMAIL_PATTERN.test(email)) return fail(res, 400, 'auth/invalid-email')
+    if (!password) return fail(res, 400, 'auth/missing-password')
+    const account = state.accounts.get(email.toLowerCase())
+    if (!account || account.password !== password) return fail(res, 400, 'auth/invalid-credential')
+    return res.json({ user: publicUser(account), idToken: tokenFor(account.uid) })
+  })
+
+  router.patch('/auth/users/:uid', requireSelf, (req, res) => {
+    const account = accountByUid(req.params.uid)
+    if (typeof req.body?.displayName === 'string') account.displayName = req.body.displayName
+    res.json({ user: publicUser(account) })
+  })
+
+  router.delete('/auth/users/:uid', requireSelf, (req, res) => {
+    const account = accountByUid(req.params.uid)
+    state.accounts.delete(account.email.toLowerCase())
+    res.status(204).end()
+  })
+
+  router.get('/firestore/users/:uid', requireSelf, (req, res) => {
+    const data = state.profiles.get(req.params.uid)
+    res.json({ exists: data !== undefined, data: data ?? null })
+  })
+
+  router.put('/firestore/users/:uid', requireSelf, (req, res) => {
+    state.profiles.set(req.params.uid, replaceSentinels(req.body ?? {}))
+    res.status(204).end()
+  })
+
+  const authenticate = createAuthenticate({
+    async verifyIdToken(token) {
+      if (!token.startsWith(TOKEN_PREFIX)) throw new Error('Invalid test token')
+      const account = accountByUid(token.slice(TOKEN_PREFIX.length))
+      if (!account) throw new Error('Token belongs to a deleted account')
+      return { uid: account.uid, email: account.email }
+    },
+    async loadProfile(uid) {
+      return state.profiles.get(uid) ?? null
+    },
+  })
+
+  const api = createApp({ authenticate, eventRequestStore: createMemoryEventRequestStore(SEED_REQUESTS) })
+
+  reset()
+  return { state, router, api, reset }
+}
+
+export function startDoubleServer({ port, clientOrigin }) {
+  const double = createDouble()
+  const server = express()
+  server.use('/__double__', cors({ origin: clientOrigin }), express.json(), double.router)
+  server.use(double.api)
+  return server.listen(port, '127.0.0.1', () => {
+    console.log(`Firebase double + API listening on http://127.0.0.1:${port} for ${clientOrigin}`)
+  })
+}
