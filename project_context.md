@@ -52,7 +52,7 @@ Tracked application routes currently include:
 - `/register`
 - protected `/profile`
 
-The root package provides development, frontend build, and shared/backend test commands. The frontend package provides build and lint commands. No CI workflow is currently present in the tracked repository.
+The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. A GitHub Actions workflow (`.github/workflows/ci.yml`) runs lint, all test suites, the production build and the Playwright E2E suites on every push and on pull requests into `main`.
 
 ## Independently Observed Implementation State
 
@@ -152,6 +152,7 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
 6. **Password policy:** no customer rule exists. The current frontend enforces six characters; record this as a team decision if retained.
 7. **Role model:** roles arrays and shared permission checks exist, but complete five-role workflows and organisation membership still require verification before SPM-42 can be Done.
 8. **Testing and CI:** automated shared/backend and frontend tests exist; no CI workflow is currently present. On 19 Sep, `npm test` passed 68 Node tests and 17 Vitest tests; frontend lint and production build passed (build reports a bundle-size warning). Organisation persistence/authentication checks use mocks or in-memory storage, including real Express HTTP routing with mocked Firebase. No live Firebase, emulator, deployed security-rule, or manual browser verification was performed for this increment. Firestore rules and the operational workbook/Sprint record remain absent from the repository.
+9. **SPM-1/SPM-2 test suites and CI (24 Sep 2026):** `tests/` holds story-organised suites for SPM-1 and SPM-2 (Vitest + React Testing Library + Supertest, Playwright for E2E), plus a GitHub Actions workflow. On 24 Sep: existing suites 107 Node + 41 Vitest passed; `tests/` Vitest 238 passed (SPM-1 133, SPM-2 101, lint 4); Playwright 18 passed (SPM-1 13, SPM-2 5) in Chromium; ESLint over the whole repository and the production build passed. Firebase is replaced by in-memory fakes (unit/integration) and an in-memory double (E2E); `firestore.rules` is checked only as source text. This is not live Firebase, emulator, deployed-rule or production-database verification — executing the rules still needs the Firestore emulator (Java), which is not set up.
 
 ## Documentation Boundaries
 

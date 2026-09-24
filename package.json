@@ -2,15 +2,44 @@
   "name": "connectsphere",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
   "scripts": {
     "dev": "concurrently -n frontend,backend -c cyan,green \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",
     "build": "npm run build --prefix frontend",
-    "test": "node --test \"shared/**/*.test.js\" \"backend/src/**/*.test.js\" \"backend/scripts/**/*.test.js\" && npm test --prefix frontend",
-    "install:all": "npm install && npm install --prefix frontend && npm install --prefix backend"
+    "lint": "eslint .",
+    "test": "npm run test:existing && npm run test:vitest && npm run test:e2e",
+    "test:existing": "node --test \"shared/**/*.test.js\" \"backend/src/**/*.test.js\" \"backend/scripts/**/*.test.js\" && npm test --prefix frontend",
+    "test:vitest": "vitest run",
+    "test:spm1": "vitest run tests/spm-1 && playwright test tests/spm-1",
+    "test:spm2": "vitest run tests/spm-2 && playwright test tests/spm-2",
+    "test:unit": "vitest run tests/spm-1/unit tests/spm-2/unit",
+    "test:integration": "vitest run tests/spm-1/integration tests/spm-2/integration tests/lint",
+    "test:e2e": "playwright test",
+    "test:coverage": "vitest run --coverage",
+    "install:all": "npm install"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^16.5.0",
+    "jsdom": "^26.1.0",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.11"
   }
 }

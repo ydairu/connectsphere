@@ -12,6 +12,11 @@ coverage/
 .vite/
 **/.vite/
 
+# Playwright output
+test-results/
+playwright-report/
+blob-report/
+
 # Environment files and local configuration
 .env
 .env.*
