@@ -83,6 +83,27 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     assert.deepEqual(forbiddenFields(owner, submitted, { core: { title: 'Renamed' } }), ['core.title'])
   })
 
+  test('Self-registered organiser views their own submitted request before organisation ID assignment', () => {
+    const selfRegisteredOwner = { uid: 'u-self-registered', roles: [ORGANISER], organisationName: 'Named Only Ltd' }
+    const ownSubmitted = request({
+      status: SUBMITTED,
+      ownerUid: selfRegisteredOwner.uid,
+      organisationId: null,
+      organisationName: selfRegisteredOwner.organisationName,
+    })
+
+    assert.equal(inScope(selfRegisteredOwner, ownSubmitted), true)
+    assert.equal(canEdit(selfRegisteredOwner, ownSubmitted, CORE), false)
+    assert.deepEqual(projectRequest(selfRegisteredOwner, ownSubmitted), {
+      id: ownSubmitted.id,
+      status: SUBMITTED,
+      core: ownSubmitted.core,
+      venue: ownSubmitted.venue,
+      equipment: ownSubmitted.equipment,
+      registration: ownSubmitted.registration,
+    })
+  })
+
   test("Organiser opens a colleague's draft in the same organisation", () => {
     const colleaguesDraft = request({ status: DRAFT, ownerUid: colleague.uid })
     assert.equal(inScope(owner, colleaguesDraft), false)
