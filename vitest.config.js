@@ -41,6 +41,7 @@ export default defineConfig({
         'frontend/src/pages/RegisterPage.jsx',
         'frontend/src/pages/ProfilePage.jsx',
         'frontend/src/pages/ForbiddenPage.jsx',
+        'frontend/src/pages/CreateVenuePage.jsx',
         'frontend/src/utils/authErrors.js',
         'frontend/src/utils/access.js',
         'frontend/src/utils/roleLabels.js',
