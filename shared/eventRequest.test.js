@@ -5,7 +5,7 @@ import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { DRAFT } from './status.js'
-import { buildDraftEventRequest, buildDraftEventRequestUpdate } from './eventRequest.js'
+import { buildDraftEventRequest, buildDraftEventRequestUpdate, validateEventRequestSubmission } from './eventRequest.js'
 
 const organiser = Object.freeze({
   uid: 'organiser-1',
@@ -103,5 +103,56 @@ describe('SPM-7 — Create an Event Request model', () => {
     assert.equal(update.assignedStaffUids, undefined)
     assert.equal(update.internal, undefined)
     assert.equal(update.core.title, 'Updated title')
+  })
+})
+
+describe('SPM-3 — Submit an Event Request validation', () => {
+  test('accepts a draft with every mandatory submission field present', () => {
+    const { errors } = validateEventRequestSubmission({
+      core: {
+        title: 'Annual Partner Forum',
+        purpose: 'Partner updates',
+        expectedAttendees: 80,
+        durationHours: 4,
+        preferredDateTime: '2026-11-20T09:00:00+08:00',
+      },
+      venue: {
+        layoutPreference: 'Theatre',
+      },
+    })
+
+    assert.deepEqual(errors, {})
+  })
+
+  test('returns every missing mandatory submission field', () => {
+    const { errors } = validateEventRequestSubmission({})
+
+    assert.deepEqual(errors, {
+      'core.title': 'Required before submission.',
+      'core.purpose': 'Required before submission.',
+      'core.expectedAttendees': 'Required before submission.',
+      'core.durationHours': 'Required before submission.',
+      'core.preferredDateTime': 'Required before submission.',
+      'venue.layoutPreference': 'Required before submission.',
+    })
+  })
+
+  test('keeps format validation errors during submission validation', () => {
+    const { errors } = validateEventRequestSubmission({
+      core: {
+        title: 'Annual Partner Forum',
+        purpose: 'Partner updates',
+        expectedAttendees: 'many',
+        durationHours: '-2',
+        preferredDateTime: 'next week',
+      },
+      venue: {
+        layoutPreference: 'Theatre',
+      },
+    })
+
+    assert.equal(errors['core.expectedAttendees'], 'Must be a positive whole number.')
+    assert.equal(errors['core.durationHours'], 'Must be a positive number.')
+    assert.equal(errors['core.preferredDateTime'], 'Must be a valid date/time.')
   })
 })

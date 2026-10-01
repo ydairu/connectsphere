@@ -10,6 +10,7 @@ import {
   EventRequestForbiddenError,
   EventRequestValidationError,
   getOwnedDraftEventRequest,
+  submitDraftEventRequest,
   updateDraftEventRequest,
 } from './eventRequestService.js'
 
@@ -195,5 +196,101 @@ describe('SPM-7 — Event request service', () => {
       () => updateDraftEventRequest('request-1', { core: { title: 'Nope' } }, organiser, db),
       EventRequestForbiddenError,
     )
+  })
+
+  test('submits an owned draft with all mandatory fields', async () => {
+    const db = fakeDb({
+      'request-1': {
+        status: DRAFT,
+        ownerUid: organiser.uid,
+        core: {
+          title: 'Ready request',
+          purpose: 'Partner updates',
+          expectedAttendees: 50,
+          durationHours: 3,
+          preferredDateTime: '2026-11-20T09:00:00+08:00',
+        },
+        venue: { layoutPreference: 'Theatre' },
+      },
+    })
+    const now = new Date('2026-09-20T10:00:00.000Z')
+
+    const submitted = await submitDraftEventRequest('request-1', organiser, db, now)
+
+    assert.equal(submitted.status, SUBMITTED)
+    assert.equal(submitted.ownerUid, organiser.uid)
+    assert.equal(submitted.core.title, 'Ready request')
+    assert.equal(submitted.updatedAt, now.toISOString())
+    assert.equal(db.store.get('request-1').status, SUBMITTED)
+  })
+
+  test('rejects submission with every missing mandatory field and leaves the draft unchanged', async () => {
+    const db = fakeDb({
+      'request-1': {
+        status: DRAFT,
+        ownerUid: organiser.uid,
+        core: { description: 'Still incomplete' },
+        venue: {},
+      },
+    })
+
+    await assert.rejects(
+      () => submitDraftEventRequest('request-1', organiser, db),
+      (error) => {
+        assert.ok(error instanceof EventRequestValidationError)
+        assert.deepEqual(error.errors, {
+          'core.title': 'Required before submission.',
+          'core.purpose': 'Required before submission.',
+          'core.expectedAttendees': 'Required before submission.',
+          'core.durationHours': 'Required before submission.',
+          'core.preferredDateTime': 'Required before submission.',
+          'venue.layoutPreference': 'Required before submission.',
+        })
+        return true
+      },
+    )
+
+    assert.equal(db.store.get('request-1').status, DRAFT)
+    assert.equal(db.store.get('request-1').core.description, 'Still incomplete')
+  })
+
+  test('rejects submission from a different organiser', async () => {
+    const db = fakeDb({
+      'request-1': {
+        status: DRAFT,
+        ownerUid: 'other-organiser',
+        core: {
+          title: 'Private request',
+          purpose: 'Partner updates',
+          expectedAttendees: 50,
+          durationHours: 3,
+          preferredDateTime: '2026-11-20T09:00:00+08:00',
+        },
+        venue: { layoutPreference: 'Theatre' },
+      },
+    })
+
+    await assert.rejects(() => submitDraftEventRequest('request-1', organiser, db), EventRequestForbiddenError)
+    assert.equal(db.store.get('request-1').status, DRAFT)
+  })
+
+  test('rejects submission after a request is no longer an unsubmitted draft', async () => {
+    const db = fakeDb({
+      'request-1': {
+        status: SUBMITTED,
+        ownerUid: organiser.uid,
+        core: {
+          title: 'Submitted request',
+          purpose: 'Partner updates',
+          expectedAttendees: 50,
+          durationHours: 3,
+          preferredDateTime: '2026-11-20T09:00:00+08:00',
+        },
+        venue: { layoutPreference: 'Theatre' },
+      },
+    })
+
+    await assert.rejects(() => submitDraftEventRequest('request-1', organiser, db), EventRequestForbiddenError)
+    assert.equal(db.store.get('request-1').status, SUBMITTED)
   })
 })

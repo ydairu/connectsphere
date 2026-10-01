@@ -122,6 +122,28 @@ export function buildDraftEventRequestUpdate(input, now = new Date()) {
   }
 }
 
+export function validateEventRequestSubmission(input = {}) {
+  const { eventRequest, errors } = normaliseEventRequestInput(input)
+
+  const requiredFields = [
+    ['core.title', eventRequest.core.title],
+    ['core.purpose', eventRequest.core.purpose],
+    ['core.expectedAttendees', eventRequest.core.expectedAttendees],
+    ['core.durationHours', eventRequest.core.durationHours],
+    ['core.preferredDateTime', eventRequest.core.preferredDateTime],
+    ['venue.layoutPreference', eventRequest.venue.layoutPreference],
+  ]
+
+  for (const [path, value] of requiredFields) {
+    if (errors[path]) continue
+    if (value === null || value === undefined || value === '') {
+      errors[path] = 'Required before submission.'
+    }
+  }
+
+  return { eventRequest, errors }
+}
+
 export function hasValidationErrors(errors) {
   return Object.keys(errors).length > 0
 }

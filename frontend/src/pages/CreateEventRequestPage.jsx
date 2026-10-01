@@ -7,7 +7,7 @@ import Card from '../components/Card.jsx'
 import Input from '../components/Input.jsx'
 import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
-import { createEventRequest, getEventRequest, updateEventRequest } from '../services/api.js'
+import { createEventRequest, getEventRequest, submitEventRequest, updateEventRequest } from '../services/api.js'
 
 const initialForm = {
   title: '',
@@ -106,8 +106,11 @@ function CreateEventRequestPage() {
   const [status, setStatus] = useState({ type: null, message: '' })
   const [toast, setToast] = useState({ title: '', message: '' })
   const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [loadingDraft, setLoadingDraft] = useState(Boolean(routeRequestId))
+  const [draftLoadFailed, setDraftLoadFailed] = useState(false)
   const [savedRequestId, setSavedRequestId] = useState(routeRequestId ?? null)
+  const [submitted, setSubmitted] = useState(false)
 
   const isOrganiser = useMemo(() => roles.includes(ORGANISER), [roles])
   const isEditingDraft = Boolean(routeRequestId)
@@ -129,6 +132,7 @@ function CreateEventRequestPage() {
       if (!routeRequestId || !isOrganiser) return
 
       setLoadingDraft(true)
+      setDraftLoadFailed(false)
       setStatus({ type: null, message: '' })
       try {
         const { eventRequest } = await getEventRequest(user, routeRequestId)
@@ -137,6 +141,7 @@ function CreateEventRequestPage() {
         setSavedRequestId(eventRequest.id)
       } catch (error) {
         if (!active) return
+        setDraftLoadFailed(true)
         setStatus({
           type: 'error',
           message:
@@ -164,8 +169,7 @@ function CreateEventRequestPage() {
     }))
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function saveDraft({ showToast = true, validationMessage = 'Fix the highlighted fields before saving.' } = {}) {
     setStatus({ type: null, message: '' })
 
     const payload = toPayload(form)
@@ -173,22 +177,22 @@ function CreateEventRequestPage() {
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors)
-      setStatus({ type: 'error', message: 'Fix the highlighted fields before saving.' })
-      return
+      setStatus({ type: 'error', message: validationMessage })
+      return null
     }
 
     setErrors({})
-    setSaving(true)
-    try {
-      const wasEditingSavedDraft = Boolean(savedRequestId)
-      const { eventRequest } = savedRequestId
-        ? await updateEventRequest(user, savedRequestId, payload)
-        : await createEventRequest(user, payload)
+    const wasEditingSavedDraft = Boolean(savedRequestId)
+    const { eventRequest } = savedRequestId
+      ? await updateEventRequest(user, savedRequestId, payload)
+      : await createEventRequest(user, payload)
 
-      setSavedRequestId(eventRequest.id)
-      if (!wasEditingSavedDraft) {
-        navigate(`/event-requests/${eventRequest.id}/edit`, { replace: true })
-      }
+    setSavedRequestId(eventRequest.id)
+    if (!wasEditingSavedDraft) {
+      navigate(`/event-requests/${eventRequest.id}/edit`, { replace: true })
+    }
+
+    if (showToast) {
       setStatus({ type: null, message: '' })
       setToast({
         title: wasEditingSavedDraft ? 'Changes saved' : 'Draft saved',
@@ -196,6 +200,16 @@ function CreateEventRequestPage() {
           ? 'Your draft changes have been saved.'
           : 'Your event request has been saved as a draft. You can continue editing it on this page.',
       })
+    }
+
+    return eventRequest
+  }
+
+  async function handleSaveDraft(event) {
+    event.preventDefault()
+    setSaving(true)
+    try {
+      await saveDraft()
     } catch (error) {
       const apiErrors = error.details?.errors
       if (apiErrors) setErrors(apiErrors)
@@ -205,6 +219,40 @@ function CreateEventRequestPage() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleSubmitRequest() {
+    setSubmitting(true)
+    try {
+      const draft = await saveDraft({
+        showToast: false,
+        validationMessage: 'Fix the highlighted fields before submitting.',
+      })
+      if (!draft) return
+
+      await submitEventRequest(user, draft.id)
+      setErrors({})
+      setSubmitted(true)
+      setStatus({
+        type: 'success',
+        message: 'Your event request has been submitted. It is no longer editable as a draft.',
+      })
+      setToast({
+        title: 'Request submitted',
+        message: 'Your event request is now available for the next staff workflow.',
+      })
+    } catch (error) {
+      const apiErrors = error.details?.errors
+      if (apiErrors) setErrors(apiErrors)
+      setStatus({
+        type: 'error',
+        message: apiErrors
+          ? 'Complete the highlighted required fields before submitting.'
+          : 'Could not submit the request. Please try again.',
+      })
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -240,7 +288,19 @@ function CreateEventRequestPage() {
           <Link className="button button-secondary" to="/profile">Back to profile</Link>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        {draftLoadFailed ? (
+          <Card className="empty-profile">
+            {status.message && <div className={`alert alert-${status.type}`}>{status.message}</div>}
+            <Link className="button button-primary" to="/requests">Back to requests</Link>
+          </Card>
+        ) : submitted ? (
+          <Card className="empty-profile">
+            <h2>Submitted for review</h2>
+            <p>Your event request has been submitted and can no longer be edited as a draft.</p>
+            <Link className="button button-primary" to="/requests">Back to requests</Link>
+          </Card>
+        ) : (
+        <form onSubmit={handleSaveDraft}>
           {status.message && <div className={`alert alert-${status.type}`}>{status.message}</div>}
           {loadingDraft && <div className="alert alert-info">Loading saved draft...</div>}
 
@@ -272,11 +332,15 @@ function CreateEventRequestPage() {
           </Card>
 
           <div className="form-actions">
-            <Button type="submit" disabled={saving || loadingDraft}>
+            <Button type="submit" disabled={saving || submitting || loadingDraft}>
               {saving ? 'Saving request...' : savedRequestId ? 'Save changes' : 'Save unsubmitted request'}
+            </Button>
+            <Button type="button" variant="secondary" disabled={saving || submitting || loadingDraft} onClick={handleSubmitRequest}>
+              {submitting ? 'Submitting request...' : 'Submit request'}
             </Button>
           </div>
         </form>
+        )}
       </main>
       {toast.message && (
         <div className="toast" role="status" aria-live="polite">

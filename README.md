@@ -101,13 +101,30 @@ firebase deploy --only firestore:rules --project <FIREBASE_PROJECT_ID>
 
 ## Tests
 
+The repository is an npm workspace (`frontend`, `backend`, `shared`); one `npm install` at the root installs everything. `.npmrc` sets `legacy-peer-deps` because npm 10.9's peer resolver crashes on this workspace layout; every peer dependency is already declared explicitly.
+
 ```bash
-npm test
+npm test               # everything: existing suites, tests/ Vitest suites, Playwright E2E
+npm run test:existing  # node:test suites in shared/, backend/ and the frontend's own Vitest suites
+npm run test:spm1      # SPM-1 (sign in, protected routes, roles, logout): Vitest + Playwright
+npm run test:spm2      # SPM-2 (registration): Vitest + Playwright
+npm run test:unit      # tests/**/unit
+npm run test:integration
+npm run test:e2e       # Playwright, Chromium (run `npx playwright install chromium` once)
+npm run test:coverage  # tests/ Vitest suites with V8 coverage in coverage/
+npm run lint           # ESLint over frontend/, backend/, shared/ and tests/
+npm run build
 ```
 
-Runs the `node:test` suites in `shared/`, `backend/src/` and `backend/scripts/`, followed by the frontend Vitest suites. Install the repository dependencies first; `npm test --prefix frontend` runs only the Vitest suites.
+User-story suites live under `tests/` and are organised by story (`tests/spm-1`, `tests/spm-2`, with `tests/shared` for fixtures and doubles both stories use and `tests/lint` for repository-level checks). Every test name carries its `spm1_`/`spm2_` identifier. Unit and integration tests run in Vitest (React Testing Library for components, Supertest for the Express API) with the Firebase client and Admin SDKs replaced by in-memory fakes. The Playwright suites run the real React app and the real Express API in Chromium against an in-memory Firebase double (`tests/shared/firebase-double`), so no Firebase project, emulator or Java is needed.
 
-The automated tests cover shared validation and permissions, backend services and scripts, registration and profile UI behavior, session restoration, profile updates, and failure paths. API suites send real HTTP requests to the Express app with Firebase token verification and persistence replaced by mocks or in-memory equivalents. They are not live Firebase, deployed-rule, or production-database verification.
+None of this is live Firebase, emulator, deployed-rule or production-database verification. In particular, `firestore.rules` is only checked as source text (`tests/spm-2/integration/firestoreRules.static.test.js`); executing the rules needs the Firestore emulator.
+
+The pre-existing suites are unchanged: `node:test` in `shared/`, `backend/src/` and `backend/scripts/`, and the frontend's co-located Vitest suites (`npm test --prefix frontend`). They cover shared validation and permissions, backend services and scripts, registration and profile UI behavior, session restoration, profile updates, and failure paths. API suites send real HTTP requests to the Express app with Firebase token verification and persistence replaced by mocks or in-memory equivalents.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and on pull requests into `main`: lint, the existing suites, the `tests/` suites with coverage, the production build, then the Playwright E2E suites. It needs no secrets. The Playwright report and coverage are uploaded as workflow artifacts.
 
 The same API cases can also run against the real Firebase project, using real sign-ins for the seeded accounts:
 
