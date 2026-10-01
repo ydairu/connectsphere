@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { normaliseVenueInput } from '../../../shared/venue.js'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -47,10 +47,10 @@ function TextArea({ id, label, hint, error, ...props }) {
 
 function CreateVenuePage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [form, setForm] = useState(initialForm)
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState({ type: null, message: '' })
-  const [createdVenue, setCreatedVenue] = useState(null)
   const [saving, setSaving] = useState(false)
 
   function updateField(event) {
@@ -61,7 +61,6 @@ function CreateVenuePage() {
   async function handleSubmit(event) {
     event.preventDefault()
     setStatus({ type: null, message: '' })
-    setCreatedVenue(null)
 
     const payload = toPayload(form)
     const { errors: validationErrors } = normaliseVenueInput(payload)
@@ -76,9 +75,7 @@ function CreateVenuePage() {
     setErrors({})
     try {
       const { venue } = await createVenue(user, payload)
-      setCreatedVenue(venue)
-      setForm(initialForm)
-      setStatus({ type: 'success', message: 'Venue added to the catalogue.' })
+      navigate(`/venues/${venue.id}`, { state: { created: true } })
     } catch (error) {
       const apiErrors = error.details?.errors
       if (apiErrors) setErrors(apiErrors)
@@ -105,12 +102,6 @@ function CreateVenuePage() {
           {status.message && (
             <div className={`alert ${status.type === 'error' ? 'alert-error' : 'alert-success'}`} role="status">
               {status.message}
-            </div>
-          )}
-
-          {createdVenue && (
-            <div className="alert alert-success" role="status">
-              <strong>{createdVenue.name}</strong> was saved with capacity {createdVenue.maximumCapacity}.
             </div>
           )}
 

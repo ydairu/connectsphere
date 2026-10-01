@@ -10,6 +10,7 @@ import ProfilePage from './pages/ProfilePage.jsx'
 import RequestDetailPage from './pages/RequestDetailPage.jsx'
 import RequestsPage from './pages/RequestsPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
+import VenueDetailPage from './pages/VenueDetailPage.jsx'
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
       {/* Venue catalogue creation belongs to Venue Staff. The API enforces this with requireRole(VENUE_STAFF). */}
       <Route element={<ProtectedRoute allowedRoles={[VENUE_STAFF]} />}>
         <Route path="/venues/new" element={<CreateVenuePage />} />
+        <Route path="/venues/:id" element={<VenueDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

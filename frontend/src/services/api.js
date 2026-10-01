@@ -76,6 +76,10 @@ export function createVenue(user, venue) {
   })
 }
 
+export function getVenue(user, id) {
+  return authenticatedRequest(user, `/api/venues/${id}`)
+}
+
 // SPM-42 list route: returns only the requests in the caller's scope, each reduced to the sections
 // their roles may view. Drafts come back only to their owner, which is what SPM-24's page relies on.
 export function listRequests(user) {

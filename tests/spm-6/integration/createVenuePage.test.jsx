@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 import { AuthContext } from '../../../frontend/src/context/auth-context.js'
 import { ApiRequestError } from '../../../frontend/src/services/api.js'
@@ -37,7 +37,11 @@ function showCreateVenuePage() {
       }}
     >
       <MemoryRouter initialEntries={['/venues/new']}>
-        <CreateVenuePage />
+        <Routes>
+          <Route path="/venues/new" element={<CreateVenuePage />} />
+          <Route path="/venues/:id" element={<p>Saved venue detail page</p>} />
+          <Route path="/requests" element={<p>Requests</p>} />
+        </Routes>
       </MemoryRouter>
     </AuthContext.Provider>,
   )
@@ -65,7 +69,7 @@ describe('SPM-6 — Add a Venue to the Catalogue frontend', () => {
     expect(createVenue).not.toHaveBeenCalled()
   })
 
-  it('spm6_frontend_submits_valid_venue_details_and_shows_success_feedback', async () => {
+  it('spm6_frontend_submits_valid_venue_details_and_opens_the_saved_venue', async () => {
     createVenue.mockResolvedValue({
       venue: {
         id: 'venue-1',
@@ -90,9 +94,7 @@ describe('SPM-6 — Add a Venue to the Catalogue frontend', () => {
         operatingHours: 'Monday-Friday 09:00-18:00',
       }),
     )
-    expect(await screen.findByText('Venue added to the catalogue.')).toBeTruthy()
-    expect(screen.getByText(/Conference Hall A/)).toBeTruthy()
-    expect(screen.getByText(/capacity 120/)).toBeTruthy()
+    expect(await screen.findByText('Saved venue detail page')).toBeTruthy()
   })
 
   it('spm6_frontend_displays_backend_validation_errors_without_clearing_entered_data', async () => {

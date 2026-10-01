@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
-import { createVenue, VenueValidationError } from '../../../backend/src/services/venueService.js'
+import { createVenue, getVenue, VenueNotFoundError } from '../../../backend/src/services/venueService.js'
 
 const venueStaff = Object.freeze({
   uid: 'venue-staff-1',
@@ -74,5 +74,41 @@ describe('SPM-6 — venue catalogue service (integration)', () => {
     })
 
     expect(db.collectionData('venues').size).toBe(0)
+  })
+
+  it('spm6_service_reopens_a_saved_venue_with_all_catalogue_details_retained', async () => {
+    const db = createFakeFirestore({
+      venues: {
+        'venue-1': {
+          name: 'Conference Hall A',
+          location: 'Level 3, Singapore Campus',
+          maximumCapacity: 120,
+          facilities: ['Projector', 'Stage', 'Wi-Fi'],
+          accessibilityFeatures: ['Wheelchair access'],
+          supportedLayouts: ['Theatre', 'Classroom'],
+          operatingHours: 'Monday-Friday 09:00-18:00',
+          createdByUid: venueStaff.uid,
+        },
+      },
+    })
+
+    const venue = await getVenue('venue-1', db)
+
+    expect(venue).toMatchObject({
+      id: 'venue-1',
+      name: 'Conference Hall A',
+      location: 'Level 3, Singapore Campus',
+      maximumCapacity: 120,
+      facilities: ['Projector', 'Stage', 'Wi-Fi'],
+      accessibilityFeatures: ['Wheelchair access'],
+      supportedLayouts: ['Theatre', 'Classroom'],
+      operatingHours: 'Monday-Friday 09:00-18:00',
+    })
+  })
+
+  it('spm6_service_reports_missing_venues_as_not_found', async () => {
+    const db = createFakeFirestore({ venues: {} })
+
+    await expect(getVenue('missing-venue', db)).rejects.toBeInstanceOf(VenueNotFoundError)
   })
 })

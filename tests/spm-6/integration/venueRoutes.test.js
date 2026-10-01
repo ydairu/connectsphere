@@ -72,6 +72,13 @@ async function postVenueAs(uid, body) {
   return { status: response.status, json: await response.json() }
 }
 
+async function getVenueAs(uid, id) {
+  const response = await fetch(`${baseUrl}/api/venues/${id}`, {
+    headers: { Authorization: `Bearer ${TOKEN_PREFIX}${uid}` },
+  })
+  return { status: response.status, json: await response.json() }
+}
+
 describe('SPM-6 — venue catalogue API (integration)', () => {
   it('spm6_api_allows_venue_staff_to_create_a_venue_with_valid_details', async () => {
     const response = await postVenueAs(VENUE_STAFF_USER.uid, {
@@ -84,6 +91,25 @@ describe('SPM-6 — venue catalogue API (integration)', () => {
     expect(response.json.venue.maximumCapacity).toBe(120)
     expect(response.json.venue.createdByUid).toBe(VENUE_STAFF_USER.uid)
     expect(response.json.venue.supportedLayouts).toEqual(['Theatre', 'Classroom'])
+  })
+
+  it('spm6_api_reopens_a_saved_venue_with_all_catalogue_details_retained', async () => {
+    const created = await postVenueAs(VENUE_STAFF_USER.uid, validVenueInput)
+    expect(created.status).toBe(201)
+
+    const opened = await getVenueAs(VENUE_STAFF_USER.uid, created.json.venue.id)
+
+    expect(opened.status).toBe(200)
+    expect(opened.json.venue).toMatchObject({
+      id: created.json.venue.id,
+      name: 'Conference Hall A',
+      location: 'Level 3, Singapore Campus',
+      maximumCapacity: 120,
+      facilities: ['Projector', 'Stage', 'Wi-Fi'],
+      accessibilityFeatures: ['Wheelchair access'],
+      supportedLayouts: ['Theatre', 'Classroom'],
+      operatingHours: 'Monday-Friday 09:00-18:00',
+    })
   })
 
   it('spm6_api_returns_all_affected_fields_and_creates_no_record_for_invalid_details', async () => {
@@ -113,6 +139,12 @@ describe('SPM-6 — venue catalogue API (integration)', () => {
     expect(db.collectionData('venues').size).toBe(beforeCount)
   })
 
+  it('spm6_api_rejects_non_venue_staff_users_from_reopening_a_venue', async () => {
+    const response = await getVenueAs(ORGANISER_USER.uid, 'request-1')
+
+    expect(response.status).toBe(403)
+  })
+
   it('spm6_api_rejects_missing_token_before_venue_creation', async () => {
     const beforeCount = db.collectionData('venues').size
     const response = await fetch(`${baseUrl}/api/venues`, {
@@ -123,5 +155,12 @@ describe('SPM-6 — venue catalogue API (integration)', () => {
 
     expect(response.status).toBe(401)
     expect(db.collectionData('venues').size).toBe(beforeCount)
+  })
+
+  it('spm6_api_returns_not_found_when_reopening_a_missing_venue', async () => {
+    const response = await getVenueAs(VENUE_STAFF_USER.uid, 'missing-venue')
+
+    expect(response.status).toBe(404)
+    expect(response.json.message).toBe('Venue not found')
   })
 })

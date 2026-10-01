@@ -1,8 +1,11 @@
-import { createVenue, VenueValidationError } from '../services/venueService.js'
+import { createVenue, getVenue, VenueNotFoundError, VenueValidationError } from '../services/venueService.js'
 
 export function sendVenueError(error, res, next) {
   if (error instanceof VenueValidationError) {
     return res.status(400).json({ message: 'Validation failed', errors: error.errors })
+  }
+  if (error instanceof VenueNotFoundError) {
+    return res.status(404).json({ message: 'Venue not found' })
   }
   return next(error)
 }
@@ -14,6 +17,14 @@ export function createVenueController(getDb) {
       try {
         const venue = await createVenue(req.body, req.user, getDb())
         return res.status(201).json({ venue })
+      } catch (error) {
+        return sendVenueError(error, res, next)
+      }
+    },
+    async getVenue(req, res, next) {
+      try {
+        const venue = await getVenue(req.params.id, getDb())
+        return res.json({ venue })
       } catch (error) {
         return sendVenueError(error, res, next)
       }
