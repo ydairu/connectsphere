@@ -55,12 +55,18 @@ function account(slug, name, roles, organisation) {
 
 export const SEED_ACCOUNTS = Object.freeze({
   coordinator: account('coordinator', 'Seed Coordinator', [COORDINATOR]),
+  // SPM-8: a second coordinator, so workload-based assignment has more than one candidate to choose from.
+  coordinator2: account('coordinator-2', 'Seed Coordinator 2', [COORDINATOR]),
+  // SPM-8: a third coordinator, so the seed spreads active work across three different workloads and the
+  // next submission visibly goes to the one with the fewest. Seeded workloads: 4, 2 and 1 (see SEED_REQUESTS).
+  coordinator3: account('coordinator-3', 'Seed Coordinator 3', [COORDINATOR]),
   venueStaff: account('venue-staff', 'Seed Venue Staff', [VENUE_STAFF]),
   technicalStaff: account('technical-staff', 'Seed Technical Staff', [TECHNICAL_STAFF]),
   // SPM-42 combined-permissions criterion: one account, two staff roles.
   venueTechnicalStaff: account('venue-technical-staff', 'Seed Venue + Technical Staff', [VENUE_STAFF, TECHNICAL_STAFF]),
   attendee: account('attendee', 'Seed Attendee', [ATTENDEE]),
-  // Organisation A has two organisers: organisation scoping plus the colleague-views-but-cannot-edit rule.
+  // Organisation A has three organisers. A1 and A2 demonstrate organisation scoping plus the
+  // colleague-views-but-cannot-edit rule; A3 is below.
   organiserA1: account('organiser-a1', 'Seed Organiser A1', [ORGANISER], SEED_ORGANISATIONS.A),
   organiserA2: account('organiser-a2', 'Seed Organiser A2', [ORGANISER], SEED_ORGANISATIONS.A),
   organiserB1: account('organiser-b1', 'Seed Organiser B1', [ORGANISER], SEED_ORGANISATIONS.B),
@@ -68,9 +74,11 @@ export const SEED_ACCOUNTS = Object.freeze({
   organiserA3: account('organiser-a3', 'Seed Organiser A3', [ORGANISER], SEED_ORGANISATIONS.A),
 })
 
-const { venueStaff, technicalStaff, venueTechnicalStaff, organiserA1, organiserA2, organiserB1 } = SEED_ACCOUNTS
+const { coordinator, coordinator2, coordinator3, venueStaff, technicalStaff, venueTechnicalStaff, organiserA1, organiserA2, organiserB1 } = SEED_ACCOUNTS
 
-function eventRequest({ slug, status, owner, title, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, createdAt }) {
+// `coordinator` is set on every non-draft request: a submitted event is always assigned exactly one
+// Coordinator (Clarification 1, Coordinator and Staff Assignment). Drafts carry no assignment field.
+function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, createdAt }) {
   const core = draft
     ? { title, purpose: null, description: null, preferredDateTime: null, durationHours: null, expectedAttendees: null, ...draftCore }
     : {
@@ -88,6 +96,7 @@ function eventRequest({ slug, status, owner, title, assigned = [], registrationE
     organisationId: owner.organisationId,
     organisationName: owner.organisationName,
     assignedStaffUids: assigned.map((staff) => staff.uid),
+    ...(coordinator ? { assignedCoordinatorUid: coordinator.uid } : {}),
     core,
     venue: { layoutPreference: draft ? null : 'theatre', accessibilityRequired: !draft },
     equipment: { requirements: draft ? [] : ['projector', 'wireless microphone'], technicalSupportNeeded: !draft },
@@ -101,15 +110,17 @@ const bothStaffTeams = [venueStaff, technicalStaff, venueTechnicalStaff]
 
 export const SEED_REQUESTS = Object.freeze([
   // Organisation A, organiser A1 — one request in every status.
+  // SPM-8 workloads (active = Submitted, Under Review, Returned, Planning, Confirmed): coordinator 4,
+  // coordinator-2 2, coordinator-3 1. Finished requests are assigned too, but do not count.
   eventRequest({ slug: 'a1-draft', status: DRAFT, owner: organiserA1, title: 'A1 draft (private to A1)', draft: true, createdAt: '2026-09-01T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-submitted', status: SUBMITTED, owner: organiserA1, title: 'A1 submitted', createdAt: '2026-09-02T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-under-review', status: UNDER_REVIEW, owner: organiserA1, title: 'A1 under review', createdAt: '2026-09-03T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-returned', status: RETURNED, owner: organiserA1, title: 'A1 returned for clarification', createdAt: '2026-09-04T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-planning', status: PLANNING, owner: organiserA1, title: 'A1 planning (all staff assigned)', assigned: bothStaffTeams, createdAt: '2026-09-05T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-confirmed', status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, createdAt: '2026-09-06T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-completed', status: COMPLETED, owner: organiserA1, title: 'A1 completed', assigned: bothStaffTeams, createdAt: '2026-09-07T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-cancelled', status: CANCELLED, owner: organiserA1, title: 'A1 cancelled', assigned: bothStaffTeams, createdAt: '2026-09-08T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-rejected', status: REJECTED, owner: organiserA1, title: 'A1 rejected', createdAt: '2026-09-09T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-submitted', coordinator, status: SUBMITTED, owner: organiserA1, title: 'A1 submitted', createdAt: '2026-09-02T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-under-review', coordinator, status: UNDER_REVIEW, owner: organiserA1, title: 'A1 under review', createdAt: '2026-09-03T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-returned', coordinator, status: RETURNED, owner: organiserA1, title: 'A1 returned for clarification', createdAt: '2026-09-04T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-planning', coordinator, status: PLANNING, owner: organiserA1, title: 'A1 planning (all staff assigned)', assigned: bothStaffTeams, createdAt: '2026-09-05T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, createdAt: '2026-09-06T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-completed', coordinator, status: COMPLETED, owner: organiserA1, title: 'A1 completed', assigned: bothStaffTeams, createdAt: '2026-09-07T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-cancelled', coordinator: coordinator2, status: CANCELLED, owner: organiserA1, title: 'A1 cancelled', assigned: bothStaffTeams, createdAt: '2026-09-08T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-rejected', coordinator, status: REJECTED, owner: organiserA1, title: 'A1 rejected', createdAt: '2026-09-09T10:00:00+08:00' }),
 
   // Further A1 drafts. A draft may be incomplete (Clarification 2, Drafts), so these cover the states the
   // drafts list has to render: a title with a date, a title without one, and no title at all.
@@ -119,10 +130,10 @@ export const SEED_REQUESTS = Object.freeze([
 
   // Organisation A, organiser A2 — the colleague.
   eventRequest({ slug: 'a2-draft', status: DRAFT, owner: organiserA2, title: 'A2 draft (private to A2, hidden from A1)', draft: true, createdAt: '2026-09-10T10:00:00+08:00' }),
-  eventRequest({ slug: 'a2-submitted', status: SUBMITTED, owner: organiserA2, title: 'A2 submitted (A1 can view, cannot edit)', createdAt: '2026-09-10T11:00:00+08:00' }),
+  eventRequest({ slug: 'a2-submitted', coordinator: coordinator2, status: SUBMITTED, owner: organiserA2, title: 'A2 submitted (A1 can view, cannot edit)', createdAt: '2026-09-10T11:00:00+08:00' }),
 
   // Organisation B — invisible to organisation A. Assigned to technical staff only, so venue-only
   // staff cannot see it while the venue+technical account can.
   eventRequest({ slug: 'b1-draft', status: DRAFT, owner: organiserB1, title: 'B1 draft (private to B1)', draft: true, createdAt: '2026-09-11T10:00:00+08:00' }),
-  eventRequest({ slug: 'b1-planning', status: PLANNING, owner: organiserB1, title: 'B1 planning (technical staff only)', assigned: [technicalStaff, venueTechnicalStaff], createdAt: '2026-09-11T11:00:00+08:00' }),
+  eventRequest({ slug: 'b1-planning', coordinator: coordinator2, status: PLANNING, owner: organiserB1, title: 'B1 planning (technical staff only)', assigned: [technicalStaff, venueTechnicalStaff], createdAt: '2026-09-11T11:00:00+08:00' }),
 ])
