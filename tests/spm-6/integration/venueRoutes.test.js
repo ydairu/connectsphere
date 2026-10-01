@@ -1,13 +1,11 @@
-// SPM-6 — Venue catalogue API.
-// Run: node --test "backend/src/**/*.test.js"
+// SPM-6 AC3/AC4/AC6/AC8 — HTTP API creation flow and access control for the Venue Staff role.
 
-import { after, before, describe, test } from 'node:test'
-import assert from 'node:assert/strict'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
-import { createApp } from '../app.js'
-import { createAuthenticate } from '../middleware/authenticate.js'
-import { createFakeFirestore } from '../testing/fakeFirestore.js'
+import { createApp } from '../../../backend/src/app.js'
+import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
+import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
 
 const TOKEN_PREFIX = 'test-token:'
 
@@ -52,7 +50,7 @@ const validVenueInput = Object.freeze({
 let server
 let baseUrl
 
-before(async () => {
+beforeAll(async () => {
   const app = createApp({ authenticate, getVenueDb: () => db })
   await new Promise((resolve) => {
     server = app.listen(0, '127.0.0.1', resolve)
@@ -60,7 +58,7 @@ before(async () => {
   baseUrl = `http://127.0.0.1:${server.address().port}`
 })
 
-after(() => new Promise((resolve) => server.close(resolve)))
+afterAll(() => new Promise((resolve) => server.close(resolve)))
 
 async function postVenueAs(uid, body) {
   const response = await fetch(`${baseUrl}/api/venues`, {
@@ -74,21 +72,21 @@ async function postVenueAs(uid, body) {
   return { status: response.status, json: await response.json() }
 }
 
-describe('SPM-6 — Venue catalogue API', () => {
-  test('Venue Staff creates a venue with valid details', async () => {
+describe('SPM-6 — venue catalogue API (integration)', () => {
+  it('spm6_api_allows_venue_staff_to_create_a_venue_with_valid_details', async () => {
     const response = await postVenueAs(VENUE_STAFF_USER.uid, {
       ...validVenueInput,
       createdByUid: 'body-value-must-not-win',
     })
 
-    assert.equal(response.status, 201)
-    assert.equal(response.json.venue.name, 'Conference Hall A')
-    assert.equal(response.json.venue.maximumCapacity, 120)
-    assert.equal(response.json.venue.createdByUid, VENUE_STAFF_USER.uid)
-    assert.deepEqual(response.json.venue.supportedLayouts, ['Theatre', 'Classroom'])
+    expect(response.status).toBe(201)
+    expect(response.json.venue.name).toBe('Conference Hall A')
+    expect(response.json.venue.maximumCapacity).toBe(120)
+    expect(response.json.venue.createdByUid).toBe(VENUE_STAFF_USER.uid)
+    expect(response.json.venue.supportedLayouts).toEqual(['Theatre', 'Classroom'])
   })
 
-  test('invalid venue details return every affected field and create no record', async () => {
+  it('spm6_api_returns_all_affected_fields_and_creates_no_record_for_invalid_details', async () => {
     const beforeCount = db.collectionData('venues').size
 
     const response = await postVenueAs(VENUE_STAFF_USER.uid, {
@@ -98,24 +96,24 @@ describe('SPM-6 — Venue catalogue API', () => {
       supportedLayouts: [],
     })
 
-    assert.equal(response.status, 400)
-    assert.equal(response.json.message, 'Validation failed')
-    assert.equal(response.json.errors.name, 'Required.')
-    assert.equal(response.json.errors.maximumCapacity, 'Must be a positive whole number.')
-    assert.equal(response.json.errors.supportedLayouts, 'Required.')
-    assert.equal(db.collectionData('venues').size, beforeCount)
+    expect(response.status).toBe(400)
+    expect(response.json.message).toBe('Validation failed')
+    expect(response.json.errors.name).toBe('Required.')
+    expect(response.json.errors.maximumCapacity).toBe('Must be a positive whole number.')
+    expect(response.json.errors.supportedLayouts).toBe('Required.')
+    expect(db.collectionData('venues').size).toBe(beforeCount)
   })
 
-  test('non-Venue Staff users cannot create venues', async () => {
+  it('spm6_api_rejects_non_venue_staff_users', async () => {
     const beforeCount = db.collectionData('venues').size
 
     const response = await postVenueAs(ORGANISER_USER.uid, validVenueInput)
 
-    assert.equal(response.status, 403)
-    assert.equal(db.collectionData('venues').size, beforeCount)
+    expect(response.status).toBe(403)
+    expect(db.collectionData('venues').size).toBe(beforeCount)
   })
 
-  test('missing token is refused before venue creation', async () => {
+  it('spm6_api_rejects_missing_token_before_venue_creation', async () => {
     const beforeCount = db.collectionData('venues').size
     const response = await fetch(`${baseUrl}/api/venues`, {
       method: 'POST',
@@ -123,7 +121,7 @@ describe('SPM-6 — Venue catalogue API', () => {
       body: JSON.stringify(validVenueInput),
     })
 
-    assert.equal(response.status, 401)
-    assert.equal(db.collectionData('venues').size, beforeCount)
+    expect(response.status).toBe(401)
+    expect(db.collectionData('venues').size).toBe(beforeCount)
   })
 })

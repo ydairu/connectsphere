@@ -22,6 +22,7 @@
     "test:unit": "vitest run tests/spm-1/unit tests/spm-2/unit",
     "test:integration": "vitest run tests/spm-1/integration tests/spm-2/integration tests/lint",
     "test:e2e": "playwright test",
+    "test:spm6": "vitest run tests/spm-6",
     "test:coverage": "vitest run --coverage",
     "install:all": "npm install",
     "test:api:live": "vitest run tests/spm-42/integration/requestApi.live.test.js tests/spm-24/integration/draftListApi.live.test.js"
