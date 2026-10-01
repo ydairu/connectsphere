@@ -28,6 +28,7 @@ describe('API routes are mounted', () => {
     ['GET', '/api/requests'], // SPM-42
     ['GET', '/api/requests/any-id'], // SPM-42
     ['PATCH', '/api/requests/any-id'], // SPM-42
+    ['POST', '/api/venues'], // SPM-6
   ]
 
   for (const [method, path] of authenticated) {
