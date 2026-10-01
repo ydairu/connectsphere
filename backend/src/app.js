@@ -7,6 +7,7 @@ import { authenticate as firebaseAuthenticate } from './middleware/authenticate.
 import healthRoutes from './routes/healthRoutes.js'
 import profileRoutes from './routes/profileRoutes.js'
 import { createRequestRoutes } from './routes/requestRoutes.js'
+import { createVenueRoutes } from './routes/venueRoutes.js'
 import { firestoreEventRequestStore } from './services/eventRequestStore.js'
 
 // Dependencies are injectable so the API tests can serve the real routes and middleware over HTTP
@@ -16,6 +17,7 @@ export function createApp({
   authenticate = firebaseAuthenticate,
   eventRequestStore = firestoreEventRequestStore,
   getEventRequestDb = getAdminDb,
+  getVenueDb = getAdminDb,
 } = {}) {
   const app = express()
 
@@ -31,6 +33,7 @@ export function createApp({
   app.use('/api/event-requests', createEventRequestRoutes({ authenticate, getDb: getEventRequestDb }))
   app.use('/api/profile', profileRoutes)
   app.use('/api/requests', createRequestRoutes({ authenticate, store: eventRequestStore }))
+  app.use('/api/venues', createVenueRoutes({ authenticate, getDb: getVenueDb }))
 
   app.use((_req, res) => {
     res.status(404).json({ message: 'Not found' })
