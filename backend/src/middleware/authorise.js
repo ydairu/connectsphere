@@ -6,7 +6,7 @@
 // predicates, and combining them lets one role's open gate unlock another role's sections (the
 // multi-role leak; CLAUDE.md, "Evaluate per role, then union the results").
 
-import { SECTIONS, canEdit, forbiddenFields, inScope, projectRequest } from '../../../shared/permissions.js'
+import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf } from '../../../shared/permissions.js'
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -15,6 +15,16 @@ function isPlainObject(value) {
 function forbidden(res) {
   // Logged in but not permitted: 403, never a redirect to login (CLAUDE.md, Repo-specific rules).
   return res.status(403).json({ message: 'Forbidden' })
+}
+
+/**
+ * The refusal for a record outside the user's scope. A coordinator gets the same 404 as for an id that
+ * does not exist, so another coordinator's event is not confirmed to exist (SPM-65). Every other role
+ * keeps SPM-42's 403.
+ */
+function outOfScope(user, res) {
+  if (rolesOf(user).includes(COORDINATOR)) return res.status(404).json({ message: 'Not found' })
+  return forbidden(res)
 }
 
 /**
@@ -45,7 +55,7 @@ export function authoriseList(req, res, next) {
  * nothing (SPM-42 criteria 1–2). Sections the user may not view are absent from the body, not hidden.
  */
 export function authoriseRead(req, res, next) {
-  if (!inScope(req.user, req.eventRequest)) return forbidden(res)
+  if (!inScope(req.user, req.eventRequest)) return outOfScope(req.user, res)
   res.locals.body = presentRequest(req.user, req.eventRequest)
   return next()
 }
@@ -60,7 +70,7 @@ export function authoriseWrite(req, res, next) {
   const patch = req.body
 
   // No field names for a record the user cannot see: naming them would confirm what it contains.
-  if (!inScope(user, eventRequest)) return forbidden(res)
+  if (!inScope(user, eventRequest)) return outOfScope(user, res)
 
   if (!isPlainObject(patch) || Object.keys(patch).length === 0) {
     return res.status(400).json({ message: 'Expected a JSON object of sections to update' })

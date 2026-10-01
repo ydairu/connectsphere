@@ -3,6 +3,7 @@
 //
 // Store contract, shared with the in-memory store the API tests use:
 //   list()                       → request[]
+//   listAssignedToCoordinator(uid) → request[] whose assignedCoordinatorUid is uid (SPM-65)
 //   get(id)                      → { request, version } | null
 //   update(id, patch, { version }) → { request, version }; throws StaleWriteError if the record changed
 //                                  since `version` was read, so a write is never applied to a record
@@ -44,6 +45,11 @@ function collection() {
 export const firestoreEventRequestStore = {
   async list() {
     const snapshot = await collection().get()
+    return snapshot.docs.map(toRequest)
+  },
+
+  async listAssignedToCoordinator(uid) {
+    const snapshot = await collection().where('assignedCoordinatorUid', '==', uid).get()
     return snapshot.docs.map(toRequest)
   },
 

@@ -1,6 +1,7 @@
 // Event request handlers — load, send, update. Authorisation is not decided here: every response body is
 // produced by authorise.js. Create, submit and draft-save belong to SPM-7, SPM-3 and SPM-4.
 
+import { COORDINATOR, rolesOf } from '../../../shared/permissions.js'
 import { presentRequest } from '../middleware/authorise.js'
 import { StaleWriteError } from '../services/eventRequestStore.js'
 
@@ -11,7 +12,15 @@ function newestFirst(a, b) {
 export function createRequestController(store) {
   return {
     async loadAll(req, _res, next) {
-      req.eventRequests = (await store.list()).sort(newestFirst)
+      // SPM-65: a coordinator-only user is served by a query on assignedCoordinatorUid, using the uid from
+      // the verified token — nothing in the request can name another coordinator. Every other user, a
+      // coordinator holding a second role included, gets the full list. Either way authoriseList's
+      // inScope() filter makes the decision; the query only narrows what is read.
+      const roles = rolesOf(req.user)
+      const requests = roles.length === 1 && roles[0] === COORDINATOR
+        ? await store.listAssignedToCoordinator(req.user.uid)
+        : await store.list()
+      req.eventRequests = requests.sort(newestFirst)
       return next()
     },
 

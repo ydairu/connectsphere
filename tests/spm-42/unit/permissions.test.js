@@ -55,6 +55,8 @@ function request(overrides = {}) {
     organisationId: ORG_ACME,
     organisationName: 'Acme Ltd',
     assignedStaffUids: [venueStaff.uid, dualStaff.uid],
+    // A submitted event always has one coordinator (SPM-8); this fixture's coordinator is it.
+    assignedCoordinatorUid: coordinator.uid,
     core: { title: 'Annual Summit', expectedAttendees: 120 },
     venue: { layout: 'theatre', accessible: true },
     equipment: { projector: true },
@@ -194,24 +196,30 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     expect(forbiddenFields(owner, returned, { core: { title: 'Clarified title' } })).toEqual([])
   })
 
-  it('Coordinator edits a section outside "main details" on an unassigned event', () => {
-    // The coordinator is not on the event's assignment list. The plan says not to add a denial test
-    // for this: full visibility and full edit is the customer's ruling (Clarification 1 & 2).
-    const unassigned = request({ status: PLANNING, assignedStaffUids: [] })
+  it('Coordinator edits a section outside "main details" on an event assigned to them', () => {
+    // No staff are assigned; the coordinator's scope comes from assignedCoordinatorUid alone (SPM-65).
+    const assigned = request({ status: PLANNING, assignedStaffUids: [] })
     const patch = { equipment: { projector: false }, internal: { planningNotes: 'Moved to Hall C' } }
-    expect(forbiddenFields(coordinator, unassigned, patch)).toEqual([])
-    for (const section of SECTIONS) expect(canEdit(coordinator, unassigned, section), section).toBe(true)
+    expect(forbiddenFields(coordinator, assigned, patch)).toEqual([])
+    for (const section of SECTIONS) expect(canEdit(coordinator, assigned, section), section).toBe(true)
+  })
+
+  it("Coordinator edits an event assigned to another coordinator", () => {
+    const elsewhere = request({ status: PLANNING, assignedCoordinatorUid: 'u-other-coord' })
+    expect(inScope(coordinator, elsewhere)).toBe(false)
+    for (const section of SECTIONS) expect(canEdit(coordinator, elsewhere, section), section).toBe(false)
   })
 })
 
 // --- SPM-24: View My Saved Draft Requests and Distinguish Them from Submitted Requests -------------
 
 describe('SPM-24 — View My Saved Draft Requests and Distinguish Them from Submitted Requests', () => {
-  it('Coordinator lists all requests — drafts absent', () => {
+  it('Coordinator lists their assigned requests — drafts absent', () => {
     const all = [
-      request({ id: 'draft-1', status: DRAFT }),
+      request({ id: 'draft-1', status: DRAFT, assignedCoordinatorUid: null }),
       request({ id: 'sub-1', status: SUBMITTED }),
       request({ id: 'conf-1', status: CONFIRMED }),
+      request({ id: 'sub-other', status: SUBMITTED, assignedCoordinatorUid: 'u-other-coord' }),
     ]
     const listed = all.filter((r) => inScope(coordinator, r)).map((r) => r.id)
     expect(listed).toEqual(['sub-1', 'conf-1'])

@@ -11,6 +11,12 @@ export function createMemoryEventRequestStore(requests) {
       return [...records.values()].map((record) => structuredClone(record.data))
     },
 
+    async listAssignedToCoordinator(uid) {
+      return [...records.values()]
+        .filter((record) => record.data.assignedCoordinatorUid === uid)
+        .map((record) => structuredClone(record.data))
+    },
+
     async get(id) {
       const record = records.get(id)
       return record ? { request: structuredClone(record.data), version: record.version } : null
