@@ -84,7 +84,7 @@ test.describe('SPM-2 — Register for an account (E2E)', () => {
     })
 
     await page.goto('/requests/drafts')
-    await expect(page.getByRole('heading', { name: 'Saved drafts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Saved drafts', exact: true })).toBeVisible()
     await expect(page.getByText('You have no saved drafts')).toBeVisible()
 
     await logout(page)
