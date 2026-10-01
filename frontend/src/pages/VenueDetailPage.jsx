@@ -55,7 +55,7 @@ function VenueDetailPage() {
   return (
     <div className="page-shell">
       <Navbar />
-      <main className="container request-page">
+      <main className="container venue-page">
         <div className="page-heading">
           <div>
             <span className="eyebrow"><Link to="/venues/new">Add another venue</Link></span>

@@ -91,8 +91,8 @@ function CreateVenuePage() {
   return (
     <div className="page-shell">
       <Navbar />
-      <main className="container request-page">
-        <section className="profile-heading">
+      <main className="container venue-page">
+        <section className="venue-heading">
           <p className="eyebrow">Venue catalogue</p>
           <h1>Add a venue</h1>
           <p>Record one independently bookable venue space so it can be used in later availability and booking workflows.</p>
@@ -108,16 +108,30 @@ function CreateVenuePage() {
           <form className="request-form" onSubmit={handleSubmit} noValidate>
             <section className="request-form-section">
               <h2>Venue details</h2>
-              <Input
-                id="venue-name"
-                name="name"
-                label="Venue name"
-                value={form.name}
-                onChange={updateField}
-                error={errors.name}
-                placeholder="Conference Hall A"
-                required
-              />
+              <div className="venue-field-grid">
+                <Input
+                  id="venue-name"
+                  name="name"
+                  label="Venue name"
+                  value={form.name}
+                  onChange={updateField}
+                  error={errors.name}
+                  placeholder="Conference Hall A"
+                  required
+                />
+                <Input
+                  id="venue-capacity"
+                  name="maximumCapacity"
+                  label="Maximum capacity"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={form.maximumCapacity}
+                  onChange={updateField}
+                  error={errors.maximumCapacity}
+                  required
+                />
+              </div>
               <Input
                 id="venue-location"
                 name="location"
@@ -126,18 +140,6 @@ function CreateVenuePage() {
                 onChange={updateField}
                 error={errors.location}
                 placeholder="Level 3, Main Campus"
-                required
-              />
-              <Input
-                id="venue-capacity"
-                name="maximumCapacity"
-                label="Maximum capacity"
-                type="number"
-                min="1"
-                step="1"
-                value={form.maximumCapacity}
-                onChange={updateField}
-                error={errors.maximumCapacity}
                 required
               />
             </section>
