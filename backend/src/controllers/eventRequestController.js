@@ -7,8 +7,14 @@ import {
   submitDraftEventRequest,
   updateDraftEventRequest,
 } from '../services/eventRequestService.js'
+import { NoEligibleCoordinatorError } from '../services/coordinatorAssignmentService.js'
 
-function sendEventRequestError(error, res, next) {
+export function sendEventRequestError(error, res, next) {
+  // SPM-8: there is always meant to be an eligible coordinator, so an empty pool is a server fault. The
+  // submit transaction has already been aborted and the draft is unchanged.
+  if (error instanceof NoEligibleCoordinatorError) {
+    return res.status(500).json({ message: error.message })
+  }
   if (error instanceof EventRequestValidationError) {
     return res.status(400).json({ message: 'Validation failed', errors: error.errors })
   }

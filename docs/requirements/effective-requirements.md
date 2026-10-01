@@ -215,6 +215,18 @@ The current backlog says a draft remains until submitted or deleted. Deletion it
 
 **[Team decision pending]** Select and document the actual assignment algorithm.
 
+**[Implemented, pending ratification — SPM-8, 30 Sep 2026]** The SPM-8 story's business rules, as supplied by the Product Owner, are implemented in `shared/coordinatorAssignment.js` and applied on submission by `backend/src/services/coordinatorAssignmentService.js`. They are recorded here so the build is traceable; the team has not yet recorded them as a ratified decision:
+
+- every user holding the Event Coordinator role is eligible; no specialisation matching;
+- the request goes to the eligible Coordinator with the fewest active assigned events — those at Submitted, Under Review, Returned, Planning or Confirmed; Draft, Completed, Cancelled and Rejected do not count;
+- a tie on the lowest count is broken at random;
+- a user who is both Event Organiser and Event Coordinator is never assigned a request they submitted;
+- a request that already has a Coordinator keeps them;
+- the system is expected always to have an eligible Coordinator, so an empty pool is treated as a server error: the submission is rejected and the request stays a Draft, rather than being saved without a Coordinator;
+- each assignment is recorded in the request's activity history with "System" as the actor.
+
+The assignment is stored in a single `assignedCoordinatorUid` field. The §SPM-42 note on the previous coordinator's read-only access after a handover still applies to reassignment (SPM-26).
+
 ### 6. Event Status Management
 
 **[Customer-confirmed]** Draft, Submitted, Under Review, Planning, Confirmed, Completed, Cancelled, Rejected, and a returned/amendment condition are required concepts.

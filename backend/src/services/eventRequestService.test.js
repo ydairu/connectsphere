@@ -13,6 +13,7 @@ import {
   submitDraftEventRequest,
   updateDraftEventRequest,
 } from './eventRequestService.js'
+import { createFakeFirestore } from '../testing/fakeFirestore.js'
 
 const organiser = Object.freeze({
   uid: 'organiser-1',
@@ -21,35 +22,9 @@ const organiser = Object.freeze({
   organisationName: 'Organisation A',
 })
 
-function fakeDb(initialDocuments = {}) {
-  const store = new Map(Object.entries(initialDocuments))
-
-  return {
-    store,
-    collection(name) {
-      assert.equal(name, 'eventRequests')
-      return {
-        async add(document) {
-          const id = `request-${store.size + 1}`
-          store.set(id, document)
-          return { id }
-        },
-        doc(id) {
-          return {
-            async get() {
-              return {
-                exists: store.has(id),
-                data: () => store.get(id),
-              }
-            },
-            async update(update) {
-              store.set(id, { ...store.get(id), ...update })
-            },
-          }
-        },
-      }
-    },
-  }
+// Submission assigns a coordinator (SPM-8), so every fake database has one by default.
+function fakeDb(eventRequests = {}, users = { 'coordinator-1': { roles: ['coordinator'] } }) {
+  return createFakeFirestore({ eventRequests, users })
 }
 
 describe('SPM-7 — Event request service', () => {
@@ -73,6 +48,7 @@ describe('SPM-7 — Event request service', () => {
     assert.equal(created.core.title, 'Partner Forum')
     assert.equal(created.core.expectedAttendees, 50)
     assert.deepEqual(created.assignedStaffUids, [])
+    assert.equal(created.assignedCoordinatorUid, null)
   })
 
   test('rejects invalid field formats before persistence', async () => {
@@ -221,7 +197,9 @@ describe('SPM-7 — Event request service', () => {
     assert.equal(submitted.ownerUid, organiser.uid)
     assert.equal(submitted.core.title, 'Ready request')
     assert.equal(submitted.updatedAt, now.toISOString())
+    assert.equal(submitted.assignedCoordinatorUid, 'coordinator-1')
     assert.equal(db.store.get('request-1').status, SUBMITTED)
+    assert.equal(db.store.get('request-1').assignedCoordinatorUid, 'coordinator-1')
   })
 
   test('rejects submission with every missing mandatory field and leaves the draft unchanged', async () => {
