@@ -138,10 +138,10 @@ Be exact about the verification environment:
 - Firebase emulator verification is not verification against a deployed Firebase project;
 - a passing frontend build is not evidence that backend security rules are correct.
 
-This repository has two event request API harnesses. They run the same cases in `backend/src/routes/requestRoutes.cases.js`:
+This repository has two event request API harnesses. They run the same cases in `tests/spm-42/integration/requestApi.cases.js`:
 
-- `npm test` runs `requestRoutes.test.js`. It sends real HTTP to the real middleware, with mocked token verification and in-memory persistence, so it is not database verification.
-- `LIVE_API_PROJECT=<FIREBASE_PROJECT_ID> npm run test:api:live --prefix backend` runs against the real Firebase project with real sign-ins. It edits seeded requests and restores them; re-run `backend/scripts/seed.js` after an interrupted run.
+- `npm test` runs `requestApi.test.js`. It sends real HTTP to the real middleware, with mocked token verification and in-memory persistence, so it is not database verification.
+- `LIVE_API_PROJECT=<FIREBASE_PROJECT_ID> npm run test:api:live` runs against the real Firebase project with real sign-ins. It edits seeded requests and restores them; re-run `backend/scripts/seed.js` after an interrupted run.
 
 State what was tested, what was not tested, and any remaining risk.
 

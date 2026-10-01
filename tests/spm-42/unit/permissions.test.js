@@ -4,11 +4,8 @@
 // from docs/requirements/effective-requirements.md. These prove the permission *decision* behind each
 // expected outcome; the HTTP status codes (403 / 200) are asserted by the API tests that call these
 // same functions, which do not exist yet.
-//
-// Run: node --test "shared/**/*.test.js"
 
-import { describe, test } from 'node:test'
-import assert from 'node:assert/strict'
+import { describe, expect, it } from 'vitest'
 
 import {
   DRAFT,
@@ -20,7 +17,7 @@ import {
   REJECTED,
   RETURNED,
   STATUSES,
-} from './status.js'
+} from '../../../shared/status.js'
 import {
   ORGANISER,
   COORDINATOR,
@@ -35,7 +32,7 @@ import {
   canEdit,
   projectRequest,
   forbiddenFields,
-} from './permissions.js'
+} from '../../../shared/permissions.js'
 
 // --- fixtures -------------------------------------------------------------------------------------
 
@@ -70,45 +67,45 @@ function request(overrides = {}) {
 // --- SPM-42: View and Edit Information According to My Role's Permissions -------------------------
 
 describe("SPM-42 — View and Edit Information According to My Role's Permissions", () => {
-  test('Attendee requests a draft by direct ID', () => {
+  it('Attendee requests a draft by direct ID', () => {
     // Registration enabled would otherwise put the event in an attendee's scope; the draft rule wins.
     const draft = request({ status: DRAFT, registration: { enabled: true } })
-    assert.equal(inScope(attendee, draft), false)
+    expect(inScope(attendee, draft)).toBe(false)
   })
 
-  test('Organiser PATCHes their own request while it is submitted', () => {
+  it('Organiser PATCHes their own request while it is submitted', () => {
     const submitted = request({ status: SUBMITTED })
-    assert.equal(inScope(owner, submitted), true, 'ownership keeps it in scope — the denial is the state gate')
-    assert.equal(canEdit(owner, submitted, 'core'), false)
-    assert.deepEqual(forbiddenFields(owner, submitted, { core: { title: 'Renamed' } }), ['core.title'])
+    expect(inScope(owner, submitted), 'ownership keeps it in scope — the denial is the state gate').toBe(true)
+    expect(canEdit(owner, submitted, 'core')).toBe(false)
+    expect(forbiddenFields(owner, submitted, { core: { title: 'Renamed' } })).toEqual(['core.title'])
   })
 
-  test("Organiser opens a colleague's draft in the same organisation", () => {
+  it("Organiser opens a colleague's draft in the same organisation", () => {
     const colleaguesDraft = request({ status: DRAFT, ownerUid: colleague.uid })
-    assert.equal(inScope(owner, colleaguesDraft), false)
+    expect(inScope(owner, colleaguesDraft)).toBe(false)
   })
 
-  test('Venue staff PATCHes an equipment field', () => {
+  it('Venue staff PATCHes an equipment field', () => {
     const planning = request({ status: PLANNING })
     const patch = { venue: { layout: 'banquet' }, equipment: { projector: false } }
-    assert.deepEqual(forbiddenFields(venueStaff, planning, patch), ['equipment.projector'])
+    expect(forbiddenFields(venueStaff, planning, patch)).toEqual(['equipment.projector'])
   })
 
-  test('Attendee GETs a confirmed event — body carries no internal fields', () => {
+  it('Attendee GETs a confirmed event — body carries no internal fields', () => {
     const body = projectRequest(attendee, request({ status: CONFIRMED }))
     for (const key of ['internal', 'venue', 'equipment', 'registration', 'ownerUid', 'organisationId', 'assignedStaffUids']) {
-      assert.equal(Object.hasOwn(body, key), false, `"${key}" must be absent from the body, not merely empty`)
+      expect(Object.hasOwn(body, key), `"${key}" must be absent from the body, not merely empty`).toBe(false)
     }
-    assert.deepEqual(body.core, { title: 'Annual Summit', expectedAttendees: 120 })
+    expect(body.core).toEqual({ title: 'Annual Summit', expectedAttendees: 120 })
   })
 
-  test('Venue+technical dual-role account PATCHes a venue field and an equipment field', () => {
+  it('Venue+technical dual-role account PATCHes a venue field and an equipment field', () => {
     const planning = request({ status: PLANNING })
     const patch = { venue: { layout: 'banquet' }, equipment: { projector: false } }
-    assert.deepEqual(forbiddenFields(dualStaff, planning, patch), [])
+    expect(forbiddenFields(dualStaff, planning, patch)).toEqual([])
   })
 
-  test('Organiser+venue-staff dual-role account edits its own request while it is in planning', () => {
+  it('Organiser+venue-staff dual-role account edits its own request while it is in planning', () => {
     // Regression for the multi-role leak — effective-requirements.md, SPM-42: combined permissions are
     // "the union of what each assigned role independently permits, evaluated per role". Every
     // dimension is satisfied by *some* role here: the organiser role has scope (same organisation) and
@@ -120,85 +117,82 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
       ownerUid: organiserVenueStaff.uid,
       assignedStaffUids: [organiserVenueStaff.uid],
     })
-    assert.equal(canEdit(organiserVenueStaff, ownPlanning, CORE), false, 'the venue role must not unlock core')
-    assert.equal(canEdit(organiserVenueStaff, ownPlanning, VENUE), true, 'the venue role still edits venue')
-    assert.deepEqual(
-      forbiddenFields(organiserVenueStaff, ownPlanning, { core: { title: 'Renamed' }, venue: { layout: 'banquet' } }),
-      ['core.title'],
-    )
+    expect(canEdit(organiserVenueStaff, ownPlanning, CORE), 'the venue role must not unlock core').toBe(false)
+    expect(canEdit(organiserVenueStaff, ownPlanning, VENUE), 'the venue role still edits venue').toBe(true)
+    expect(forbiddenFields(organiserVenueStaff, ownPlanning, { core: { title: 'Renamed' }, venue: { layout: 'banquet' } })).toEqual(['core.title'])
   })
 
-  test('Venue staff GETs an assigned event — equipment section absent', () => {
+  it('Venue staff GETs an assigned event — equipment section absent', () => {
     // SPM-42: Venue Staff "cannot see the equipment section" — absent from the body, not hidden.
     const body = projectRequest(venueStaff, request({ status: PLANNING, assignedStaffUids: [venueStaff.uid] }))
-    assert.equal(Object.hasOwn(body, EQUIPMENT), false, 'equipment must be absent from the body')
-    assert.deepEqual(body.venue, { layout: 'theatre', accessible: true })
+    expect(Object.hasOwn(body, EQUIPMENT), 'equipment must be absent from the body').toBe(false)
+    expect(body.venue).toEqual({ layout: 'theatre', accessible: true })
   })
 
-  test('Technical staff GETs an assigned event — venue section absent', () => {
+  it('Technical staff GETs an assigned event — venue section absent', () => {
     // SPM-42: Technical Support Staff "cannot see the venue section" — absent from the body, not hidden.
     const body = projectRequest(technicalStaff, request({ status: PLANNING, assignedStaffUids: [technicalStaff.uid] }))
-    assert.equal(Object.hasOwn(body, VENUE), false, 'venue must be absent from the body')
-    assert.deepEqual(body.equipment, { projector: true })
+    expect(Object.hasOwn(body, VENUE), 'venue must be absent from the body').toBe(false)
+    expect(body.equipment).toEqual({ projector: true })
   })
 
   // Finished events are read-only for every role. Team decision, proposed by Shaun (14 Sep 2026) and
   // ratified 20 Sep 2026 — effective-requirements.md, SPM-42 "[Team decision]".
-  test('Coordinator PATCHes a completed, cancelled or rejected event', () => {
+  it('Coordinator PATCHes a completed, cancelled or rejected event', () => {
     for (const status of FINISHED) {
       const finished = request({ status })
-      assert.deepEqual(forbiddenFields(coordinator, finished, { internal: { planningNotes: 'Late note' } }), ['internal.planningNotes'], status)
-      for (const section of SECTIONS) assert.equal(canEdit(coordinator, finished, section), false, `${status}: ${section}`)
+      expect(forbiddenFields(coordinator, finished, { internal: { planningNotes: 'Late note' } }), status).toEqual(['internal.planningNotes'])
+      for (const section of SECTIONS) expect(canEdit(coordinator, finished, section), `${status}: ${section}`).toBe(false)
     }
-    assert.equal(canEdit(coordinator, request({ status: CONFIRMED }), CORE), true, 'confirmed stays editable')
+    expect(canEdit(coordinator, request({ status: CONFIRMED }), CORE), 'confirmed stays editable').toBe(true)
   })
 
-  test('Assigned venue and technical staff PATCH their section on a completed, cancelled or rejected event', () => {
+  it('Assigned venue and technical staff PATCH their section on a completed, cancelled or rejected event', () => {
     for (const status of FINISHED) {
       const finished = request({ status, assignedStaffUids: [venueStaff.uid, technicalStaff.uid, dualStaff.uid] })
-      assert.equal(canEdit(venueStaff, finished, VENUE), false, `${status}: venue staff`)
-      assert.equal(canEdit(technicalStaff, finished, EQUIPMENT), false, `${status}: technical staff`)
-      assert.deepEqual(forbiddenFields(dualStaff, finished, { venue: { layout: 'x' }, equipment: { projector: false } }), ['venue.layout', 'equipment.projector'], status)
+      expect(canEdit(venueStaff, finished, VENUE), `${status}: venue staff`).toBe(false)
+      expect(canEdit(technicalStaff, finished, EQUIPMENT), `${status}: technical staff`).toBe(false)
+      expect(forbiddenFields(dualStaff, finished, { venue: { layout: 'x' }, equipment: { projector: false } }), status).toEqual(['venue.layout', 'equipment.projector'])
     }
     const confirmed = request({ status: CONFIRMED, assignedStaffUids: [venueStaff.uid] })
-    assert.equal(canEdit(venueStaff, confirmed, VENUE), true, 'confirmed stays editable for assigned staff')
+    expect(canEdit(venueStaff, confirmed, VENUE), 'confirmed stays editable for assigned staff').toBe(true)
   })
 
   // Attendees see confirmed events only. Team decision, proposed by Shaun (14 Sep 2026) and ratified
   // 20 Sep 2026.
-  test('Attendee requests an event with registration enabled before it is confirmed or after it has finished', () => {
+  it('Attendee requests an event with registration enabled before it is confirmed or after it has finished', () => {
     for (const status of STATUSES.filter((s) => s !== CONFIRMED)) {
       const notConfirmed = request({ status, registration: { enabled: true } })
-      assert.equal(inScope(attendee, notConfirmed), false, status)
-      assert.equal(projectRequest(attendee, notConfirmed), null, `${status}: no body at all`)
+      expect(inScope(attendee, notConfirmed), status).toBe(false)
+      expect(projectRequest(attendee, notConfirmed), `${status}: no body at all`).toBe(null)
     }
   })
 
-  test('Organiser edits their own request after it is returned for clarification', () => {
+  it('Organiser edits their own request after it is returned for clarification', () => {
     const returned = request({ status: RETURNED })
-    assert.deepEqual(forbiddenFields(owner, returned, { core: { title: 'Clarified title' } }), [])
+    expect(forbiddenFields(owner, returned, { core: { title: 'Clarified title' } })).toEqual([])
   })
 
-  test('Coordinator edits a section outside "main details" on an unassigned event', () => {
+  it('Coordinator edits a section outside "main details" on an unassigned event', () => {
     // The coordinator is not on the event's assignment list. The plan says not to add a denial test
     // for this: full visibility and full edit is the customer's ruling (Clarification 1 & 2).
     const unassigned = request({ status: PLANNING, assignedStaffUids: [] })
     const patch = { equipment: { projector: false }, internal: { planningNotes: 'Moved to Hall C' } }
-    assert.deepEqual(forbiddenFields(coordinator, unassigned, patch), [])
-    for (const section of SECTIONS) assert.equal(canEdit(coordinator, unassigned, section), true, section)
+    expect(forbiddenFields(coordinator, unassigned, patch)).toEqual([])
+    for (const section of SECTIONS) expect(canEdit(coordinator, unassigned, section), section).toBe(true)
   })
 })
 
 // --- SPM-24: View My Saved Draft Requests and Distinguish Them from Submitted Requests -------------
 
 describe('SPM-24 — View My Saved Draft Requests and Distinguish Them from Submitted Requests', () => {
-  test('Coordinator lists all requests — drafts absent', () => {
+  it('Coordinator lists all requests — drafts absent', () => {
     const all = [
       request({ id: 'draft-1', status: DRAFT }),
       request({ id: 'sub-1', status: SUBMITTED }),
       request({ id: 'conf-1', status: CONFIRMED }),
     ]
     const listed = all.filter((r) => inScope(coordinator, r)).map((r) => r.id)
-    assert.deepEqual(listed, ['sub-1', 'conf-1'])
+    expect(listed).toEqual(['sub-1', 'conf-1'])
   })
 })

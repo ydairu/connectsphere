@@ -18,6 +18,17 @@ export const ROLE_USERS = Object.freeze({
 
 export const ALL_ROLE_USERS = Object.freeze(Object.values(ROLE_USERS))
 
+// Accounts beyond one-per-role, needed by SPM-42 and SPM-24. Kept out of ROLE_USERS so suites that
+// iterate the five customer roles are unaffected.
+export const EXTRA_USERS = Object.freeze({
+  // SPM-42's combined-permissions criterion: one account holding two staff roles.
+  venueTechnicalStaff: SEED_ACCOUNTS.venueTechnicalStaff,
+  // SPM-24's empty-state criterion: an Organiser who owns nothing.
+  organiserWithoutRequests: SEED_ACCOUNTS.organiserA3,
+})
+
+export const ALL_TEST_USERS = Object.freeze([...ALL_ROLE_USERS, ...Object.values(EXTRA_USERS)])
+
 // The users/{uid} document as persisted for an account (everything except the auth uid).
 export function profileOf(account) {
   const { uid, ...profile } = account

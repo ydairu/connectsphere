@@ -1,11 +1,9 @@
 // SPM-42 — route-level role gate for multi-role users.
-// Run: node --test "backend/src/**/*.test.js"
 
-import { describe, test } from 'node:test'
-import assert from 'node:assert/strict'
+import { describe, expect, it } from 'vitest'
 
 import { COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
-import { requireRole } from './requireRole.js'
+import { requireRole } from '../../../backend/src/middleware/requireRole.js'
 
 function run(middleware, user) {
   const outcome = { nextCalled: false, status: null }
@@ -25,24 +23,24 @@ function run(middleware, user) {
 }
 
 describe("SPM-42 — View and Edit Information According to My Role's Permissions (route gate)", () => {
-  test('Venue+technical dual-role account reaches a technical-staff route', () => {
+  it('Venue+technical dual-role account reaches a technical-staff route', () => {
     const outcome = run(requireRole(TECHNICAL_STAFF), { uid: 'u-dual', roles: [VENUE_STAFF, TECHNICAL_STAFF] })
-    assert.equal(outcome.nextCalled, true)
+    expect(outcome.nextCalled).toBe(true)
   })
 
-  test('Venue staff account requests a coordinator-only route', () => {
+  it('Venue staff account requests a coordinator-only route', () => {
     const outcome = run(requireRole(COORDINATOR), { uid: 'u-venue', roles: [VENUE_STAFF] })
-    assert.equal(outcome.nextCalled, false)
-    assert.equal(outcome.status, 403, 'logged in but forbidden is 403, not a redirect to login')
+    expect(outcome.nextCalled).toBe(false)
+    expect(outcome.status, 'logged in but forbidden is 403, not a redirect to login').toBe(403)
   })
 
-  test('Single-role account written before the roles migration still reaches its route', () => {
+  it('Single-role account written before the roles migration still reaches its route', () => {
     const outcome = run(requireRole(ORGANISER), { uid: 'u-legacy', role: ORGANISER })
-    assert.equal(outcome.nextCalled, true)
+    expect(outcome.nextCalled).toBe(true)
   })
 
-  test('Request with no authenticated user is refused', () => {
+  it('Request with no authenticated user is refused', () => {
     const outcome = run(requireRole(ORGANISER), undefined)
-    assert.equal(outcome.status, 403)
+    expect(outcome.status).toBe(403)
   })
 })

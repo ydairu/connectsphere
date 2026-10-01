@@ -1,6 +1,6 @@
 # SPM-42 and SPM-24 — permission matrix and traceability
 
-Owner: Shaun. Sprint 1. Last verified: 20 September 2026.
+Owner: Shaun. Sprint 1. Last verified: 1 October 2026 (live API and deployed-rule checks: 26 September 2026).
 
 This record maps each acceptance criterion to the code that implements it and the tests that prove it,
 and states the permission matrix the two stories share. Acceptance criteria are quoted from
@@ -97,7 +97,7 @@ customer rulings; both are recorded as such in `effective-requirements.md`.
 | 9 | An owner cannot edit after submission unless returned for clarification | `Organiser PATCHes their own request while it is submitted`, `Organiser edits their own request after it is returned for clarification` |
 | 10 | Coordinators edit every section of any event | `Coordinator edits any section on an unassigned event` |
 | 11 | Venue staff update only venue; technical staff only equipment | `Venue staff PATCHes a venue field and an equipment field together — nothing is applied` |
-| 12 | A multi-role user receives the combined permissions | `Venue+technical dual-role account PATCHes a venue field and an equipment field`, plus the leak regression in [`requestRoutes.test.js`](../../backend/src/routes/requestRoutes.test.js) |
+| 12 | A multi-role user receives the combined permissions | `Venue+technical dual-role account PATCHes a venue field and an equipment field`, plus the leak regression in [`requestApi.test.js`](../../tests/spm-42/integration/requestApi.test.js) |
 
 Interface behaviour for criteria 5, 7 and the read-only states is covered by
 [`requestDetail.test.jsx`](../../frontend/src/pages/requestDetail.test.jsx), and the signed-in-but-forbidden
@@ -110,7 +110,7 @@ response by [`access.test.js`](../../frontend/src/utils/access.test.js).
 | 1 | Drafts on a dedicated page, separate from submitted requests | `Lists every draft and nothing that has been submitted` ([`draftRequests.test.jsx`](../../frontend/src/pages/draftRequests.test.jsx)) |
 | 2 | Every owned draft listed; no other Organiser's draft appears | `Every draft the Organiser owns is listed, and no draft belonging to another Organiser appears` (API) |
 | 3 | An Organiser with no drafts is told so | `An Organiser with no saved drafts receives none` (API) and the empty-state test (UI) |
-| 4 | Selecting a draft opens it for editing | `Selecting a draft opens it for editing` (UI) |
+| 4 | Selecting a draft opens it for editing | `Selecting a draft opens it for editing` (UI, API mocked). The E2E test `spm24_selecting_a_draft_opens_it_for_editing` is marked `fixme`; see section 5 |
 | 5 | Submitted requests show their status and are not editable as drafts | `A submitted request is listed with its current status, not as a draft` (API), `Shows each request with its status label and no editing` (UI) |
 | 6 | A draft is invisible to every other user, coordinators and colleagues included | `A draft that has never been submitted is not visible to an Event Coordinator` and the same for a same-organisation Organiser, each checking list and direct id |
 
@@ -120,23 +120,42 @@ Reopening a draft with its data intact is SPM-4's criterion, verified there.
 
 | Layer | Location | Count | Environment |
 | :--- | :--- | ---: | :--- |
-| Unit — the predicates | [`shared/permissions.test.js`](../../shared/permissions.test.js) | 15 | Offline |
-| Unit — seed demonstrates the rules | [`backend/scripts/seedData.test.js`](../../backend/scripts/seedData.test.js) | 12 | Offline |
-| API — real HTTP status codes | [`requestRoutes.cases.js`](../../backend/src/routes/requestRoutes.cases.js) via [`requestRoutes.test.js`](../../backend/src/routes/requestRoutes.test.js) | 28 + 4 | Real Express app and middleware; mocked token verification and in-memory persistence |
-| API — same cases, real project | [`requestRoutes.live.js`](../../backend/src/routes/requestRoutes.live.js) | 28 | Real Firebase Auth sign-ins and real Firestore |
+| Unit — the predicates | [`tests/spm-42/unit/permissions.test.js`](../../tests/spm-42/unit/permissions.test.js) | 15 | Offline |
+| Unit — seed demonstrates the rules | [`tests/spm-42/unit/seedData.test.js`](../../tests/spm-42/unit/seedData.test.js) | 12 | Offline |
+| API — real HTTP status codes | [`requestApi.cases.js`](../../tests/spm-42/integration/requestApi.cases.js) via [`requestApi.test.js`](../../tests/spm-42/integration/requestApi.test.js) | 28 + 4 | Real Express app and middleware; mocked token verification and in-memory persistence |
+| API — SPM-24's list cases | [`draftListApi.cases.js`](../../tests/spm-24/integration/draftListApi.cases.js) via [`draftListApi.test.js`](../../tests/spm-24/integration/draftListApi.test.js) | 7 | As above |
+| API — same cases, real project | [`requestApi.live.test.js`](../../tests/spm-42/integration/requestApi.live.test.js), [`draftListApi.live.test.js`](../../tests/spm-24/integration/draftListApi.live.test.js) | 28 | Real Firebase Auth sign-ins and real Firestore |
 | Security rules | [`check-firestore-rules.js`](../../backend/scripts/check-firestore-rules.js) | 16 | Deployed rules, via the Firestore REST API as a signed-in user |
+| End to end | [`spm42.permissions.spec.js`](../../tests/spm-42/e2e/spm42.permissions.spec.js), [`spm24.drafts.spec.js`](../../tests/spm-24/e2e/spm24.drafts.spec.js) | 13 + 1 `fixme` | Playwright in Chromium: real frontend and real API, Firebase replaced by the in-memory double |
 | Interface | `frontend/src/pages/`, `frontend/src/utils/` | 53 | Vitest with jsdom and Testing Library; API mocked |
 
 Commands:
 
 ```bash
-npm test                                                                      # 107 Node, 53 Vitest
-LIVE_API_PROJECT=<FIREBASE_PROJECT_ID> npm run test:api:live --prefix backend  # 28 against the real project
+npm test                                                                      # every suite: node:test, Vitest, Playwright
+npm run test:vitest                                                           # the tests/ suites only
+npx playwright test tests/spm-42 tests/spm-24                                 # the E2E specs for these stories
+LIVE_API_PROJECT=<FIREBASE_PROJECT_ID> npm run test:api:live                  # 28 against the real project
 node backend/scripts/check-firestore-rules.js --project=<FIREBASE_PROJECT_ID>  # 16 against deployed rules
 ```
 
-Results on 20 September 2026: 107 Node tests, 53 Vitest tests, 28 live API tests and 16 rules checks
-passed; frontend lint passed; the production build passed with the existing bundle-size warning.
+SPM-42 and SPM-24 suites live under `tests/spm-42/` and `tests/spm-24/`, matching the layout SPM-1 and
+SPM-2 use. Their component tests stay beside the pages in `frontend/src/` for now, because the root
+Vitest project loads React twice when `frontend/node_modules` is present, which fails every jsdom suite
+locally; see `project_context.md`.
+
+Results on 1 October 2026, after merging `origin/main` at `414af4b`: 46 unit and 32 API tests under
+`tests/`, 53 frontend Vitest tests and 37 remaining `node:test` tests passed; 31 Playwright tests passed
+and 1 is marked `fixme`; repository lint and the production build passed with the existing bundle-size
+warning. The 28 live API tests and 16 deployed-rule checks were last run, and passed, on 26 September
+2026; they were not re-run after the merge.
+
+`spm24_selecting_a_draft_opens_it_for_editing` is marked `fixme` because the draft never loads under the
+in-memory double: `backend/src/routes/eventRequestRoutes.js` imports the real Firebase `authenticate`
+instead of taking the one `createApp` injects, so `GET /api/event-requests/:id` rejects the double's test
+token. The test passed before the merge only because the editor still rendered an empty form after a
+failed load; SPM-3's load-failure state removed that, so the earlier pass did not prove criterion 4 end
+to end. Criterion 4 remains covered by the component test with the API mocked.
 
 ## 6. Definition of Done — status
 
@@ -149,7 +168,7 @@ passed; frontend lint passed; the production build passed with the existing bund
 | Unrelated behaviour and files preserved | Yes; SPM-2, SPM-7 and SPM-4 flows untouched and their tests passing |
 | Repository records updated | Yes: this file, `project_context.md`, `presentation-evidence.md`, `AGENTS.md`, `README.md` |
 | Team decisions labelled and dated | Yes: the two supporting rules and the route split, ratified 20 September 2026 |
-| Browser-driven end-to-end test | **No.** Checked manually against the running app with the seeded accounts; no automated browser test exists |
-| Continuous integration | **No.** No CI workflow in the repository |
+| Browser-driven end-to-end test | Partly: 13 Playwright tests in Chromium pass against the real frontend and API with Firebase replaced by the in-memory double. SPM-24 criterion 4 is `fixme` until the event request routes accept an injected `authenticate` (section 5) |
+| Continuous integration | Yes: GitHub Actions runs lint, every test suite, the build and Playwright on each push |
 | Operational workbook and Sprint record updated | **Outstanding — team action.** The workbook is not held in this repository |
 | Team Definition of Done review | **Outstanding — team action** |

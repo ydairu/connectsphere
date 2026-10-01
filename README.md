@@ -129,7 +129,7 @@ The pre-existing suites are unchanged: `node:test` in `shared/`, `backend/src/` 
 The same API cases can also run against the real Firebase project, using real sign-ins for the seeded accounts:
 
 ```bash
-LIVE_API_PROJECT=<FIREBASE_PROJECT_ID> npm run test:api:live --prefix backend
+LIVE_API_PROJECT=<FIREBASE_PROJECT_ID> npm run test:api:live
 ```
 
 This needs the seed applied, plus `VITE_FIREBASE_API_KEY` and `SEED_ACCOUNT_PASSWORD`. It edits seeded requests and restores them; re-run the seed script after an interrupted run.

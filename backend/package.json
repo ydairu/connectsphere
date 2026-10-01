@@ -7,8 +7,7 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "migrate:user-roles": "node scripts/migrate-user-roles.js",
-    "seed": "node scripts/seed.js",
-    "test:api:live": "node --test src/routes/requestRoutes.live.js"
+    "seed": "node scripts/seed.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

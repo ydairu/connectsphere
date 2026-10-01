@@ -12,7 +12,7 @@ import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createMemoryEventRequestStore } from '../../../backend/src/testing/memoryEventRequestStore.js'
-import { ALL_ROLE_USERS, TEST_PASSWORD, profileOf } from '../fixtures/testUsers.js'
+import { ALL_TEST_USERS, TEST_PASSWORD, profileOf } from '../fixtures/testUsers.js'
 
 const TOKEN_PREFIX = 'test-token:'
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/
@@ -24,7 +24,7 @@ export function createDouble() {
     state.accounts.clear()
     state.profiles.clear()
     state.nextUid = 1
-    for (const account of ALL_ROLE_USERS) {
+    for (const account of ALL_TEST_USERS) {
       state.accounts.set(account.email.toLowerCase(), {
         uid: account.uid,
         email: account.email,

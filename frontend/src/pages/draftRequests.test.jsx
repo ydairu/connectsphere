@@ -1,5 +1,5 @@
 // SPM-24 — the saved drafts page. The API is mocked; that drafts reach only their owner is enforced and
-// tested at the API level (backend/src/routes/requestRoutes.cases.js).
+// tested at the API level (tests/spm-24/integration/draftListApi.cases.js).
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

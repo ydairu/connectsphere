@@ -2,7 +2,7 @@
 // reset double (seeded role accounts, no registrations) and a new browser context (no session).
 
 import { expect, test as base } from '@playwright/test'
-import { ROLE_USERS, TEST_PASSWORD } from '../fixtures/testUsers.js'
+import { EXTRA_USERS, ROLE_USERS, TEST_PASSWORD } from '../fixtures/testUsers.js'
 
 export const DOUBLE_ORIGIN = process.env.E2E_DOUBLE_ORIGIN ?? 'http://127.0.0.1:5001'
 export const LOGIN_HEADING = 'Welcome back'
@@ -23,7 +23,7 @@ export const test = base.extend({
   ],
 })
 
-export { expect, ROLE_USERS, TEST_PASSWORD }
+export { expect, EXTRA_USERS, ROLE_USERS, TEST_PASSWORD }
 
 export async function loginAs(page, account, password = TEST_PASSWORD) {
   await page.goto('/login')
