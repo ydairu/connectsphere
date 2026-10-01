@@ -29,18 +29,21 @@ test.describe('SPM-24 — View my saved draft requests and distinguish them from
     await expect(page.getByText('A2 draft', { exact: false })).toHaveCount(0)
   })
 
-  // fixme: the draft never loads under the double. backend/src/routes/eventRequestRoutes.js imports the
-  // real Firebase authenticate instead of taking createApp's injected one, so GET /api/event-requests/:id
-  // rejects the double's test token. This passed only while the editor still rendered an empty form after
-  // a failed load; SPM-3's load-failure state removed that. When the route is injectable, also assert the
-  // draft's saved values, not just that the field exists.
-  test.fixme('spm24_selecting_a_draft_opens_it_for_editing', async ({ page }) => {
+  test('spm24_selecting_a_draft_opens_it_for_editing', async ({ page }) => {
+    // A draft with saved values to check, so an editor that failed to load (an empty form) cannot pass.
+    const draft = ownDrafts.find((request) => request.core.title && request.core.expectedAttendees)
     await signIn(page, ROLE_USERS.organiser)
     await page.goto('/requests/drafts')
-    await page.getByRole('link', { name: 'Continue editing' }).first().click()
+    await page
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('heading', { name: draft.core.title, exact: true }) })
+      .getByRole('link', { name: 'Continue editing' })
+      .click()
 
-    await expect(page).toHaveURL(/\/event-requests\/seed-req-[a-z0-9-]+\/edit$/)
-    await expect(page.getByLabel('Event title')).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`/event-requests/${draft.id}/edit$`))
+    await expect(page.getByLabel('Event title')).toHaveValue(draft.core.title)
+    await expect(page.getByLabel('Expected attendance')).toHaveValue(String(draft.core.expectedAttendees))
+    await expect(page.getByLabel('Event title')).toBeEditable()
   })
 
   test('spm24_an_organiser_with_no_drafts_is_told_so', async ({ page }) => {

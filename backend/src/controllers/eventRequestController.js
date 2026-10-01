@@ -27,38 +27,44 @@ export function sendEventRequestError(error, res, next) {
   return next(error)
 }
 
-export async function createEventRequest(req, res, next) {
-  try {
-    const eventRequest = await createDraftEventRequest(req.body, req.user)
-    return res.status(201).json({ eventRequest })
-  } catch (error) {
-    return sendEventRequestError(error, res, next)
-  }
-}
+// getDb is called per request, not at construction, so the production app never touches Firebase until a
+// request arrives; tests and the E2E double pass an in-memory database.
+export function createEventRequestController(getDb) {
+  return {
+    async createEventRequest(req, res, next) {
+      try {
+        const eventRequest = await createDraftEventRequest(req.body, req.user, getDb())
+        return res.status(201).json({ eventRequest })
+      } catch (error) {
+        return sendEventRequestError(error, res, next)
+      }
+    },
 
-export async function getEventRequest(req, res, next) {
-  try {
-    const eventRequest = await getOwnedDraftEventRequest(req.params.id, req.user)
-    return res.json({ eventRequest })
-  } catch (error) {
-    return sendEventRequestError(error, res, next)
-  }
-}
+    async getEventRequest(req, res, next) {
+      try {
+        const eventRequest = await getOwnedDraftEventRequest(req.params.id, req.user, getDb())
+        return res.json({ eventRequest })
+      } catch (error) {
+        return sendEventRequestError(error, res, next)
+      }
+    },
 
-export async function updateEventRequest(req, res, next) {
-  try {
-    const eventRequest = await updateDraftEventRequest(req.params.id, req.body, req.user)
-    return res.json({ eventRequest })
-  } catch (error) {
-    return sendEventRequestError(error, res, next)
-  }
-}
+    async updateEventRequest(req, res, next) {
+      try {
+        const eventRequest = await updateDraftEventRequest(req.params.id, req.body, req.user, getDb())
+        return res.json({ eventRequest })
+      } catch (error) {
+        return sendEventRequestError(error, res, next)
+      }
+    },
 
-export async function submitEventRequest(req, res, next) {
-  try {
-    const eventRequest = await submitDraftEventRequest(req.params.id, req.user)
-    return res.json({ eventRequest })
-  } catch (error) {
-    return sendEventRequestError(error, res, next)
+    async submitEventRequest(req, res, next) {
+      try {
+        const eventRequest = await submitDraftEventRequest(req.params.id, req.user, getDb())
+        return res.json({ eventRequest })
+      } catch (error) {
+        return sendEventRequestError(error, res, next)
+      }
+    },
   }
 }

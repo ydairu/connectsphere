@@ -110,7 +110,7 @@ response by [`access.test.js`](../../frontend/src/utils/access.test.js).
 | 1 | Drafts on a dedicated page, separate from submitted requests | `Lists every draft and nothing that has been submitted` ([`draftRequests.test.jsx`](../../frontend/src/pages/draftRequests.test.jsx)) |
 | 2 | Every owned draft listed; no other Organiser's draft appears | `Every draft the Organiser owns is listed, and no draft belonging to another Organiser appears` (API) |
 | 3 | An Organiser with no drafts is told so | `An Organiser with no saved drafts receives none` (API) and the empty-state test (UI) |
-| 4 | Selecting a draft opens it for editing | `Selecting a draft opens it for editing` (UI, API mocked). The E2E test `spm24_selecting_a_draft_opens_it_for_editing` is marked `fixme`; see section 5 |
+| 4 | Selecting a draft opens it for editing | `Selecting a draft opens it for editing` (UI, API mocked); `spm24_selecting_a_draft_opens_it_for_editing` (E2E), which checks the draft's saved values load into editable fields |
 | 5 | Submitted requests show their status and are not editable as drafts | `A submitted request is listed with its current status, not as a draft` (API), `Shows each request with its status label and no editing` (UI) |
 | 6 | A draft is invisible to every other user, coordinators and colleagues included | `A draft that has never been submitted is not visible to an Event Coordinator` and the same for a same-organisation Organiser, each checking list and direct id |
 
@@ -126,7 +126,7 @@ Reopening a draft with its data intact is SPM-4's criterion, verified there.
 | API — SPM-24's list cases | [`draftListApi.cases.js`](../../tests/spm-24/integration/draftListApi.cases.js) via [`draftListApi.test.js`](../../tests/spm-24/integration/draftListApi.test.js) | 7 | As above |
 | API — same cases, real project | [`requestApi.live.test.js`](../../tests/spm-42/integration/requestApi.live.test.js), [`draftListApi.live.test.js`](../../tests/spm-24/integration/draftListApi.live.test.js) | 28 | Real Firebase Auth sign-ins and real Firestore |
 | Security rules | [`check-firestore-rules.js`](../../backend/scripts/check-firestore-rules.js) | 16 | Deployed rules, via the Firestore REST API as a signed-in user |
-| End to end | [`spm42.permissions.spec.js`](../../tests/spm-42/e2e/spm42.permissions.spec.js), [`spm24.drafts.spec.js`](../../tests/spm-24/e2e/spm24.drafts.spec.js) | 13 + 1 `fixme` | Playwright in Chromium: real frontend and real API, Firebase replaced by the in-memory double |
+| End to end | [`spm42.permissions.spec.js`](../../tests/spm-42/e2e/spm42.permissions.spec.js), [`spm24.drafts.spec.js`](../../tests/spm-24/e2e/spm24.drafts.spec.js) | 14 | Playwright in Chromium: real frontend and real API, Firebase replaced by the in-memory double |
 | Interface | `frontend/src/pages/`, `frontend/src/utils/` | 53 | Vitest with jsdom and Testing Library; API mocked |
 
 Commands:
@@ -145,17 +145,16 @@ Vitest project loads React twice when `frontend/node_modules` is present, which 
 locally; see `project_context.md`.
 
 Results on 1 October 2026, after merging `origin/main` at `49db945`: 47 unit and 33 API tests under
-`tests/`, 53 frontend Vitest tests and 59 remaining `node:test` tests (SPM-8's included) passed; 31 Playwright tests passed
-and 1 is marked `fixme`; repository lint and the production build passed with the existing bundle-size
-warning. The 28 live API tests and 16 deployed-rule checks were last run, and passed, on 26 September
-2026; they were not re-run after the merge.
+`tests/`, 53 frontend Vitest tests, 59 remaining `node:test` tests (SPM-8's included) and 32 Playwright
+tests passed; repository lint and the production build passed with the existing bundle-size warning. The
+28 live API tests and 16 deployed-rule checks were last run, and passed, on 26 September 2026; they were
+not re-run after the merge.
 
-`spm24_selecting_a_draft_opens_it_for_editing` is marked `fixme` because the draft never loads under the
-in-memory double: `backend/src/routes/eventRequestRoutes.js` imports the real Firebase `authenticate`
-instead of taking the one `createApp` injects, so `GET /api/event-requests/:id` rejects the double's test
-token. The test passed before the merge only because the editor still rendered an empty form after a
-failed load; SPM-3's load-failure state removed that, so the earlier pass did not prove criterion 4 end
-to end. Criterion 4 remains covered by the component test with the API mocked.
+Before 1 October, `spm24_selecting_a_draft_opens_it_for_editing` passed without proving criterion 4:
+`/api/event-requests` used the real Firebase `authenticate` whatever `createApp` was given, so under the
+in-memory double the draft never loaded, and the editor still rendered an empty form. Those routes now take
+`authenticate` and their database from `createApp`, the double serves them from the same in-memory records
+as `/api/requests`, and the test checks the draft's saved values. Restoring the old wiring makes it fail.
 
 ## 6. Definition of Done — status
 
@@ -168,7 +167,7 @@ to end. Criterion 4 remains covered by the component test with the API mocked.
 | Unrelated behaviour and files preserved | Yes; SPM-2, SPM-7 and SPM-4 flows untouched and their tests passing |
 | Repository records updated | Yes: this file, `project_context.md`, `presentation-evidence.md`, `AGENTS.md`, `README.md` |
 | Team decisions labelled and dated | Yes: the two supporting rules and the route split, ratified 20 September 2026 |
-| Browser-driven end-to-end test | Partly: 13 Playwright tests in Chromium pass against the real frontend and API with Firebase replaced by the in-memory double. SPM-24 criterion 4 is `fixme` until the event request routes accept an injected `authenticate` (section 5) |
+| Browser-driven end-to-end test | Yes: 14 Playwright tests in Chromium covering both stories, against the real frontend and API with Firebase replaced by the in-memory double |
 | Continuous integration | Yes: GitHub Actions runs lint, every test suite, the build and Playwright on each push |
 | Operational workbook and Sprint record updated | **Outstanding — team action.** The workbook is not held in this repository |
 | Team Definition of Done review | **Outstanding — team action** |

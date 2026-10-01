@@ -1,7 +1,8 @@
 // In-memory Firebase double for the Playwright suites, serving:
 //   /__double__/...   the Firebase Auth + Firestore behaviour the browser app depends on
 //   /api/...          the REAL Express application (createApp) with token verification and profile
-//                     loading pointed at the double, and event requests in the in-memory store.
+//                     loading pointed at the double. Every route, /api/event-requests included, reads
+//                     and writes one in-memory database (fakeFirestore) that also holds the profiles.
 //
 // Not Firebase: error codes and flows mirror what the application relies on, nothing more. Security
 // rules are not evaluated here (see tests/spm-2/integration/firestoreRules.static.test.js).
@@ -11,18 +12,24 @@ import express from 'express'
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
-import { createMemoryEventRequestStore } from '../../../backend/src/testing/memoryEventRequestStore.js'
+import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
 import { ALL_TEST_USERS, TEST_PASSWORD, profileOf } from '../fixtures/testUsers.js'
+import { createFakeFirestoreEventRequestStore } from './fakeFirestoreEventRequestStore.js'
 
 const TOKEN_PREFIX = 'test-token:'
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/
 
 export function createDouble() {
-  const state = { accounts: new Map(), profiles: new Map(), nextUid: 1 }
+  // users/{uid} profiles live in the database too, so SPM-8's coordinator selection on submit sees them.
+  // reset() replaces the whole database: seeded requests, no activity entries, no assignment lock.
+  const state = { accounts: new Map(), db: null, profiles: null, nextUid: 1 }
 
   function reset() {
     state.accounts.clear()
-    state.profiles.clear()
+    state.db = createFakeFirestore({
+      eventRequests: Object.fromEntries(SEED_REQUESTS.map(({ id, ...request }) => [id, request])),
+    })
+    state.profiles = state.db.collectionData('users')
     state.nextUid = 1
     for (const account of ALL_TEST_USERS) {
       state.accounts.set(account.email.toLowerCase(), {
@@ -134,7 +141,11 @@ export function createDouble() {
     },
   })
 
-  const api = createApp({ authenticate, eventRequestStore: createMemoryEventRequestStore(SEED_REQUESTS) })
+  const api = createApp({
+    authenticate,
+    eventRequestStore: createFakeFirestoreEventRequestStore(() => state.db),
+    getEventRequestDb: () => state.db,
+  })
 
   reset()
   return { state, router, api, reset }
