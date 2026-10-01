@@ -25,6 +25,7 @@ describe('API routes are mounted', () => {
     ['POST', '/api/event-requests'], // SPM-7
     ['PATCH', '/api/event-requests/any-id'], // SPM-7
     ['POST', '/api/event-requests/any-id/submit'], // SPM-3
+    ['POST', '/api/event-requests/any-id/transitions'], // SPM-9
     ['GET', '/api/requests'], // SPM-42
     ['GET', '/api/requests/any-id'], // SPM-42
     ['PATCH', '/api/requests/any-id'], // SPM-42

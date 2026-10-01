@@ -1,4 +1,5 @@
-import { DRAFT, SUBMITTED } from '../../../shared/status.js'
+import { DRAFT, RETURNED, SUBMITTED } from '../../../shared/status.js'
+import { RESUBMIT, SUBMIT, canTransition } from '../../../shared/statusTransitions.js'
 import {
   buildDraftEventRequest,
   buildDraftEventRequestUpdate,
@@ -7,6 +8,7 @@ import {
 } from '../../../shared/eventRequest.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { assignCoordinatorInTransaction } from './coordinatorAssignmentService.js'
+import { recordStatusChange, userActor } from './statusHistory.js'
 
 export class EventRequestValidationError extends Error {
   constructor(errors) {
@@ -70,6 +72,8 @@ export async function updateDraftEventRequest(id, input, organiser, db = getAdmi
 
 // SPM-3 submit and SPM-8 coordinator assignment commit together or not at all: a request is never left
 // Submitted without its coordinator, and a failed assignment leaves the draft unchanged.
+// SPM-9: a Returned request is resubmitted the same way (Returned → Submitted), keeping its coordinator,
+// and either change is recorded in the activity history in the same transaction.
 export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), now = new Date(), { random } = {}) {
   return db.runTransaction(async (tx) => {
     const docRef = db.collection('eventRequests').doc(id)
@@ -79,7 +83,10 @@ export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), 
 
     const existing = snapshot.data()
     if (existing.ownerUid !== organiser.uid) throw new EventRequestForbiddenError()
-    if (existing.status !== DRAFT) throw new EventRequestForbiddenError('Only unsubmitted draft requests can be submitted.')
+
+    const action = existing.status === RETURNED ? RESUBMIT : SUBMIT
+    const decision = canTransition(organiser, existing, action, now)
+    if (!decision.allowed) throw new EventRequestForbiddenError('Only draft or returned requests can be submitted.')
 
     const { errors } = validateEventRequestSubmission(existing)
     if (hasValidationErrors(errors)) throw new EventRequestValidationError(errors)
@@ -98,6 +105,13 @@ export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), 
     }
 
     tx.update(docRef, update)
+    recordStatusChange(tx, docRef, {
+      action,
+      fromStatus: existing.status,
+      toStatus: SUBMITTED,
+      actor: userActor(organiser),
+      at: now.toISOString(),
+    })
     return { id, ...existing, ...update }
   })
 }

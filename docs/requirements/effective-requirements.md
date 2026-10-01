@@ -235,6 +235,38 @@ The assignment is stored in a single `assignedCoordinatorUid` field. The §SPM-4
 
 **[Customer-confirmed]** Under Review means evaluation/clarification; Planning means arrangements are underway; Completed follows the event date/time; returned requests may be edited/resubmitted; rejected requests close.
 
+**[Team decision, 1 Oct 2026 — resolves the [Unresolved] Approved/Confirmed item above]** "Approved", as a customer status word ("Confirmed/Approved", Clarification 2), means the **Confirmed** status. There is no separate Approved status. The review action that passes initial feasibility moves Under Review to Planning (SPM-9: "when the Coordinator approves, then it moves to Planning"); Planning moves to Confirmed only when the assigned Coordinator confirms after all mandatory venue and required technical arrangements are approved. The earlier source records are unchanged.
+
+**[Implemented — SPM-9, 1 Oct 2026]** The SPM-9 acceptance criteria, implemented in `shared/statusTransitions.js` and applied by `backend/src/services/statusTransitionService.js`:
+
+- Draft → Submitted (submit) and Returned → Submitted (resubmit), by the owning Event Organiser; resubmission keeps the assigned Coordinator;
+- Submitted → Under Review (start review); Under Review → Returned (return for clarification); Under Review → Planning (approve); Under Review or Planning → Rejected (reject); Planning → Confirmed (confirm, once arrangements are approved); Confirmed → Completed (complete); Confirmed → Cancelled (direct cancel, or approval of an Organiser's cancellation request);
+- Completed, Cancelled and Rejected are terminal: no action is accepted from them;
+- each status change adds a `status_changed` entry to the request's `activity` subcollection with the previous status, the new status, the user responsible and the date/time, in the same transaction as the change.
+
+**[Team decision — SPM-9, 1 Oct 2026]** Three rules the criteria leave open, proposed with the SPM-9 build and confirmed by the team on 1 Oct 2026. They fill areas the customer left open and do not override a confirmed customer requirement:
+
+- every Coordinator action is limited to the assigned Coordinator (`assignedCoordinatorUid`), not only confirm and reject;
+- the assigned Coordinator marks an event Completed, and only once `core.preferredDateTime` plus `core.durationHours` has passed; an automatic system job is deferred;
+- the status actions are served at `POST /api/event-requests/:id/transitions`, beside submit, rather than under `/api/requests`.
+
+**[Team decision, 1 Oct 2026 — SPM-9] Minimal venue and technical sign-off**, so Confirm can be reached before the Venue Booking Approval (§13) and equipment (§15–17) stories exist. Those stories are expected to build on or replace it (`shared/arrangements.js`):
+
+- at Planning, assigned Venue Staff approve or reject the venue arrangement, and assigned Technical Support Staff approve or reject the technical arrangement;
+- the venue arrangement is always mandatory; the technical arrangement is required only when the request asks for equipment or technical support (Clarification 2: approval "is based on what the event actually requests");
+- a rejection keeps the event in Planning (§13) and blocks Confirm until the arrangement is approved; staff may change their decision while the event is in Planning;
+- decisions are stored as record metadata (`arrangementApprovals`), which no section edit can write, so the Coordinator cannot override a missing approval (Clarification 1); each decision is recorded in the activity history.
+
+**[Implemented — SPM-9, 1 Oct 2026] Organiser cancellation requests** (`shared/cancellationRequests.js`), per Clarification 1 and 2: the owning Organiser may request cancellation of a Confirmed event, with an optional reason; the assigned Coordinator approves it (Confirmed → Cancelled) or refuses it (the event stays Confirmed, and the Organiser may ask again). One request may be pending at a time, and while it is pending the Coordinator decides it rather than cancelling directly. The Coordinator's direct cancellation requires a stated reason (Clarification 2). Requests and decisions are stored as record metadata (`cancellationRequest`) and recorded in the activity history.
+
+**[Known gaps — SPM-9]**
+
+- No feature assigns Venue or Technical Support Staff to a request; only seeded requests have `assignedStaffUids`. A request created in the app therefore cannot be signed off or confirmed until staff assignment exists (Clarification 1: Technical Support Staff are auto-assigned from a general pool).
+- Releasing venue and equipment reservations and notifying registered Attendees on cancellation (Clarification 1) are not implemented: reservations, registration and notifications do not exist yet.
+- A venue or equipment edit after sign-off does not clear the approval. Significant changes are meant to trigger re-review (§19), which does not exist yet.
+- Venue Staff suggesting alternatives (§13) is not modelled.
+- The activity history is recorded but not displayed.
+
 ### 7. Event Information Management
 
 **[Customer-confirmed]** Field and section permissions follow role and ownership. Routine contact or descriptive edits are normal. Significant date/time, duration, attendance, venue/layout, or equipment changes trigger formal re-review and may alter Planning/confirmation status.
