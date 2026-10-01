@@ -80,6 +80,27 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     expect(forbiddenFields(owner, submitted, { core: { title: 'Renamed' } })).toEqual(['core.title'])
   })
 
+  it('Self-registered organiser views their own submitted request before organisation ID assignment', () => {
+    const selfRegisteredOwner = { uid: 'u-self-registered', roles: [ORGANISER], organisationName: 'Named Only Ltd' }
+    const ownSubmitted = request({
+      status: SUBMITTED,
+      ownerUid: selfRegisteredOwner.uid,
+      organisationId: null,
+      organisationName: selfRegisteredOwner.organisationName,
+    })
+
+    expect(inScope(selfRegisteredOwner, ownSubmitted)).toBe(true)
+    expect(canEdit(selfRegisteredOwner, ownSubmitted, CORE)).toBe(false)
+    expect(projectRequest(selfRegisteredOwner, ownSubmitted)).toEqual({
+      id: ownSubmitted.id,
+      status: SUBMITTED,
+      core: ownSubmitted.core,
+      venue: ownSubmitted.venue,
+      equipment: ownSubmitted.equipment,
+      registration: ownSubmitted.registration,
+    })
+  })
+
   it("Organiser opens a colleague's draft in the same organisation", () => {
     const colleaguesDraft = request({ status: DRAFT, ownerUid: colleague.uid })
     expect(inScope(owner, colleaguesDraft)).toBe(false)

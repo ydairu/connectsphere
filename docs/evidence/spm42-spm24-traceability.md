@@ -38,7 +38,7 @@ the organiser's `core` section, which Clarification 2 forbids. A regression test
 
 | Role | Records in scope |
 | :--- | :--- |
-| Event Organiser | Own drafts; their organisation's non-draft requests, matched on `organisationId` |
+| Event Organiser | Own drafts and every other request they own, with or without an `organisationId`; their organisation's non-draft requests, matched on `organisationId` |
 | Event Coordinator | Every request except a draft |
 | Venue Staff | Non-draft requests they are assigned to |
 | Technical Support Staff | Non-draft requests they are assigned to |
@@ -88,7 +88,7 @@ customer rulings; both are recorded as such in `effective-requirements.md`.
 | :--- | :--- | :--- |
 | 1 | A record outside a user's scope is not returned, not merely hidden | `Attendee requests a draft by direct ID`, `Organiser requests another organisation's event by direct ID` (API) |
 | 2 | Direct-link and API attempts are denied | The same API cases, plus 16 checks against the deployed rules in [`check-firestore-rules.js`](../../backend/scripts/check-firestore-rules.js) |
-| 3 | Organisers see their own and their organisation's requests, by organisation ID | `Organiser lists requests — own drafts and own organisation only` (API) |
+| 3 | Organisers see their own and their organisation's requests, by organisation ID | `Organiser lists requests — own drafts and own organisation only` (API); `Self-registered organiser lists and opens their own submitted request without organisation ID` (API and predicate) |
 | 4 | Coordinators have full visibility except drafts | `Coordinator lists all requests — drafts absent` (API and predicate) |
 | 5 | Venue staff cannot see equipment; technical staff cannot see venue | `Venue staff GETs an assigned event — equipment section absent` and its mirror, asserted on the raw response body |
 | 6 | Attendees receive no internal planning information | `Attendee GETs a confirmed event — no internal fields in the body` |
@@ -120,9 +120,9 @@ Reopening a draft with its data intact is SPM-4's criterion, verified there.
 
 | Layer | Location | Count | Environment |
 | :--- | :--- | ---: | :--- |
-| Unit — the predicates | [`tests/spm-42/unit/permissions.test.js`](../../tests/spm-42/unit/permissions.test.js) | 15 | Offline |
+| Unit — the predicates | [`tests/spm-42/unit/permissions.test.js`](../../tests/spm-42/unit/permissions.test.js) | 16 | Offline |
 | Unit — seed demonstrates the rules | [`tests/spm-42/unit/seedData.test.js`](../../tests/spm-42/unit/seedData.test.js) | 12 | Offline |
-| API — real HTTP status codes | [`requestApi.cases.js`](../../tests/spm-42/integration/requestApi.cases.js) via [`requestApi.test.js`](../../tests/spm-42/integration/requestApi.test.js) | 28 + 4 | Real Express app and middleware; mocked token verification and in-memory persistence |
+| API — real HTTP status codes | [`requestApi.cases.js`](../../tests/spm-42/integration/requestApi.cases.js) via [`requestApi.test.js`](../../tests/spm-42/integration/requestApi.test.js) | 21 + 5 | Real Express app and middleware; mocked token verification and in-memory persistence |
 | API — SPM-24's list cases | [`draftListApi.cases.js`](../../tests/spm-24/integration/draftListApi.cases.js) via [`draftListApi.test.js`](../../tests/spm-24/integration/draftListApi.test.js) | 7 | As above |
 | API — same cases, real project | [`requestApi.live.test.js`](../../tests/spm-42/integration/requestApi.live.test.js), [`draftListApi.live.test.js`](../../tests/spm-24/integration/draftListApi.live.test.js) | 28 | Real Firebase Auth sign-ins and real Firestore |
 | Security rules | [`check-firestore-rules.js`](../../backend/scripts/check-firestore-rules.js) | 16 | Deployed rules, via the Firestore REST API as a signed-in user |
@@ -144,8 +144,8 @@ SPM-2 use. Their component tests stay beside the pages in `frontend/src/` for no
 Vitest project loads React twice when `frontend/node_modules` is present, which fails every jsdom suite
 locally; see `project_context.md`.
 
-Results on 1 October 2026, after merging `origin/main` at `414af4b`: 46 unit and 32 API tests under
-`tests/`, 53 frontend Vitest tests and 37 remaining `node:test` tests passed; 31 Playwright tests passed
+Results on 1 October 2026, after merging `origin/main` at `49db945`: 47 unit and 33 API tests under
+`tests/`, 53 frontend Vitest tests and 59 remaining `node:test` tests (SPM-8's included) passed; 31 Playwright tests passed
 and 1 is marked `fixme`; repository lint and the production build passed with the existing bundle-size
 warning. The 28 live API tests and 16 deployed-rule checks were last run, and passed, on 26 September
 2026; they were not re-run after the merge.

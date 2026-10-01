@@ -210,16 +210,19 @@ You can also run either application separately with `npm run dev:frontend` or `n
 | Role | Email | Organisation |
 | --- | --- | --- |
 | Event Coordinator | `coordinator@seed.connectsphere.test` | — |
+| Event Coordinator | `coordinator-2@seed.connectsphere.test` | — |
+| Event Coordinator | `coordinator-3@seed.connectsphere.test` | — |
 | Venue Staff | `venue-staff@seed.connectsphere.test` | — |
 | Technical Support Staff | `technical-staff@seed.connectsphere.test` | — |
 | Venue + Technical Staff | `venue-technical-staff@seed.connectsphere.test` | — |
 | Attendee | `attendee@seed.connectsphere.test` | — |
 | Event Organiser | `organiser-a1@seed.connectsphere.test` | SEED-ORG-A |
 | Event Organiser | `organiser-a2@seed.connectsphere.test` | SEED-ORG-A |
+| Event Organiser | `organiser-a3@seed.connectsphere.test` | SEED-ORG-A |
 | Event Organiser | `organiser-b1@seed.connectsphere.test` | SEED-ORG-B |
 
-The venue + technical account demonstrates combined permissions from two roles. The two organisations demonstrate that an Organiser sees their own organisation's events and not another's.
+The three coordinator accounts demonstrate automatic coordinator assignment (SPM-8) by workload. The seeded requests give them 4, 2 and 1 active requests (Submitted, Under Review, Returned, Planning or Confirmed), so the next submitted request goes to `coordinator-3`, which has the fewest. Requests created outside the seed also count, so on a shared project the counts may be higher. The venue + technical account demonstrates combined permissions from two roles. The two organisations demonstrate that an Organiser sees their own organisation's events and not another's.
 
-The seed also creates 13 event requests covering every status in `shared/status.js`, owned by the three Organiser accounts.
+The seed also creates 16 event requests covering every status in `shared/status.js`, owned by `organiser-a1`, `organiser-a2` and `organiser-b1`. `organiser-a3` owns none, to show the empty drafts list (SPM-24).
 
 These are demonstration credentials sharing one password. Remove them, with the `seedTag` field and the `seed-` ID prefix, before any public deployment.

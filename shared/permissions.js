@@ -123,6 +123,9 @@ function roleInScope(role, user, request) {
     case COORDINATOR:
       return true
     case ORGANISER:
+      // A self-registered organiser may not have an organisationId yet, but they must still be able to
+      // see their own submitted request. Colleague visibility remains company-ID based below.
+      if (isOwner(user, request)) return true
       // Scope on the company ID, never the name — Clarification 1, Accounts & Registration.
       // Both sides must be present: undefined === undefined would put every request in scope.
       return user.organisationId != null && request.organisationId === user.organisationId

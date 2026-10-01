@@ -6,6 +6,7 @@ import {
   validateEventRequestSubmission,
 } from '../../../shared/eventRequest.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
+import { assignCoordinatorInTransaction } from './coordinatorAssignmentService.js'
 
 export class EventRequestValidationError extends Error {
   constructor(errors) {
@@ -67,24 +68,36 @@ export async function updateDraftEventRequest(id, input, organiser, db = getAdmi
   return { id, ...existing, ...update }
 }
 
-export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), now = new Date()) {
-  const docRef = db.collection('eventRequests').doc(id)
-  const snapshot = await docRef.get()
+// SPM-3 submit and SPM-8 coordinator assignment commit together or not at all: a request is never left
+// Submitted without its coordinator, and a failed assignment leaves the draft unchanged.
+export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), now = new Date(), { random } = {}) {
+  return db.runTransaction(async (tx) => {
+    const docRef = db.collection('eventRequests').doc(id)
+    const snapshot = await tx.get(docRef)
 
-  if (!snapshot.exists) throw new EventRequestNotFoundError()
+    if (!snapshot.exists) throw new EventRequestNotFoundError()
 
-  const existing = snapshot.data()
-  if (existing.ownerUid !== organiser.uid) throw new EventRequestForbiddenError()
-  if (existing.status !== DRAFT) throw new EventRequestForbiddenError('Only unsubmitted draft requests can be submitted.')
+    const existing = snapshot.data()
+    if (existing.ownerUid !== organiser.uid) throw new EventRequestForbiddenError()
+    if (existing.status !== DRAFT) throw new EventRequestForbiddenError('Only unsubmitted draft requests can be submitted.')
 
-  const { errors } = validateEventRequestSubmission(existing)
-  if (hasValidationErrors(errors)) throw new EventRequestValidationError(errors)
+    const { errors } = validateEventRequestSubmission(existing)
+    if (hasValidationErrors(errors)) throw new EventRequestValidationError(errors)
 
-  const update = {
-    status: SUBMITTED,
-    updatedAt: now.toISOString(),
-  }
+    const assignedCoordinatorUid = await assignCoordinatorInTransaction(tx, db, {
+      requestRef: docRef,
+      request: existing,
+      now,
+      random,
+    })
 
-  await docRef.update(update)
-  return { id, ...existing, ...update }
+    const update = {
+      status: SUBMITTED,
+      assignedCoordinatorUid,
+      updatedAt: now.toISOString(),
+    }
+
+    tx.update(docRef, update)
+    return { id, ...existing, ...update }
+  })
 }

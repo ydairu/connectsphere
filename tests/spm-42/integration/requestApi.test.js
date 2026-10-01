@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
-import { PLANNING } from '../../../shared/status.js'
+import { PLANNING, SUBMITTED } from '../../../shared/status.js'
 import { SEED_ACCOUNTS } from '../../../backend/scripts/seedData.js'
 import { startInMemoryApi } from '../../shared/helpers/requestApiServer.js'
 import { registerSpm42ApiCases } from './requestApi.cases.js'
@@ -38,10 +38,37 @@ const OWN_PLANNING_REQUEST = {
   createdAt: '2026-09-12T10:00:00+08:00',
 }
 
+// Not a seeded account: a self-registered Organiser who has no organisationId yet.
+const SELF_REGISTERED_ORGANISER = {
+  uid: 'test-self-registered-organiser',
+  email: 'self-registered-organiser@test.invalid',
+  name: 'Self Registered Organiser',
+  roles: [ORGANISER],
+  organisationName: 'Named Only Organisation',
+}
+
+const OWN_SUBMITTED_WITHOUT_ORGANISATION_ID = {
+  id: 'test-req-own-submitted-no-org-id',
+  status: SUBMITTED,
+  ownerUid: SELF_REGISTERED_ORGANISER.uid,
+  organisationId: null,
+  organisationName: SELF_REGISTERED_ORGANISER.organisationName,
+  assignedStaffUids: [],
+  core: { title: 'Submitted request without organisation ID' },
+  venue: { layoutPreference: 'classroom' },
+  equipment: { requirements: [] },
+  registration: { enabled: false },
+  internal: { planningNotes: '' },
+  createdAt: '2026-09-12T11:00:00+08:00',
+}
+
 let api
 
 beforeAll(async () => {
-  api = await startInMemoryApi({ extraAccounts: [ORGANISER_VENUE], extraRequests: [OWN_PLANNING_REQUEST] })
+  api = await startInMemoryApi({
+    extraAccounts: [ORGANISER_VENUE, SELF_REGISTERED_ORGANISER],
+    extraRequests: [OWN_PLANNING_REQUEST, OWN_SUBMITTED_WITHOUT_ORGANISATION_ID],
+  })
 })
 
 afterAll(() => api.close())
@@ -49,6 +76,13 @@ afterAll(() => api.close())
 registerSpm42ApiCases({ baseUrl: () => api.baseUrl(), tokenFor: (accountKey) => api.tokenFor(accountKey) })
 
 describe("SPM-42 — View and Edit Information According to My Role's Permissions (API, in-memory only)", () => {
+  async function getAs(uid, path) {
+    const response = await fetch(`${api.baseUrl()}${path}`, {
+      headers: { Authorization: `Bearer ${api.tokenForUid(uid)}` },
+    })
+    return { status: response.status, json: await response.json() }
+  }
+
   async function patchAs(uid, id, body, { rawBody } = {}) {
     const response = await fetch(`${api.baseUrl()}/api/requests/${id}`, {
       method: 'PATCH',
@@ -70,6 +104,20 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     const response = await patchAs(ORGANISER_VENUE.uid, OWN_PLANNING_REQUEST.id, { venue: { layoutPreference: 'banquet' } })
     expect(response.status).toBe(200)
     expect(response.json.editableSections).toEqual(['venue'])
+  })
+
+  it('Self-registered organiser lists and opens their own submitted request without organisation ID', async () => {
+    const listed = await getAs(SELF_REGISTERED_ORGANISER.uid, '/api/requests')
+    expect(listed.status).toBe(200)
+    expect(
+      listed.json.requests.some((request) => request.id === OWN_SUBMITTED_WITHOUT_ORGANISATION_ID.id),
+      'own submitted request is listed even before organisationId assignment',
+    ).toBe(true)
+
+    const opened = await getAs(SELF_REGISTERED_ORGANISER.uid, `/api/requests/${OWN_SUBMITTED_WITHOUT_ORGANISATION_ID.id}`)
+    expect(opened.status).toBe(200)
+    expect(opened.json.request.id).toBe(OWN_SUBMITTED_WITHOUT_ORGANISATION_ID.id)
+    expect(opened.json.editableSections, 'submitted organiser request stays read-only').toEqual([])
   })
 
   it('PATCH with a body that is not valid JSON', async () => {
