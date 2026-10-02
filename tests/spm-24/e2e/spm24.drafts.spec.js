@@ -72,7 +72,7 @@ test.describe('SPM-24 — View my saved draft requests and distinguish them from
     await signIn(page, ROLE_USERS.coordinator)
     await page.goto('/requests')
 
-    await expect(page.getByRole('heading', { name: 'All event requests' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Events assigned to you' })).toBeVisible()
     await expect(page.getByText('A1 draft (private to A1)')).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'My drafts' })).toHaveCount(0)
   })

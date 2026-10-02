@@ -58,9 +58,16 @@ describe('SPM-24 #5 — submitted requests are shown with their status, not as d
 })
 
 describe('SPM-42 — the same page, worded for the role', () => {
-  it('A coordinator sees the system-wide heading', async () => {
+  it('A coordinator sees the assigned-events heading and the events the API returned', async () => {
     showRequests(['coordinator'])
-    expect(await screen.findByRole('heading', { name: 'All event requests' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Events assigned to you' })).toBeTruthy()
+    expect(screen.getByText('Coordination')).toBeTruthy()
+    expect(screen.getByText('A1 confirmed')).toBeTruthy()
+  })
+
+  it('A coordinator with nothing assigned is told so', async () => {
+    showRequests(['coordinator'], [])
+    expect(await screen.findByText('No events assigned to you yet')).toBeTruthy()
   })
 
   it('Staff see assigned work, and the venue+technical account sees one heading', async () => {

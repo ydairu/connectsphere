@@ -1,21 +1,20 @@
 import { ATTENDEE, COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
 
 // Wording for the requests page. The page, its data and its permission rules are identical for every
-// role — only the words differ, because the same list means different things to each of them: every
-// request in the system to a coordinator, assigned work to staff, their organisation's requests to an
-// organiser, and open events to an attendee.
+// role — only the words differ, because the same list means different things to each of them: the
+// events they coordinate to a coordinator (SPM-65), assigned work to staff, their organisation's
+// requests to an organiser, and open events to an attendee.
 //
-// A user may hold several roles (SPM-42), so one wording has to be chosen. Precedence runs from the
-// widest view to the narrowest: coordinator sees everything, staff see assigned events, organisers see
-// their organisation, attendees see confirmed events. The permissions themselves are still the union
-// of all their roles — this only decides the heading.
+// A user may hold several roles (SPM-42), so one wording has to be chosen. Precedence puts internal
+// roles first: coordinator, then staff, then organiser, then attendee. The permissions themselves are
+// still the union of all their roles — this only decides the heading.
 const COPY = {
   [COORDINATOR]: {
     eyebrow: 'Coordination',
-    title: 'All event requests',
-    description: 'Every submitted request, with its current status. Drafts stay private to their organiser until submitted.',
-    emptyTitle: 'No requests yet',
-    emptyBody: 'Requests appear here once Event Organisers submit them.',
+    title: 'Events assigned to you',
+    description: 'Submitted events you are the assigned coordinator for, with their current status.',
+    emptyTitle: 'No events assigned to you yet',
+    emptyBody: 'Events appear here once a submitted request is assigned to you.',
   },
   [VENUE_STAFF]: {
     eyebrow: 'Assigned work',

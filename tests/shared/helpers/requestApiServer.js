@@ -26,8 +26,10 @@ async function listen(app) {
  * @param {object} [options]
  * @param {object[]} [options.extraAccounts]  profiles beyond the seeded ones
  * @param {object[]} [options.extraRequests]  requests beyond the seeded ones
+ * @param {object} [options.eventRequestStore]  replaces the seeded in-memory store, for a suite that
+ *   needs to change records directly (extraRequests is then ignored)
  */
-export async function startInMemoryApi({ extraAccounts = [], extraRequests = [] } = {}) {
+export async function startInMemoryApi({ extraAccounts = [], extraRequests = [], eventRequestStore } = {}) {
   const profiles = new Map([...Object.values(SEED_ACCOUNTS), ...extraAccounts].map((account) => [account.uid, account]))
 
   const authenticate = createAuthenticate({
@@ -42,7 +44,7 @@ export async function startInMemoryApi({ extraAccounts = [], extraRequests = [] 
 
   const app = createApp({
     authenticate,
-    eventRequestStore: createMemoryEventRequestStore([...SEED_REQUESTS, ...extraRequests]),
+    eventRequestStore: eventRequestStore ?? createMemoryEventRequestStore([...SEED_REQUESTS, ...extraRequests]),
   })
   const { server, baseUrl } = await listen(app)
 

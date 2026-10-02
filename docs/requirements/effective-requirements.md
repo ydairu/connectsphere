@@ -110,7 +110,7 @@ Sprint 1 focuses on the first three functionality areas and contains seven stori
 - direct-link and API attempts to reach unauthorised information are denied; an interface-level restriction alone does not satisfy this;
 - Event Organisers view their own requests and their organisation's events, matched on the **company ID** supplied at registration, and cannot view another organisation's events (Clarification 1, Accounts & Registration: organisers register with "name, company name, and company ID");
 - Event Organisers edit only requests they own, and **cannot edit a request they own once it has been submitted**, unless the Event Coordinator returned it for clarification or changes (Clarification 2, Role Permissions & Access);
-- Event Coordinators have **full system visibility and can edit the full event** (Clarification 1: "Event coordinator: full system visibility"; Clarification 2: "Can edit the full event"), with one exception — a draft that has never been submitted;
+- Event Coordinators edit event details (Clarification 1: "Coordinators can edit event details"; Clarification 2: "Modify Access: Event Coordinators edit main event details"). Which events they view is stated only as "internal staff can view relevant event information" (Clarification 2) and "internal staff can search relevant system events" (Clarification 1); the SPM-65 team decision below fills that gap. No Coordinator sees a draft that has never been submitted;
 - Venue Staff view and update the venue section of relevant events and cannot see the equipment section; Technical Support Staff view and update the equipment/technical section and cannot see the venue section (Clarification 1: the two "operate independently"; the restriction is stated there on view, not only update);
 - Attendees see attendee-facing information but not internal planning information;
 - multi-role users receive combined permissions — the union of what each assigned role independently permits, evaluated per role rather than by combining roles before the record and status checks.
@@ -123,11 +123,29 @@ condition (the customer barred editing after submission). Corrected under AGENTS
 customer clarification outranks a backlog record. The chronological session records are unchanged, per
 §8.
 
-**[Unresolved ambiguity]** Two rulings that bear on this story have no home in this document yet, and
-belong to sections this story does not own:
+**Correction note (2 Oct 2026):** three quotations previously cited in this section and in §5 —
+"Event coordinator: full system visibility" (attributed to Clarification 1), "Can edit the full event"
+and "the previous coordinator retains read-only access" (both attributed to Clarification 2) — do not
+appear in the G8 Session 1 or Session 2 answer sheets, and are not traceable to any customer source.
+They were removed and replaced with the sheets' wording. The 14 Sep correction note above is kept as
+the record of that earlier change.
+
+**[Team decision] (1 Oct 2026, SPM-65)** Event Coordinators view and act only on events assigned to
+them (`assignedCoordinatorUid`). This fills the gap left by "relevant event information"; it does not
+override a customer requirement. Enforced on the server by `isAssignedCoordinator()` in
+`shared/permissions.js`, through record scope. A Coordinator requesting an event not assigned to them
+receives 404, so its existence is not confirmed; other roles keep 403. When an event is reassigned
+(SPM-26), it leaves the previous Coordinator's scope and enters the new one's — SPM-65 acceptance
+criterion 5 is consistent with this decision.
+
+**[Unresolved ambiguity]** Whether "edit main event details" limits a Coordinator to some sections. The
+SPM-42 implementation lets the assigned Coordinator view and edit every section, including internal
+planning notes; that is the team's implementation, not a customer quotation.
+
+**[Unresolved ambiguity]** A ruling that bears on this story has no home in this document yet, and
+belongs to a section this story does not own:
 
 - **§6 Event Status Management** presents the lifecycle as settled at "Draft, Submitted". Clarification 1's transcript is explicit that the status on submission is *Requested*; Clarification 2's summary says *Submitted*. Both written course documents — the Week 1 Customer Briefing and the Week 4 Project Instructions — list "submitted" in their status examples, so *Submitted* is the better-supported reading, but the team has not ratified it. SPM-42's state gate and SPM-24's queries are both written to test only `draft`, so neither breaks either way; the workbook and §6 should still record the decision.
-- **§5 Coordinator Assignment** does not record that after a handover "the previous coordinator retains read-only access" (Clarification 2, Event Coordinator Assignment). This is a record-scope rule and shapes the assignment data model SPM-42 reads, so a single `coordinatorUid` field would need migrating later.
 
 **[Team decision]** Two rules the customer did not rule on, proposed by Shaun on 14 Sep 2026, implemented in `shared/permissions.js`, and ratified by the team on 20 Sep 2026. They fill an area the customer left open and do not override any confirmed customer requirement:
 
@@ -225,7 +243,7 @@ The current backlog says a draft remains until submitted or deleted. Deletion it
 - the system is expected always to have an eligible Coordinator, so an empty pool is treated as a server error: the submission is rejected and the request stays a Draft, rather than being saved without a Coordinator;
 - each assignment is recorded in the request's activity history with "System" as the actor.
 
-The assignment is stored in a single `assignedCoordinatorUid` field. The §SPM-42 note on the previous coordinator's read-only access after a handover still applies to reassignment (SPM-26).
+The assignment is stored in a single `assignedCoordinatorUid` field. The customer says only that reassignment is "initiated by the assigned Coordinator after offline agreement" (Clarification 2). Under the SPM-65 team decision (1 Oct 2026, §SPM-42), a reassigned event leaves the previous Coordinator's scope; nothing is retained.
 
 ### 6. Event Status Management
 

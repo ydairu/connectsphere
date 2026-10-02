@@ -16,6 +16,10 @@ export function createFakeFirestoreEventRequestStore(getDb) {
       return [...records()].map(([id, data]) => toRequest(id, data))
     },
 
+    async listAssignedToCoordinator(uid) {
+      return [...records()].filter(([, data]) => data.assignedCoordinatorUid === uid).map(([id, data]) => toRequest(id, data))
+    },
+
     async get(id) {
       const data = records().get(id)
       return data ? { request: toRequest(id, data), version: data } : null

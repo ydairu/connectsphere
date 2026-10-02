@@ -182,6 +182,21 @@ describe('SPM-9 — viewing and changing an event status', () => {
     expect(await screen.findByText('This action is not available at the request’s current status.')).toBeTruthy()
   })
 
+  it('A transition returning 404 shows the error, retains status and releases the busy state', async () => {
+    const user = showRequest(underReview, ['coordinator'])
+    transitionRequest.mockRejectedValue(
+      new ApiRequestError('API_REQUEST_FAILED', {
+        status: 404,
+        details: { message: 'Event request not found.' },
+      }),
+    )
+    await user.click(await screen.findByRole('button', { name: 'Approve for planning' }))
+    expect(await screen.findByText('Event request not found.')).toBeTruthy()
+    expect(screen.getByText('Under review', { selector: '.status-pill' })).toBeTruthy()
+    expect(screen.queryByText(/Status changed to/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Approve for planning' }).disabled).toBe(false)
+  })
+
   it('A resubmission missing mandatory fields names them', async () => {
     const user = showRequest(
       { request: { id: 'req-1', status: 'returned_for_clarification', core: { title: 'Returned' } }, editableSections: ['core'], availableActions: ['resubmit'] },

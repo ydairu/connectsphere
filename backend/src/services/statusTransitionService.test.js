@@ -231,9 +231,9 @@ describe('SPM-9 — refused status changes leave the request and its history unc
     })
   }
 
-  test('a Coordinator who is not the assigned one cannot act', async () => {
+  test('a Coordinator who is not assigned to the request is out of scope', async () => {
     const db = fakeDb(readyRequest(SUBMITTED))
-    await assertRefused(transitionEventRequest('request-1', START_REVIEW, otherCoordinator, db, NOW), NOT_PERMITTED)
+    await assert.rejects(transitionEventRequest('request-1', START_REVIEW, otherCoordinator, db, NOW), EventRequestNotFoundError)
     assert.equal(db.store.get('request-1').status, SUBMITTED)
     assert.deepEqual(activityOf(db), [])
   })
@@ -266,7 +266,7 @@ describe('SPM-9 — refused status changes leave the request and its history unc
       )
     }
     // A draft is out of scope for everyone but its owner, the assigned-to-be Coordinator included.
-    await assert.rejects(transitionEventRequest('request-1', SUBMIT, assigned, fakeDb(readyRequest(DRAFT)), NOW), EventRequestForbiddenError)
+    await assert.rejects(transitionEventRequest('request-1', SUBMIT, assigned, fakeDb(readyRequest(DRAFT)), NOW), EventRequestNotFoundError)
   })
 
   test('a missing request is reported as not found', async () => {
@@ -283,6 +283,33 @@ const planningWithStaff = (overrides = {}) =>
     equipment: { requirements: ['projector'], technicalSupportNeeded: true },
     ...overrides,
   })
+
+describe('SPM-65 — transition scope preserves multi-role permissions', () => {
+  for (const [status, action] of [[DRAFT, SUBMIT], [RETURNED, RESUBMIT]]) {
+    test(`an owning Organiser with the Coordinator role can ${action}`, async () => {
+      const user = { ...owner, roles: [ORGANISER, COORDINATOR] }
+      const db = fakeDb(readyRequest(status))
+      const updated = await transitionEventRequest('request-1', action, user, db, NOW)
+      assert.equal(updated.status, SUBMITTED)
+      assert.ok(updated.assignedCoordinatorUid)
+      assert.notEqual(updated.assignedCoordinatorUid, user.uid)
+      if (action === RESUBMIT) assert.equal(updated.assignedCoordinatorUid, assigned.uid)
+      assert.equal(statusChangesOf(db).length, 1)
+    })
+  }
+
+  test('an assigned staff member with the Coordinator role can sign off but cannot act as the assigned Coordinator', async () => {
+    const user = { ...venueStaff, roles: [VENUE_STAFF, COORDINATOR] }
+    const db = fakeDb(planningWithStaff())
+    await transitionEventRequest('request-1', APPROVE_VENUE, user, db, NOW)
+    assert.equal(db.store.get('request-1').arrangementApprovals.venue.decision, 'approved')
+    const before = structuredClone(db.store.get('request-1'))
+    const activityBefore = structuredClone(activityOf(db))
+    await assertRefused(transitionEventRequest('request-1', REJECT, user, db, NOW), NOT_PERMITTED)
+    assert.deepEqual(db.store.get('request-1'), before)
+    assert.deepEqual(activityOf(db), activityBefore)
+  })
+})
 
 describe('SPM-9 — venue and technical sign-off unlocks Confirm', () => {
   test('assigned staff approve; each decision is recorded; then the assigned Coordinator confirms', async () => {

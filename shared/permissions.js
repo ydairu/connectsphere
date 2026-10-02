@@ -11,7 +11,8 @@
 //
 // Request shape assumed here (the event-request model does not exist yet — SPM-7):
 //   { id, status, ownerUid, organisationId, organisationName, assignedStaffUids: string[],
-//     core: {...}, venue: {...}, equipment: {...}, registration: { enabled, ... }, internal: {...} }
+//     assignedCoordinatorUid (SPM-8), core: {...}, venue: {...}, equipment: {...},
+//     registration: { enabled, ... }, internal: {...} }
 // Section data lives under its section key, so a field's section is its top-level key.
 
 import { DRAFT, RETURNED, PLANNING, CONFIRMED, COMPLETED, CANCELLED, REJECTED } from './status.js'
@@ -41,8 +42,9 @@ export const SECTIONS = Object.freeze([CORE, VENUE, EQUIPMENT, REGISTRATION, INT
 const SECTION_ACCESS = Object.freeze({
   // Organiser: can view and modify their own requests' content. — Clarification 1 & 2, Role Permissions.
   [ORGANISER]: { view: [CORE, VENUE, EQUIPMENT, REGISTRATION], edit: [CORE, VENUE, EQUIPMENT, REGISTRATION] },
-  // "Event coordinator: full system visibility." — Clarification 1, User Roles & Access Control
-  // "Event coordinator: Can edit the full event." — Clarification 2, Role Permissions & Access
+  // "Coordinators can edit event details" — Clarification 1. "Event Coordinators edit main event
+  // details" — Clarification 2. Every section on an event the coordinator may see is the team's SPM-42
+  // implementation; which events they may see is record scope, isAssignedCoordinator() (SPM-65).
   [COORDINATOR]: { view: SECTIONS, edit: SECTIONS },
   // "Venue staff: venue details only. Technical staff: technical equipment details only."
   // — Clarification 1, User Roles & Access Control. A view restriction, not just edit.
@@ -114,6 +116,18 @@ function isOwner(user, request) {
   return user?.uid != null && request.ownerUid === user.uid
 }
 
+/**
+ * Is this user the Event Coordinator assigned to this request? The single check for a coordinator's
+ * record scope: list, read and edit use it through inScope(), and coordinator action routes (SPM-5,
+ * SPM-25, SPM-45, SPM-26) should call it rather than restate the rule.
+ *
+ * Implements the SPM-65 team decision of 1 Oct 2026: coordinators view and act only on events assigned
+ * to them (effective-requirements.md, SPM-42). A request with no coordinator — every draft — matches no one.
+ */
+export function isAssignedCoordinator(user, request) {
+  return user?.uid != null && request.assignedCoordinatorUid === user.uid
+}
+
 function roleInScope(role, user, request) {
   // "Drafts are strictly private until submitted." "It's not visible to anyone unless I submit it."
   // — Clarification 2, Drafts. Applies to every role, the coordinator included.
@@ -121,7 +135,9 @@ function roleInScope(role, user, request) {
 
   switch (role) {
     case COORDINATOR:
-      return true
+      // Assigned events only — SPM-65 team decision, 1 Oct 2026. Reassignment moves the event to the new
+      // coordinator's scope and out of the previous one's.
+      return isAssignedCoordinator(user, request)
     case ORGANISER:
       // A self-registered organiser may not have an organisationId yet, but they must still be able to
       // see their own submitted request. Colleague visibility remains company-ID based below.
@@ -148,7 +164,7 @@ function roleInScope(role, user, request) {
  *  - SPM-42 "direct-link or API attempts are denied" for out-of-scope records.
  *  - SPM-24 last criterion: a draft is not visible to a coordinator's search. — Clarification 2, Drafts
  *  - Organisers see their own organisation's events only, by company ID. — Clarification 1
- *  - Coordinator: full system visibility, drafts excepted. — Clarification 1 & 2
+ *  - Coordinator: events assigned to them, never drafts. — SPM-65 team decision of 1 Oct 2026
  *  - Venue/technical staff: assigned events, never drafts. — plan, "Role capability"
  *  - Attendee: confirmed events with registration enabled. — plan, "Role capability", narrowed to
  *    confirmed by team decision of 20 Sep 2026 (effective-requirements.md, SPM-42)

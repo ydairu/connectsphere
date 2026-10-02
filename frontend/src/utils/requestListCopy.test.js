@@ -16,9 +16,17 @@ describe('Requests page wording by role', () => {
     }
   })
 
-  it('Coordinator, staff, organiser and attendee each get their own heading', () => {
-    const titles = [COORDINATOR, VENUE_STAFF, ORGANISER, ATTENDEE].map((role) => requestListCopy([role]).title)
-    expect(new Set(titles).size).toBe(titles.length)
+  it('Coordinator, staff, organiser and attendee each get their own wording', () => {
+    // Coordinator and staff share the "Events assigned to you" heading (SPM-65); the eyebrow tells them apart.
+    const labels = [COORDINATOR, VENUE_STAFF, ORGANISER, ATTENDEE].map((role) => {
+      const { eyebrow, title } = requestListCopy([role])
+      return `${eyebrow} / ${title}`
+    })
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  it('A coordinator is told the list holds the events assigned to them', () => {
+    expect(requestListCopy([COORDINATOR]).title).toBe('Events assigned to you')
   })
 
   it('Venue and technical staff share the assigned-events wording', () => {

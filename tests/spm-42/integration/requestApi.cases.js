@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
+import { SEED_ACCOUNTS, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { CONFIRMED, DRAFT } from '../../../shared/status.js'
 import { apiClient } from '../../shared/helpers/requestApiServer.js'
 
@@ -53,13 +53,18 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
       expect(response.status).toBe(403)
     })
 
-    it('Coordinator lists all requests — drafts absent', async () => {
+    // SPM-65: a coordinator's scope is the events assigned to them.
+    it('Coordinator lists the requests assigned to them — drafts and other coordinators\' events absent', async () => {
       const response = await list('coordinator')
       expect(response.status).toBe(200)
       const ids = response.json.requests.map((request) => request.id)
       expect(response.json.requests.filter((request) => request.status === DRAFT)).toEqual([])
+      for (const request of response.json.requests) {
+        expect(request.assignedCoordinatorUid, `${request.id} is assigned to the caller`).toBe(SEED_ACCOUNTS.coordinator.uid)
+      }
       for (const request of SEED_REQUESTS.filter((candidate) => candidate.status !== DRAFT)) {
-        expect(ids.includes(request.id), `${request.id} (${request.status}) should be listed`).toBeTruthy()
+        const mine = request.assignedCoordinatorUid === SEED_ACCOUNTS.coordinator.uid
+        expect(ids.includes(request.id), `${request.id} listed: ${mine}`).toBe(mine)
       }
     })
 
@@ -105,6 +110,15 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     it('Unknown request id', async () => {
       const response = await get('coordinator', 'seed-req-does-not-exist')
       expect(response.status).toBe(404)
+    })
+
+    it("Coordinator requests another coordinator's event by direct ID — 404, as if it did not exist", async () => {
+      expect(seeded[A2_SUBMITTED].assignedCoordinatorUid, 'precondition').toBe(SEED_ACCOUNTS.coordinator2.uid)
+      const response = await get('coordinator', A2_SUBMITTED)
+      const unknown = await get('coordinator', 'seed-req-does-not-exist')
+      expect(response.status).toBe(404)
+      expect(response.json, 'same body as an unknown id').toEqual(unknown.json)
+      expect(!response.text.includes(seeded[A2_SUBMITTED].core.title), 'no event content').toBeTruthy()
     })
   })
 
@@ -183,8 +197,9 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
       expect(restored.status, 'seeded value restored').toBe(200)
     })
 
-    it('Coordinator edits any section on an unassigned event', async () => {
+    it('Coordinator edits any section on an event assigned to them', async () => {
       expect(seeded[A1_SUBMITTED].assignedStaffUids, 'precondition: no staff assigned').toEqual([])
+      expect(seeded[A1_SUBMITTED].assignedCoordinatorUid, 'precondition: assigned to the caller').toBe(SEED_ACCOUNTS.coordinator.uid)
       const response = await patch('coordinator', A1_SUBMITTED, {
         internal: { planningNotes: 'Coordinator note' },
         equipment: { technicalSupportNeeded: false },
@@ -197,6 +212,16 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
         equipment: { technicalSupportNeeded: seeded[A1_SUBMITTED].equipment.technicalSupportNeeded },
       })
       expect(restored.status, 'seeded values restored').toBe(200)
+    })
+
+    it("Coordinator PATCHes another coordinator's event — 404 and the record is unchanged", async () => {
+      const response = await patch('coordinator', A2_SUBMITTED, { internal: { planningNotes: 'Not my event' } })
+      expect(response.status).toBe(404)
+      expect(response.json.forbiddenFields).toBe(undefined)
+
+      const after = await get('organiserA2', A2_SUBMITTED)
+      expect(after.status).toBe(200)
+      expect(after.json.request.core.title, 'record unchanged').toBe(seeded[A2_SUBMITTED].core.title)
     })
 
     it('Attendee PATCHes a draft they cannot see — refused without naming fields', async () => {

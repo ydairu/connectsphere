@@ -65,7 +65,8 @@ describe('SPM-24 — View My Saved Draft Requests and Distinguish Them from Subm
     const listed = await list('coordinator')
     expect(!listed.json.requests.some((request) => request.id === A1_DRAFT), 'not in the list').toBeTruthy()
     const direct = await get('coordinator', A1_DRAFT)
-    expect(direct.status, 'not reachable by direct id either').toBe(403)
+    // 404 rather than 403: a coordinator is told nothing about events outside their scope (SPM-65).
+    expect(direct.status, 'not reachable by direct id either').toBe(404)
   })
 
   it('A draft that has never been submitted is not visible to another Organiser in the same organisation', async () => {

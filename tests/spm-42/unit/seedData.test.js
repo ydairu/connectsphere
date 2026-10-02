@@ -74,8 +74,12 @@ describe('Seed data — SPM-42 / SPM-24 demonstration coverage', () => {
     expect(inScope(organiserA2, byId['seed-req-b1-planning'])).toBe(false)
   })
 
-  it('Demonstrable on the seed: coordinator sees every non-draft request and no draft', () => {
-    for (const request of SEED_REQUESTS) expect(inScope(coordinator, request), request.id).toBe(request.status !== DRAFT)
+  it('Demonstrable on the seed: coordinator sees the non-draft requests assigned to them and no draft', () => {
+    for (const request of SEED_REQUESTS) {
+      const expected = request.status !== DRAFT && request.assignedCoordinatorUid === coordinator.uid
+      expect(inScope(coordinator, request), request.id).toBe(expected)
+    }
+    expect(inScope(coordinator, byId['seed-req-a2-submitted']), "coordinator-2's event").toBe(false)
   })
 
   it('Demonstrable on the seed: owner edits a returned request but not a submitted one', () => {
