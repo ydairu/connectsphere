@@ -13,6 +13,8 @@ export function createEventRequestRoutes({ authenticate, getDb }) {
   router.get('/:id', authenticate, requireRole(ORGANISER), controller.getEventRequest)
   router.patch('/:id', authenticate, requireRole(ORGANISER), controller.updateEventRequest)
   router.post('/:id/submit', authenticate, requireRole(ORGANISER), controller.submitEventRequest)
+  // SPM-9 lifecycle actions. No role check here: shared/statusTransitions.js decides who may do what.
+  router.post('/:id/transitions', authenticate, controller.transitionEventRequest)
 
   return router
 }

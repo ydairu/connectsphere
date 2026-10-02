@@ -97,3 +97,13 @@ export function getRequest(user, id) {
 export function updateRequest(user, id, patch) {
   return authenticatedRequest(user, `/api/requests/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
 }
+
+// SPM-9 action, e.g. { action: 'start_review' } or { action: 'cancel', reason: '...' }. The response is
+// shaped like getRequest's. A refused action comes back as 403 (not permitted), 400 (malformed, or a
+// required reason missing) or 409 (not allowed in the request's current state), with a message.
+export function transitionRequest(user, id, action, reason) {
+  return authenticatedRequest(user, `/api/event-requests/${id}/transitions`, {
+    method: 'POST',
+    body: JSON.stringify(reason === undefined ? { action } : { action, reason }),
+  })
+}

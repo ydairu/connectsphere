@@ -5,9 +5,11 @@ import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
+import StatusActions from '../components/StatusActions.jsx'
 import StatusPill from '../components/StatusPill.jsx'
 import { useAuth } from '../hooks/useAuth.js'
-import { getRequest, updateRequest } from '../services/api.js'
+import { getRequest, transitionRequest, updateRequest } from '../services/api.js'
+import { statusLabel } from '../utils/statusLabels.js'
 import { buildPatch, hasChanges, toFormValues } from '../utils/requestPatch.js'
 import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSections.js'
 
@@ -16,6 +18,9 @@ import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSect
 // absent because the API removed it, not because the UI hid it.
 //
 // Drafts are not edited here. They belong to the SPM-4 editor, per the route split in AGENTS.md §6.
+//
+// SPM-9: the status is shown in the heading, and the status actions this user may take (availableActions
+// in the response) are offered above the sections.
 
 function ReadOnlyValue({ type, value }) {
   if (type === 'boolean') return <strong>{value === true ? 'Yes' : 'No'}</strong>
@@ -63,6 +68,10 @@ function RequestDetailPage() {
   const { user } = useAuth()
   const [request, setRequest] = useState(null)
   const [editableSections, setEditableSections] = useState([])
+  const [availableActions, setAvailableActions] = useState([])
+  const [arrangements, setArrangements] = useState(null)
+  const [cancellationRequest, setCancellationRequest] = useState(null)
+  const [acting, setActing] = useState(false)
   const [form, setForm] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -72,6 +81,9 @@ function RequestDetailPage() {
   const applyResponse = useCallback((response) => {
     setRequest(response.request)
     setEditableSections(response.editableSections ?? [])
+    setAvailableActions(response.availableActions ?? [])
+    setArrangements(response.arrangements ?? null)
+    setCancellationRequest(response.cancellationRequest ?? null)
     setForm(toFormValues(response.request))
   }, [])
 
@@ -133,6 +145,31 @@ function RequestDetailPage() {
     }
   }
 
+  async function handleAction(action, reason) {
+    setActing(true)
+    setStatus(null)
+    try {
+      const response = await transitionRequest(user, id, action, reason)
+      const statusChanged = response.request.status !== request.status
+      applyResponse(response)
+      setStatus({
+        type: 'success',
+        message: statusChanged ? `Status changed to ${statusLabel(response.request.status)}.` : 'Your decision has been recorded.',
+      })
+    } catch (error) {
+      // A resubmission is validated like a submission: name the missing fields.
+      const missing = error.status === 400 && error.details?.errors ? Object.keys(error.details.errors) : []
+      setStatus({
+        type: 'error',
+        message: missing.length
+          ? `Complete these fields before resubmitting: ${missing.join(', ')}`
+          : error.details?.message ?? 'We could not change the status. Please try again.',
+      })
+    } finally {
+      setActing(false)
+    }
+  }
+
   if (!loading && request?.status === DRAFT) {
     return <Navigate to={`/event-requests/${id}/edit`} replace />
   }
@@ -160,6 +197,15 @@ function RequestDetailPage() {
         {!loading && !loadError && request && (
           <form onSubmit={handleSave}>
             {status && <div className={`alert alert-${status.type}`} role="alert">{status.message}</div>}
+
+            <StatusActions
+              status={request.status}
+              actions={availableActions}
+              arrangements={arrangements}
+              cancellationRequest={cancellationRequest}
+              busy={acting || saving}
+              onAction={handleAction}
+            />
 
             {visibleSections.map((section) => {
               const editable = editableSections.includes(section)

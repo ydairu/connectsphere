@@ -7,6 +7,7 @@
 // multi-role leak; CLAUDE.md, "Evaluate per role, then union the results").
 
 import { SECTIONS, canEdit, forbiddenFields, inScope, projectRequest } from '../../../shared/permissions.js'
+import { allAvailableActions, arrangementsSummary, cancellationSummary } from '../../../shared/requestActions.js'
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -21,11 +22,17 @@ function forbidden(res) {
  * The response body for one request: what this user may view of it, and which sections they may edit
  * right now. `editableSections` lets the UI render read-only sections without re-deriving the rule —
  * the projected record deliberately omits ownerUid and assignedStaffUids, so the client cannot.
+ * `availableActions` (SPM-9) lists the actions this user may take now, for the same reason. `arrangements`
+ * and `cancellationRequest` (SPM-9) summarise sign-off and any cancellation request for users who may see
+ * them, without the internal record of who decided.
  */
 export function presentRequest(user, request) {
   return {
     request: projectRequest(user, request),
     editableSections: SECTIONS.filter((section) => canEdit(user, request, section)),
+    availableActions: allAvailableActions(user, request),
+    arrangements: arrangementsSummary(user, request),
+    cancellationRequest: cancellationSummary(user, request),
   }
 }
 
