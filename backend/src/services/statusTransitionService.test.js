@@ -231,9 +231,9 @@ describe('SPM-9 — refused status changes leave the request and its history unc
     })
   }
 
-  test('a Coordinator who is not the assigned one cannot act', async () => {
+  test('a Coordinator who is not assigned to the request is out of scope', async () => {
     const db = fakeDb(readyRequest(SUBMITTED))
-    await assertRefused(transitionEventRequest('request-1', START_REVIEW, otherCoordinator, db, NOW), NOT_PERMITTED)
+    await assert.rejects(transitionEventRequest('request-1', START_REVIEW, otherCoordinator, db, NOW), EventRequestForbiddenError)
     assert.equal(db.store.get('request-1').status, SUBMITTED)
     assert.deepEqual(activityOf(db), [])
   })
