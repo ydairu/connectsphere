@@ -134,7 +134,8 @@ describe('SPM-8 — automatic coordinator assignment', () => {
 
     await submitDraftEventRequest('draft', organiser, db, now)
 
-    assert.deepEqual(activityOf(db, 'draft'), [
+    // SPM-9 adds a status_changed entry in the same transaction; this test is about the assignment entry.
+    assert.deepEqual(activityOf(db, 'draft').filter((entry) => entry.type === COORDINATOR_ASSIGNED), [
       {
         type: COORDINATOR_ASSIGNED,
         coordinatorUid: 'A',
