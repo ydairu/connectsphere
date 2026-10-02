@@ -33,6 +33,7 @@ import {
   RESUBMIT,
   RETURN_FOR_CLARIFICATION,
   START_REVIEW,
+  SUBMIT,
   TERMINAL_STATUS,
   UNKNOWN_ACTION,
 } from '../../../shared/statusTransitions.js'
@@ -104,7 +105,9 @@ const statusChanges = (slug) =>
 describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
   it('spm9_organiser_and_coordinator_both_see_the_current_status', async () => {
     for (const slug of ['a1-submitted', 'a1-under-review', 'a1-returned', 'a1-planning', 'a1-confirmed', 'a1-completed', 'a1-cancelled', 'a1-rejected']) {
-      for (const account of [organiserA1, coordinator]) {
+      const assignedCoordinator = Object.values(SEED_ACCOUNTS).find((account) => account.uid === seeded(slug).assignedCoordinatorUid)
+      expect(assignedCoordinator, slug).toBeDefined()
+      for (const account of [organiserA1, assignedCoordinator]) {
         const response = await view(account, slug)
         expect(response.status, `${account.uid} ${slug}`).toBe(200)
         expect(response.json.request.status).toBe(seeded(slug).status)
@@ -120,7 +123,7 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
     expect((await view(organiserA1, 'a1-returned')).json.availableActions).toEqual([RESUBMIT])
     // Same organisation, not the owner: may view, may not resubmit.
     expect((await view(organiserA2, 'a1-returned')).json.availableActions).toEqual([])
-    expect((await view(coordinator2, 'a1-under-review')).json.availableActions).toEqual([])
+    expect(await view(coordinator2, 'a1-under-review')).toEqual({ status: 404, json: { message: 'Not found' } })
   })
 
   it('spm9_review_return_resubmit_approve_moves_through_each_status_and_records_each_change', async () => {
@@ -189,7 +192,6 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
 
   it('spm9_a_status_change_by_anyone_but_the_permitted_actor_is_forbidden', async () => {
     const refused = [
-      [coordinator2, 'a1-submitted', START_REVIEW],
       [organiserA1, 'a1-under-review', APPROVE],
       [organiserA2, 'a1-returned', RESUBMIT],
       [venueStaff, 'a1-planning', REJECT],
@@ -208,6 +210,24 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
       const response = await act(organiserB1, slug, START_REVIEW)
       expect(response.status, slug).toBe(403)
       expect(response.json).toEqual({ message: 'Forbidden' })
+    }
+  })
+
+  it('spm9_out_of_scope_coordinator_actions_match_missing_requests_without_writes', async () => {
+    for (const [slug, action] of [
+      ['a1-submitted', START_REVIEW],
+      ['a1-draft', SUBMIT],
+      ['a1-returned', RESUBMIT],
+      ['a1-confirmed', APPROVE_CANCELLATION],
+      ['a1-confirmed', REFUSE_CANCELLATION],
+    ]) {
+      const before = structuredClone(db.store.get(`seed-req-${slug}`))
+      const activityBefore = [...db.collectionData(`eventRequests/seed-req-${slug}/activity`).values()]
+      const missing = await act(coordinator2, 'missing', action)
+      expect(missing.status).toBe(404)
+      expect(await act(coordinator2, slug, action)).toEqual(missing)
+      expect(db.store.get(`seed-req-${slug}`)).toEqual(before)
+      expect([...db.collectionData(`eventRequests/seed-req-${slug}/activity`).values()]).toEqual(activityBefore)
     }
   })
 
@@ -316,8 +336,8 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
     expect((await act(organiserA2, 'a1-confirmed', REQUEST_CANCELLATION)).status).toBe(403)
     expect((await act(coordinator3, 'a1-confirmed', REQUEST_CANCELLATION)).status).toBe(403)
     await act(organiserA1, 'a1-confirmed', REQUEST_CANCELLATION)
-    expect((await act(coordinator, 'a1-confirmed', APPROVE_CANCELLATION)).status).toBe(403)
-    expect((await act(coordinator, 'a1-confirmed', REFUSE_CANCELLATION)).status).toBe(403)
+    expect((await act(coordinator, 'a1-confirmed', APPROVE_CANCELLATION)).status).toBe(404)
+    expect((await act(coordinator, 'a1-confirmed', REFUSE_CANCELLATION)).status).toBe(404)
     expect((await act(organiserA1, 'a1-planning', REQUEST_CANCELLATION)).status).toBe(409)
     expect(db.store.get('seed-req-a1-confirmed').status).toBe(CONFIRMED)
   })

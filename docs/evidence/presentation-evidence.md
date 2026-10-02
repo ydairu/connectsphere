@@ -204,6 +204,14 @@ Implemented the SPM-2 organisation-name registration criterion and the team's ap
 
 Verification: `npm test` passed 68 Node tests and 17 Vitest tests; `npm run lint --prefix frontend` and `npm run build` passed. Build reported a bundle-size warning. HTTP tests exercised real Express routing on localhost with Firebase verification/storage mocked; service tests used in-memory storage and UI tests used jsdom. No live Firebase/emulator, deployed Firestore rules, manual browser flow, or CI verification is claimed. The operational backlog and Sprint records were unavailable and were not updated.
 
+## 2 October 2026 — SPM-65 / SPM-9 CI reconciliation
+
+Reproduced three SPM-9 API failures caused by outdated coordinator-scope expectations after merging SPM-65. Updated the visibility assertions to use assigned coordinators and aligned both transition-service paths with the recorded 404 policy for out-of-scope coordinators. Other roles retain 403; multi-role access remains the union of permitted roles.
+
+Executable evidence: `tests/spm-9/integration/statusTransitionsApi.test.js` verifies missing-event-equivalent refusals without record/history writes; `backend/src/services/statusTransitionService.test.js` verifies multi-role submission, resubmission and staff sign-off while refusing unassigned Coordinator actions; `frontend/src/pages/requestDetail.test.jsx` verifies the transition 404 error leaves status unchanged and releases the busy state.
+
+Local verification on Windows with Node 22.17.0: lint passed, existing suites passed (128 Node + 67 frontend tests), coverage suites passed (395 passed, 30 opt-in live tests skipped), production build passed with a bundle-size warning, and Playwright Chromium passed all 39 tests. Vite-based checks required execution outside the restricted sandbox. API/E2E persistence and authentication use in-memory doubles; UI component tests mock the API. No live Firebase, emulator, deployed-rules, manual browser or updated GitHub Actions run is claimed. The operational backlog and Sprint records remain unavailable and were not updated; this is regression-fix evidence, not a story Done claim.
+
 ## Evidence Entry Template
 
 Copy this row into the Verified Evidence Register when new evidence is produced:

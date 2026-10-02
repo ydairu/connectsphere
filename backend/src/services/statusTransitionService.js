@@ -27,7 +27,7 @@ import {
   canRefuseCancellation,
   canRequestCancellation,
 } from '../../../shared/cancellationRequests.js'
-import { inScope } from '../../../shared/permissions.js'
+import { COORDINATOR, inScope, rolesOf } from '../../../shared/permissions.js'
 import {
   MAX_REASON_LENGTH,
   REASON_ACCEPTED_ACTIONS,
@@ -107,11 +107,18 @@ function addActivity(tx, docRef, entry) {
   tx.set(docRef.collection(ACTIVITY_SUBCOLLECTION).doc(), entry)
 }
 
+function requireRequestScope(user, request) {
+  if (inScope(user, request)) return
+  // Match SPM-65's read/edit refusal, after evaluating the union of all roles' scopes.
+  if (rolesOf(user).includes(COORDINATOR)) throw new EventRequestNotFoundError()
+  throw new EventRequestForbiddenError()
+}
+
 /**
  * Applies `action` to request `id` as `user`, and returns the updated request (unprojected — the caller
- * must pass it through presentRequest()). Throws EventRequestNotFoundError, EventRequestForbiddenError for
- * a request outside the user's scope (nothing about it is revealed), EventRequestValidationError for a
- * resubmission missing mandatory fields, or StatusTransitionError.
+ * must pass it through presentRequest()). Out-of-scope coordinators get EventRequestNotFoundError;
+ * other out-of-scope users get EventRequestForbiddenError. Neither refusal reveals request details.
+ * Validation failures throw EventRequestValidationError or StatusTransitionError.
  */
 export async function transitionEventRequest(id, action, user, db = getAdminDb(), now = new Date(), options = {}) {
   if (action === SUBMIT || action === RESUBMIT) {
@@ -124,7 +131,7 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     if (!snapshot.exists) throw new EventRequestNotFoundError()
 
     const existing = { id, ...snapshot.data() }
-    if (!inScope(user, existing)) throw new EventRequestForbiddenError()
+    requireRequestScope(user, existing)
 
     // The reason is checked only after the action itself is allowed, so a refusal names the real cause.
     const reasonFor = () => normaliseReason(action, options.reason)
@@ -187,7 +194,7 @@ async function transitionBySubmission(id, action, user, db, now, options) {
   if (!snapshot.exists) throw new EventRequestNotFoundError()
 
   const existing = { id, ...snapshot.data() }
-  if (!inScope(user, existing)) throw new EventRequestForbiddenError()
+  requireRequestScope(user, existing)
 
   refuse(canTransition(user, existing, action, now))
 

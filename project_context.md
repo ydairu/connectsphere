@@ -176,6 +176,13 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - The first live run had 4 venue-staff failures. SPM-9 testing (`feature/spm-9`) had moved `seed-req-a1-planning` to Cancelled, which is not an SPM-65 defect; re-seeding fixed it.
       - Reassignment (criteria 4–5) is tested in memory only.
 
+14. **SPM-65 / SPM-9 CI reconciliation (2 Oct 2026):**
+    - SPM-9 visibility tests now use each seeded event's assigned Coordinator and expect 404 for an out-of-scope Coordinator read. Scope refusals are tested separately from forbidden actions on visible events.
+    - Both paths through `statusTransitionService.js` now return 404 for out-of-scope users holding the Coordinator role, matching the recorded SPM-65 rule; other out-of-scope users retain 403. The union of roles is evaluated before choosing the refusal.
+    - Regression evidence: `tests/spm-9/integration/statusTransitionsApi.test.js` covers scope refusals, missing-event equivalence and unchanged records/history; `backend/src/services/statusTransitionService.test.js` covers multi-role submission, resubmission and staff sign-off without granting unassigned Coordinator actions; `frontend/src/pages/requestDetail.test.jsx` covers displaying a transition 404 without changing status or remaining busy.
+    - Local verification on Windows, Node 22.17.0: lint passed; existing suites passed (128 Node tests and 67 frontend tests); coverage suites passed (395 tests, 30 opt-in live tests skipped); production build passed with a bundle-size warning; Playwright Chromium passed all 39 tests. Vite-based checks required execution outside the restricted sandbox.
+    - These API and E2E checks use in-memory Firebase doubles. No live Firebase, emulator, deployed-rules or manual browser verification was performed. GitHub Actions verification of the updated branch remains pending; no deployment or operational story-status update is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.
