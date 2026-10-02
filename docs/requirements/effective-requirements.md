@@ -227,6 +227,12 @@ The current backlog says a draft remains until submitted or deleted. Deletion it
 
 **[Customer-confirmed]** Event Coordinators review submitted requests, seek clarification, return for amendment, approve/allow planning, or reject. Returned requests are edited and resubmitted; rejected unfulfillable requests close. Initial feasibility considers attendance, date/time, venue, and equipment availability.
 
+**[Implemented — SPM-5, 2 Oct 2026]** The assigned Coordinator reviews a Submitted request's title, attendance, duration, preferred date/time, venue/layout preference, accessibility and equipment on the request page, moves it to Under Review, and approves it to Planning. Every other Coordinator is refused approve, return, reject and start review with the same 404 as a missing request (SPM-65). The SPM-9 transitions are reused unchanged; reject remains as built by SPM-9, which SPM-45 should take into account.
+
+**[Team decision pending — SPM-5]** "When they open it for review" is served by the Coordinator's **Start review** action, not by viewing the request: opening a page does not change the status, so a Coordinator can look at a request without starting review.
+
+**[Engineering recommendation — SPM-5]** "With sufficient information" is enforced as a minimum: Approve is refused while the request fails the submission check (mandatory fields present and every field well-formed, `validateEventRequestSubmission`), because section edits after submission are not validated (AGENTS.md §6). Whether the information is sufficient beyond that remains the Coordinator's judgement.
+
 ### 5. Coordinator Assignment
 
 **[Customer-confirmed]** Assignment is automatic with exactly one Coordinator per event. Round-robin or load-based are acceptable examples. The assigned Coordinator may initiate reassignment following offline agreement.

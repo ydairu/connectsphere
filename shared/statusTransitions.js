@@ -12,6 +12,7 @@
 // choices the criteria left open, confirmed by the team on 1 Oct 2026 (effective-requirements.md §6).
 
 import { arrangementsApproved } from './arrangements.js'
+import { hasValidationErrors, validateEventRequestSubmission } from './eventRequest.js'
 import { CANCELLATION_REQUEST_PENDING, NO_PENDING_CANCELLATION, hasPendingCancellation } from './cancellationRequests.js'
 import { NOT_PERMITTED, isAssignedCoordinator, isOwningOrganiser } from './requestActors.js'
 import {
@@ -50,6 +51,7 @@ export const WRONG_STATUS = 'wrong_status'
 export { NOT_PERMITTED }
 export const ARRANGEMENTS_NOT_APPROVED = 'arrangements_not_approved'
 export const EVENT_NOT_ENDED = 'event_not_ended'
+export const INSUFFICIENT_INFORMATION = 'insufficient_information'
 
 // --- Guards ---------------------------------------------------------------------------------------
 // Actors (owning Organiser, assigned Coordinator) are in shared/requestActors.js. The Confirm guard,
@@ -72,6 +74,20 @@ export function eventHasEnded(request, now = new Date()) {
   return start + hours * 60 * 60 * 1000 <= now.getTime()
 }
 
+/**
+ * Does the request still hold the information a submission needs? The same check as SPM-3's submit
+ * (validateEventRequestSubmission): mandatory fields present and every field well-formed.
+ *
+ * SPM-5: "Given a request in Under Review with sufficient information, when the assigned Event Coordinator
+ * approves it, then its status changes to Planning." Section edits after submission are not validated
+ * (AGENTS.md §6), so a required field can be cleared while the request is Under Review.
+ * [Engineering recommendation, SPM-5] This is the minimum; whether the information is sufficient beyond it
+ * is the Coordinator's judgement, and Return for Clarification (SPM-25) is the action for that.
+ */
+export function hasSufficientInformation(request) {
+  return !hasValidationErrors(validateEventRequestSubmission(request).errors)
+}
+
 // --- Transition table -----------------------------------------------------------------------------
 
 const TRANSITIONS = Object.freeze({
@@ -86,7 +102,13 @@ const TRANSITIONS = Object.freeze({
   // moves to Returned."
   [RETURN_FOR_CLARIFICATION]: { from: [UNDER_REVIEW], to: RETURNED, actor: isAssignedCoordinator },
   // "Given an event in Under Review, when the Coordinator approves, then it moves to Planning."
-  [APPROVE]: { from: [UNDER_REVIEW], to: PLANNING, actor: isAssignedCoordinator },
+  // SPM-5: only "with sufficient information" — see hasSufficientInformation().
+  [APPROVE]: {
+    from: [UNDER_REVIEW],
+    to: PLANNING,
+    actor: isAssignedCoordinator,
+    guard: (request) => (hasSufficientInformation(request) ? null : INSUFFICIENT_INFORMATION),
+  },
   // "Given an event is in Planning and all mandatory venue and required technical arrangements have been
   // approved, when the assigned Event Coordinator confirms it, then its status changes to Confirmed."
   [CONFIRM]: {

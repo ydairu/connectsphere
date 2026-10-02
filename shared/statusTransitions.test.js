@@ -67,7 +67,9 @@ function requestAt(status, overrides = {}) {
     ownerUid: owner.uid,
     assignedCoordinatorUid: status === DRAFT ? null : assigned.uid,
     assignedStaffUids: [venueStaff.uid, technicalStaff.uid],
-    core: { preferredDateTime: '2026-09-29T09:00:00.000Z', durationHours: 4 },
+    // Complete enough to approve (SPM-5's sufficient-information guard).
+    core: { title: 'Partner Forum', purpose: 'Partner updates', expectedAttendees: 50, preferredDateTime: '2026-09-29T09:00:00.000Z', durationHours: 4 },
+    venue: { layoutPreference: 'theatre' },
     ...overrides,
   }
 }
