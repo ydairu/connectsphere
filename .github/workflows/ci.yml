@@ -36,7 +36,7 @@ jobs:
       - name: Existing shared, backend and frontend suites
         run: npm run test:existing
 
-      - name: SPM-1 / SPM-2 unit and integration suites with coverage
+      - name: Unit and integration suites with coverage (all stories)
         run: npm run test:coverage
 
       - name: Frontend production build
@@ -61,7 +61,7 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      - name: SPM-1 / SPM-2 end-to-end suites
+      - name: End-to-end suites (all stories)
         run: npm run test:e2e
 
       - name: Upload Playwright report
