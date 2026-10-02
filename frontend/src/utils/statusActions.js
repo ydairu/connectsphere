@@ -31,6 +31,7 @@ const ACTIONS = {
   [RETURN_FOR_CLARIFICATION]: {
     label: 'Return for clarification',
     confirm: 'Return this request to the organiser for clarification or amendments?',
+    reasonLabel: 'Message to the organiser',
   },
   [APPROVE]: { label: 'Approve for planning' },
   [CONFIRM]: { label: 'Confirm event' },
@@ -83,4 +84,11 @@ export function actionReason(action) {
   if (REASON_REQUIRED_ACTIONS.includes(action)) return 'required'
   if (REASON_ACCEPTED_ACTIONS.includes(action)) return 'optional'
   return null
+}
+
+/** The label for the action's reason box, e.g. 'Reason (required)'. */
+export function actionReasonLabel(action) {
+  const mode = actionReason(action)
+  if (!mode) return null
+  return `${ACTIONS[action]?.reasonLabel ?? 'Reason'} (${mode})`
 }

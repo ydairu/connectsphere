@@ -136,7 +136,9 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
     ]
     let from = SUBMITTED
     for (const [account, action, to] of steps) {
-      const response = await act(account, 'a1-submitted', action)
+      // SPM-25: a return needs the Coordinator's message.
+      const reason = action === RETURN_FOR_CLARIFICATION ? 'Please confirm the expected attendance' : undefined
+      const response = await act(account, 'a1-submitted', action, reason)
       expect(response.status, action).toBe(200)
       expect(response.json.request.status).toBe(to)
       // The other party sees the new status too.

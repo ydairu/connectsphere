@@ -44,6 +44,7 @@ test.describe('SPM-9 — View an event’s current lifecycle status (E2E)', () =
     await expect(statusPill(page)).toHaveText('Under review')
 
     await page.getByRole('button', { name: 'Return for clarification' }).click()
+    await page.getByLabel('Message to the organiser (required)').fill('Please confirm the expected attendance.')
     await page.getByRole('group', { name: 'Confirm status change' }).getByRole('button', { name: 'Return for clarification' }).click()
     await expect(statusPill(page)).toHaveText('Returned for clarification')
     await logout(page)
