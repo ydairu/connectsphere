@@ -124,4 +124,11 @@ export function reassignCoordinator(user, id, { coordinatorUid, handoverAgreed }
     method: 'POST',
     body: JSON.stringify({ coordinatorUid, handoverAgreed }),
   })
+// SPM-47, SPM-63 — the signed-in user's own in-app notifications, newest first.
+export function listNotifications(user) {
+  return authenticatedRequest(user, '/api/notifications')
+}
+
+export function markNotificationRead(user, id) {
+  return authenticatedRequest(user, `/api/notifications/${id}/read`, { method: 'POST' })
 }

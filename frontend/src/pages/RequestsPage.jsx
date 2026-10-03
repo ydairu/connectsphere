@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ORGANISER } from '../../../shared/permissions.js'
 import { DRAFT } from '../../../shared/status.js'
+import { TERMINAL_STATUSES } from '../../../shared/statusTransitions.js'
 import Card from '../components/Card.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
@@ -19,6 +20,8 @@ import { requestListCopy } from '../utils/requestListCopy.js'
 // submitted-side status names are never enumerated.
 //
 // SPM-26: a page that sends the user here after an action may pass `state.notice`, shown at the top.
+// SPM-63 — a Cancelled event "is not in the active events list". Completed, Cancelled and Rejected events
+// (TERMINAL_STATUSES) are listed separately under "Closed events", so they stay reachable.
 
 function requestTitle(request) {
   const title = request.core?.title
@@ -33,6 +36,32 @@ function requestDate(request) {
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+function RequestList({ requests }) {
+  return (
+    <ul className="request-list">
+      {requests.map((request) => {
+        const date = requestDate(request)
+        return (
+          <li key={request.id}>
+            <Card className="request-item">
+              <div className="request-item-main">
+                <h2>{requestTitle(request)}</h2>
+                <p className="request-meta">
+                  {[request.organisationName, date].filter(Boolean).join(' · ') || 'No preferred date yet'}
+                </p>
+              </div>
+              <div className="request-item-actions">
+                <StatusPill status={request.status} />
+                <Link className="button button-secondary button-small" to={`/requests/${request.id}`}>View</Link>
+              </div>
+            </Card>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 function RequestsPage() {
   const { user, roles } = useAuth()
   const notice = useLocation().state?.notice
@@ -41,6 +70,8 @@ function RequestsPage() {
   const [error, setError] = useState(null)
   const isOrganiser = roles.includes(ORGANISER)
   const copy = requestListCopy(roles)
+  const activeRequests = requests.filter((request) => !TERMINAL_STATUSES.includes(request.status))
+  const closedRequests = requests.filter((request) => TERMINAL_STATUSES.includes(request.status))
 
   useEffect(() => {
     let active = true
@@ -89,28 +120,15 @@ function RequestsPage() {
           </Card>
         )}
 
-        {!loading && !error && requests.length > 0 && (
-          <ul className="request-list">
-            {requests.map((request) => {
-              const date = requestDate(request)
-              return (
-                <li key={request.id}>
-                  <Card className="request-item">
-                    <div className="request-item-main">
-                      <h2>{requestTitle(request)}</h2>
-                      <p className="request-meta">
-                        {[request.organisationName, date].filter(Boolean).join(' · ') || 'No preferred date yet'}
-                      </p>
-                    </div>
-                    <div className="request-item-actions">
-                      <StatusPill status={request.status} />
-                      <Link className="button button-secondary button-small" to={`/requests/${request.id}`}>View</Link>
-                    </div>
-                  </Card>
-                </li>
-              )
-            })}
-          </ul>
+        {!loading && !error && activeRequests.length > 0 && <RequestList requests={activeRequests} />}
+
+        {!loading && !error && closedRequests.length > 0 && (
+          <section aria-labelledby="closed-requests-heading">
+            <div className="section-heading">
+              <h2 id="closed-requests-heading">Closed events</h2>
+            </div>
+            <RequestList requests={closedRequests} />
+          </section>
         )}
       </main>
     </div>

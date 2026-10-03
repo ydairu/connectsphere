@@ -52,7 +52,8 @@ export function sendEventRequestError(error, res, next) {
 
 // getDb is called per request, not at construction, so the production app never touches Firebase until a
 // request arrives; tests and the E2E double pass an in-memory database.
-export function createEventRequestController(getDb) {
+// loadCoordinatorName (SPM-46): see services/assignedCoordinatorService.js.
+export function createEventRequestController(getDb, loadCoordinatorName = async () => null) {
   return {
     async createEventRequest(req, res, next) {
       try {
@@ -101,7 +102,8 @@ export function createEventRequestController(getDb) {
         const eventRequest = await transitionEventRequest(req.params.id, action, req.user, getDb(), new Date(), {
           reason: req.body.reason,
         })
-        return res.json(presentRequest(req.user, eventRequest))
+        const coordinatorName = await loadCoordinatorName(req.user, eventRequest)
+        return res.json(presentRequest(req.user, eventRequest, { coordinatorName }))
       } catch (error) {
         return sendEventRequestError(error, res, next)
       }

@@ -280,6 +280,19 @@ The assignment is stored in a single `assignedCoordinatorUid` field. The custome
 **[Team decision, Sprint Planning 20 Sep 2026 (PO confirmed) — applied to reassignment, 3 Oct 2026]** The event's submitter, if they also hold the Coordinator role, is never a reassignment candidate. This applies the existing submitter-exclusion decision above ("never assigned a request they submitted") to reassignment, so reassignment cannot route around it. It is not a new decision.
 
 **[Not in scope]** Notifying either Coordinator or the Organiser (§20). There is no Confirmed → Planning transition in `shared/statusTransitions.js`, and SPM-26 does not add one.
+#### SPM-46 — View the Assigned Event Coordinator
+
+**[Customer-confirmed]** "The assigned Event Coordinator acts as the primary point of contact for the Organiser." — G8 Session 1 ([`clarification-session-1.md`](clarification-session-1.md) §4). There is strictly one Coordinator per event (Session 1 §4; Session 2 §4).
+
+**[Team decision, 3 Oct 2026]** How the Organiser sees the Coordinator, recorded with the SPM-46 owner:
+
+- **Who sees it:** anyone whose Organiser role puts the event in scope under SPM-42 — the owner and same-organisation colleagues. Only the Organiser role receives it; Coordinator, Venue Staff, Technical Support Staff and Attendee responses are unchanged.
+- **What is shown:** the Coordinator's display name, `users/{uid}.name`, and nothing else — never the uid, email or roles.
+- **Drafts:** no Coordinator is shown.
+- **Submitted with no Coordinator:** shown as "Not yet assigned". The SPM-8 rule that an empty pool fails the submission means this does not arise today, except through data; it is kept as a supported state for the unassigned queue expected in Week 7 Change 5.
+- **Assigned, but no usable name:** if the profile is missing, has no name, or cannot be read, the Organiser sees "Assigned (name unavailable)", never "Not yet assigned".
+
+Implemented by `shared/assignedCoordinator.js` (visibility and response shape) and `backend/src/services/assignedCoordinatorService.js` (the `users/{uid}` read). The response field is `assignedCoordinator` on `GET`/`PATCH /api/requests/:id` and `POST /api/event-requests/:id/transitions`. Reassignment itself is SPM-26.
 
 ### 6. Event Status Management
 
@@ -320,6 +333,26 @@ The assignment is stored in a single `assignedCoordinatorUid` field. The custome
 - A venue or equipment edit after sign-off does not clear the approval. Significant changes are meant to trigger re-review (§19), which does not exist yet.
 - Venue Staff suggesting alternatives (§13) is not modelled.
 - The activity history is recorded but not displayed.
+
+**[Implemented — SPM-63 and SPM-47, 3 Oct 2026]** Cancellation builds on the SPM-9 transitions (`shared/cancellationRequests.js`, `shared/statusTransitions.js`, `shared/notifications.js`):
+
+- the assigned Coordinator cancels a Confirmed event directly with a required reason (SPM-63); a Coordinator who is not assigned is refused with SPM-65's 404;
+- the Organiser's cancellation request now requires a reason; the assigned Coordinator approves it, refuses it with a required reason, or returns it with a required message, after which the Organiser updates the reason and resubmits it (SPM-47). A pending or returned request is open: the Organiser cannot start another, the Coordinator cannot cancel directly, and the event stays Confirmed. Only a pending request can be approved;
+- every cancellation records top-level `cancellation` metadata (reason, time, whether it came from an Organiser request), shown on the event page to every user who can view the event; the `status_changed` activity entry carries the reason. Each request, return, resubmission, refusal and approval is recorded in the activity history with its action, actor, reason or message, and time;
+- Cancelled, Completed and Rejected events are listed under "Closed events" on the requests page, apart from the active events.
+
+**[Team decision pending — SPM-63/SPM-47]** Choices proposed with the build and not yet confirmed by the team:
+
+- **Time boundary.** The customer set none and left it to the team (Clarification 2). The SPM-47 and SPM-63 criteria set it at the event's start date/time (`core.preferredDateTime`). From that moment an event cannot be cancelled directly, and a cancellation cannot be requested, resubmitted, returned or approved. This supersedes SPM-9's "cancellation does not depend on the date". A pending or returned request can still be refused after the start, so it is not left open. A missing or invalid start date never blocks a cancellation.
+- **Returned requests.** A request returned for more information can be refused but not approved until the Organiser resubmits it.
+
+**[Team decision, 3 Oct 2026 — SPM-47]** A Coordinator who is not assigned to the event can neither view nor decide its cancellation request; both are refused with the same 404 as a missing event, consistent with SPM-65 (1 Oct 2026). This replaces the criterion's "(they may view it)"; the backlog wording is to be updated to match.
+
+**[Known gaps — SPM-63/SPM-47]**
+
+- **Reservations are not released.** "Its venue booking and equipment reservations are released" is not met: there are no venue booking (§12–13) or equipment reservation (§17) records to release. Staff are notified of the cancellation instead.
+- **Registered Attendees are not notified.** "All registered Attendees receive a cancellation notification" is not met: Attendee Registration (§18) does not exist, so no event has registered Attendees. `cancellationNotifications()` already accepts their uids, and the backend passes none.
+- **Notified staff are the assigned staff only.** "Affected" Venue Staff and Technical Support Staff are taken to be those in `assignedStaffUids`. No feature assigns staff yet (see the SPM-9 gaps), so an event created in the app notifies no staff.
 
 ### 7. Event Information Management
 
@@ -384,6 +417,13 @@ The assignment is stored in a single `assignedCoordinatorUid` field. The custome
 **[Customer-confirmed]** Notify affected users about material changes, cancellations, availability failures, waiting-list opportunities, and relevant actions.
 
 **[Team decision pending]** Select channels, delivery preferences, acknowledgement, and optional mentions. Offline communication may be manually recorded as event comments.
+
+**[Implemented, pending ratification — SPM-63/SPM-47, 3 Oct 2026]** A minimal in-app channel for cancellation only:
+
+- **Storage.** Each notification is a document in the top-level `notifications` collection, one per recipient, written in the same transaction as the action.
+- **Access.** The browser never reads the collection; `firestore.rules` denies it by default. Each user reads their own notifications through `GET /api/notifications` and marks one read with `POST /api/notifications/:id/read`, and sees them on the Notifications page.
+- **Not built.** There is no email, SMS, delivery preference or unread badge.
+- **Not yet covered.** Other notifiable events, such as SPM-25's return for clarification, still have no notification.
 
 ## 6. Cancellation and Reservation Release
 

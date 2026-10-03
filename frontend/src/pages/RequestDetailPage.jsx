@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { DRAFT } from '../../../shared/status.js'
+import AssignedCoordinator from '../components/AssignedCoordinator.jsx'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import ClarificationRequests from '../components/ClarificationRequests.jsx'
@@ -24,11 +25,15 @@ import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSect
 // SPM-9: the status is shown in the heading, and the status actions this user may take (availableActions
 // in the response) are offered above the sections.
 //
+// SPM-63: a Cancelled event shows its cancellation reason and time (cancellation in the response).
+//
 // SPM-25: the Coordinator's clarification messages (clarificationRequests in the response) are shown
 // first, so a returned request's Organiser reads what to amend before editing.
 //
 // SPM-26: the assigned Coordinator can hand the event to another Coordinator (canReassignCoordinator in the
 // response). They lose access to it at once (SPM-65), so on success they are taken to their list.
+// SPM-46: an Organiser sees the event's assigned Coordinator (assignedCoordinator in the response) above
+// everything else. The API sends only the name, and null to other roles.
 
 function ReadOnlyValue({ type, value }) {
   if (type === 'boolean') return <strong>{value === true ? 'Yes' : 'No'}</strong>
@@ -82,6 +87,8 @@ function RequestDetailPage() {
   const [cancellationRequest, setCancellationRequest] = useState(null)
   const [clarificationRequests, setClarificationRequests] = useState(null)
   const [canReassign, setCanReassign] = useState(false)
+  const [assignedCoordinator, setAssignedCoordinator] = useState(null)
+  const [cancellation, setCancellation] = useState(null)
   const [acting, setActing] = useState(false)
   const [form, setForm] = useState({})
   const [loading, setLoading] = useState(true)
@@ -97,6 +104,8 @@ function RequestDetailPage() {
     setCancellationRequest(response.cancellationRequest ?? null)
     setClarificationRequests(response.clarificationRequests ?? null)
     setCanReassign(response.canReassignCoordinator === true)
+    setAssignedCoordinator(response.assignedCoordinator ?? null)
+    setCancellation(response.cancellation ?? null)
     setForm(toFormValues(response.request))
   }, [])
 
@@ -211,6 +220,8 @@ function RequestDetailPage() {
           <form onSubmit={handleSave}>
             {status && <div className={`alert alert-${status.type}`} role="alert">{status.message}</div>}
 
+            <AssignedCoordinator coordinator={assignedCoordinator} />
+
             <ClarificationRequests status={request.status} entries={clarificationRequests} />
 
             <StatusActions
@@ -218,6 +229,7 @@ function RequestDetailPage() {
               actions={availableActions}
               arrangements={arrangements}
               cancellationRequest={cancellationRequest}
+              cancellation={cancellation}
               busy={acting || saving}
               onAction={handleAction}
             />

@@ -1,5 +1,5 @@
-// SPM-9 — apply an action to an event request: a status transition, an Organiser cancellation request or
-// its refusal, or a venue/technical arrangement sign-off.
+// SPM-9 — apply an action to an event request: a status transition, an Organiser cancellation request and
+// the Coordinator's return or refusal of it (SPM-47), or a venue/technical arrangement sign-off.
 //
 // Which actions exist, from which statuses, by whom and under what guard is decided only by the shared
 // modules (shared/statusTransitions.js, shared/cancellationRequests.js, shared/arrangements.js). This file
@@ -19,13 +19,19 @@ import {
 import {
   CANCELLATION_ALREADY_PENDING,
   CANCELLATION_APPROVED,
+  CANCELLATION_NOT_RETURNED,
   CANCELLATION_PENDING,
   CANCELLATION_REFUSED,
   CANCELLATION_REQUEST_PENDING,
+  CANCELLATION_REQUEST_RETURNED,
+  CANCELLATION_RETURNED,
+  EVENT_STARTED,
   NOT_CONFIRMED,
   NO_PENDING_CANCELLATION,
   canRefuseCancellation,
   canRequestCancellation,
+  canResubmitCancellation,
+  canReturnCancellation,
 } from '../../../shared/cancellationRequests.js'
 import { COORDINATOR, inScope, rolesOf } from '../../../shared/permissions.js'
 import {
@@ -34,11 +40,14 @@ import {
   REASON_REQUIRED_ACTIONS,
   REFUSE_CANCELLATION,
   REQUEST_CANCELLATION,
+  RESUBMIT_CANCELLATION,
+  RETURN_CANCELLATION,
   arrangementAction,
 } from '../../../shared/requestActions.js'
 import {
   APPROVE_CANCELLATION,
   ARRANGEMENTS_NOT_APPROVED,
+  CANCEL,
   EVENT_NOT_ENDED,
   INSUFFICIENT_INFORMATION,
   NOT_PERMITTED,
@@ -50,9 +59,11 @@ import {
   WRONG_STATUS,
   canTransition,
 } from '../../../shared/statusTransitions.js'
+import { cancellationNotifications } from '../../../shared/notifications.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError, submitDraftEventRequest } from './eventRequestService.js'
+import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
 
 export const REASON_REQUIRED = 'reason_required'
@@ -71,9 +82,12 @@ const MESSAGES = Object.freeze({
   [ARRANGEMENTS_NOT_APPROVED]: 'All mandatory venue and technical arrangements must be approved before confirmation.',
   [EVENT_NOT_ENDED]: 'An event can be marked complete only after it has taken place.',
   [INSUFFICIENT_INFORMATION]: 'The request is missing required details or has invalid ones. Complete them, or return it for clarification.',
-  [CANCELLATION_REQUEST_PENDING]: 'The organiser has requested cancellation. Approve or refuse that request instead.',
+  [CANCELLATION_REQUEST_PENDING]: 'The organiser has an open cancellation request. Decide that request instead.',
   [NO_PENDING_CANCELLATION]: 'There is no pending cancellation request.',
   [CANCELLATION_ALREADY_PENDING]: 'A cancellation request is already awaiting the coordinator’s decision.',
+  [CANCELLATION_REQUEST_RETURNED]: 'The coordinator returned your cancellation request. Update and resubmit it instead.',
+  [CANCELLATION_NOT_RETURNED]: 'There is no returned cancellation request to resubmit.',
+  [EVENT_STARTED]: 'The event’s start date/time has passed, so it can no longer be cancelled.',
   [NOT_CONFIRMED]: 'Only a confirmed event can be cancelled.',
   [NOT_AT_PLANNING]: 'Arrangements are approved or rejected while the event is in planning.',
   [NOT_ASSIGNED_STAFF]: 'Only staff assigned to this event can decide this arrangement.',
@@ -95,8 +109,8 @@ function refuse(decision) {
   if (!decision.allowed) throw new StatusTransitionError(decision.reason)
 }
 
-// The reason as stored: trimmed text, or null when none was given. Required for a Coordinator's direct
-// cancellation; ignored for actions that do not take one.
+// The reason as stored: trimmed text, or null when none was given. Required for every action in
+// REASON_REQUIRED_ACTIONS; ignored for actions that do not take one.
 function normaliseReason(action, reason) {
   if (!REASON_ACCEPTED_ACTIONS.includes(action)) return null
   if (reason !== undefined && reason !== null && typeof reason !== 'string') throw new StatusTransitionError(REASON_INVALID)
@@ -147,13 +161,30 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     let update
 
     if (action === REQUEST_CANCELLATION) {
-      refuse(canRequestCancellation(user, existing))
+      refuse(canRequestCancellation(user, existing, now))
       const reason = reasonFor()
       update = {
         cancellationRequest: { status: CANCELLATION_PENDING, reason, requestedByUid: user.uid, requestedAt: at },
         updatedAt: at,
       }
-      addActivity(tx, docRef, { type: CANCELLATION_REQUESTED, reason, actor, at })
+      addActivity(tx, docRef, { type: CANCELLATION_REQUESTED, action, reason, actor, at })
+    } else if (action === RESUBMIT_CANCELLATION) {
+      // SPM-47: the Organiser updates the reason and sends the same request back to the Coordinator.
+      refuse(canResubmitCancellation(user, existing, now))
+      const reason = reasonFor()
+      update = {
+        cancellationRequest: { ...existing.cancellationRequest, status: CANCELLATION_PENDING, reason, resubmittedAt: at },
+        updatedAt: at,
+      }
+      addActivity(tx, docRef, { type: CANCELLATION_REQUESTED, action, reason, actor, at })
+    } else if (action === RETURN_CANCELLATION) {
+      refuse(canReturnCancellation(user, existing, now))
+      const reason = reasonFor()
+      update = {
+        cancellationRequest: { ...existing.cancellationRequest, status: CANCELLATION_RETURNED, returnMessage: reason, returnedByUid: user.uid, returnedAt: at },
+        updatedAt: at,
+      }
+      addActivity(tx, docRef, { type: CANCELLATION_DECIDED, action, decision: CANCELLATION_RETURNED, reason, actor, at })
     } else if (action === REFUSE_CANCELLATION) {
       refuse(canRefuseCancellation(user, existing))
       const reason = reasonFor()
@@ -161,7 +192,7 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
         cancellationRequest: { ...existing.cancellationRequest, status: CANCELLATION_REFUSED, decidedByUid: user.uid, decidedAt: at, decisionReason: reason },
         updatedAt: at,
       }
-      addActivity(tx, docRef, { type: CANCELLATION_DECIDED, decision: CANCELLATION_REFUSED, reason, actor, at })
+      addActivity(tx, docRef, { type: CANCELLATION_DECIDED, action, decision: CANCELLATION_REFUSED, reason, actor, at })
     } else if (arrangementAction(action)) {
       const { arrangement, decision } = arrangementAction(action)
       refuse(canDecideArrangement(user, existing, arrangement))
@@ -185,7 +216,17 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       }
       if (action === APPROVE_CANCELLATION) {
         update.cancellationRequest = { ...existing.cancellationRequest, status: CANCELLATION_APPROVED, decidedByUid: user.uid, decidedAt: at }
-        addActivity(tx, docRef, { type: CANCELLATION_DECIDED, decision: CANCELLATION_APPROVED, reason: null, actor, at })
+        addActivity(tx, docRef, { type: CANCELLATION_DECIDED, action, decision: CANCELLATION_APPROVED, reason: null, actor, at })
+      }
+      // SPM-63: what "Cancelled" records, whichever path led there. The reason is the Coordinator's own, or
+      // the Organiser's request reason when the Coordinator approved it (SPM-47).
+      if (action === CANCEL || action === APPROVE_CANCELLATION) {
+        update.cancellation = {
+          reason: action === CANCEL ? reason : existing.cancellationRequest?.reason ?? null,
+          requestedByOrganiser: action === APPROVE_CANCELLATION,
+          cancelledByUid: user.uid,
+          cancelledAt: at,
+        }
       }
       recordStatusChange(tx, docRef, {
         action,
@@ -196,6 +237,12 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
         ...(reason ? { reason } : {}),
       })
     }
+
+    // SPM-47, SPM-63 — notify the affected users in the same transaction, so a notice exists only for an
+    // action that was saved. An approval carries the Organiser's request reason. No Attendee uids are passed:
+    // Attendee Registration does not exist yet (shared/notifications.js).
+    const noticeReason = action === APPROVE_CANCELLATION ? existing.cancellationRequest?.reason ?? null : reasonFor()
+    addNotifications(tx, db, cancellationNotifications(action, existing, user, { reason: noticeReason, at }))
 
     tx.update(docRef, update)
     return { ...existing, ...update }

@@ -259,11 +259,12 @@ describe('SPM-9 — arrangement sign-off and cancellation requests on the page',
     expect(screen.getByText('Venue arrangement').nextSibling.textContent).toBe('Approved')
   })
 
-  it('The Organiser requests cancellation with an optional reason, and sees it is awaiting a decision', async () => {
+  // SPM-47 made the reason required (it was optional under SPM-9).
+  it('The Organiser requests cancellation with a reason, and sees it is awaiting a decision', async () => {
     const user = showRequest({ request: confirmed, editableSections: [], availableActions: ['request_cancellation'] }, ['organiser'])
     await user.click(await screen.findByRole('button', { name: 'Request cancellation' }))
     expect(screen.getByText(/The event stays confirmed until they decide/)).toBeTruthy()
-    await user.type(screen.getByLabelText('Reason (optional)'), 'Keynote speaker withdrew')
+    await user.type(screen.getByLabelText('Reason (required)'), 'Keynote speaker withdrew')
 
     transitionRequest.mockResolvedValue({
       request: confirmed,

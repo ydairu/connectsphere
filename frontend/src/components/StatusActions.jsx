@@ -1,13 +1,15 @@
 import { useState } from 'react'
+import { REFUSE_CANCELLATION } from '../../../shared/requestActions.js'
 import { PLANNING, UNDER_REVIEW } from '../../../shared/status.js'
-import { APPROVE, CONFIRM, REJECT } from '../../../shared/statusTransitions.js'
-import { actionConfirmation, actionLabel, actionReason, actionReasonLabel } from '../utils/statusActions.js'
+import { APPROVE, APPROVE_CANCELLATION, CONFIRM, REJECT } from '../../../shared/statusTransitions.js'
+import { actionConfirmation, actionLabel, actionReason, actionReasonLabel, actionReasonPrompt } from '../utils/statusActions.js'
 import Button from './Button.jsx'
 import Card from './Card.jsx'
 
 const DECISION_TEXT = { approved: 'Approved', rejected: 'Rejected' }
 const CANCELLATION_TEXT = {
   pending: 'Cancellation requested — awaiting the event coordinator’s decision.',
+  returned: 'Cancellation request returned — the event coordinator needs more information.',
   approved: 'Cancellation request approved.',
   refused: 'Cancellation request refused. The event remains confirmed.',
 }
@@ -42,13 +44,49 @@ function StatusDetails({ arrangements, cancellationRequest }) {
           </strong>
         </div>
       )}
+      {cancellationRequest?.status === 'returned' && cancellationRequest.returnMessage && (
+        <div className="profile-row">
+          <span>Message from the event coordinator</span>
+          <strong>{cancellationRequest.returnMessage}</strong>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function formatDateTime(value) {
+  const date = new Date(value ?? '')
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+// SPM-63 — why and when a Cancelled event was cancelled. Until a Notification System exists, this is how
+// the Organiser and assigned staff learn the reason.
+function CancellationNotice({ cancellation }) {
+  if (!cancellation) return null
+  const when = formatDateTime(cancellation.cancelledAt)
+  return (
+    <Card className="request-form-section">
+      <div className="section-heading">
+        <h2>Event cancelled</h2>
+      </div>
+      {cancellation.requestedByOrganiser && <p className="form-note">Cancelled at the organiser’s request.</p>}
+      <div className="profile-row">
+        <span>Reason</span>
+        <strong>{cancellation.reason ?? 'No reason recorded'}</strong>
+      </div>
+      {when && (
+        <div className="profile-row">
+          <span>Cancelled on</span>
+          <strong>{when}</strong>
+        </div>
+      )}
     </Card>
   )
 }
 
 // SPM-9 — the actions this user may take now. `actions` comes from the API (availableActions), so the
 // page shows only what the backend will accept; the backend checks again on every action.
-function StatusActions({ status, actions, arrangements, cancellationRequest, busy, onAction }) {
+function StatusActions({ status, actions, arrangements, cancellationRequest, cancellation, busy, onAction }) {
   const [pending, setPending] = useState(null)
   const [reason, setReason] = useState('')
 
@@ -56,7 +94,11 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, bus
   const confirmBlocked = status === PLANNING && actions.includes(REJECT) && !actions.includes(CONFIRM)
   // SPM-5: likewise at Under Review, when required details are missing or invalid there is no Approve.
   const approveBlocked = status === UNDER_REVIEW && actions.includes(REJECT) && !actions.includes(APPROVE)
+  // SPM-47: a pending request the Coordinator may refuse but no longer approve — its event has started.
+  const approveCancellationBlocked =
+    cancellationRequest?.status === 'pending' && actions.includes(REFUSE_CANCELLATION) && !actions.includes(APPROVE_CANCELLATION)
   const reasonMode = pending ? actionReason(pending) : null
+  const reasonMissing = reasonMode === 'required' && reason.trim() === ''
 
   function choose(action) {
     setReason('')
@@ -66,6 +108,7 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, bus
 
   return (
     <>
+      <CancellationNotice cancellation={cancellation} />
       <StatusDetails arrangements={arrangements} cancellationRequest={cancellationRequest} />
 
       {actions.length > 0 && (
@@ -81,6 +124,7 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, bus
                 <div className="field">
                   <label htmlFor="status-action-reason">{actionReasonLabel(pending)}</label>
                   <textarea id="status-action-reason" rows={3} value={reason} onChange={(event) => setReason(event.target.value)} />
+                  {reasonMissing && <p className="form-note">{actionReasonPrompt(pending)}</p>}
                 </div>
               )}
               <div className="form-actions" style={{ gap: 12 }}>
@@ -89,7 +133,7 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, bus
                 </Button>
                 <Button
                   type="button"
-                  disabled={busy || (reasonMode === 'required' && reason.trim() === '')}
+                  disabled={busy || reasonMissing}
                   onClick={() => {
                     const chosen = pending
                     setPending(null)
@@ -112,6 +156,11 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, bus
 
           {confirmBlocked && (
             <p className="form-note">The event can be confirmed once all mandatory venue and technical arrangements are approved.</p>
+          )}
+          {approveCancellationBlocked && (
+            <p className="form-note">
+              The event’s start date/time has passed, so this cancellation request can no longer be approved. You can still refuse it.
+            </p>
           )}
           {approveBlocked && (
             <p className="form-note">

@@ -117,7 +117,7 @@ test.describe('SPM-9 — View an event’s current lifecycle status (E2E)', () =
     await page.goto(`/requests/${planning.id}`)
     await expect(statusPill(page)).toHaveText('Confirmed')
     await page.getByRole('button', { name: 'Request cancellation' }).click()
-    await page.getByLabel('Reason (optional)').fill('Keynote speaker withdrew')
+    await page.getByLabel('Reason (required)').fill('Keynote speaker withdrew')
     await page.getByRole('group', { name: 'Confirm status change' }).getByRole('button', { name: 'Request cancellation' }).click()
     await expect(page.getByText(/awaiting the event coordinator/)).toBeVisible()
     await expect(statusPill(page)).toHaveText('Confirmed')
