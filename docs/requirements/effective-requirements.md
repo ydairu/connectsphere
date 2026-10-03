@@ -243,19 +243,43 @@ The current backlog says a draft remains until submitted or deleted. Deletion it
 
 **[Customer-confirmed]** Assignment is automatic with exactly one Coordinator per event. Round-robin or load-based are acceptable examples. The assigned Coordinator may initiate reassignment following offline agreement.
 
-**[Team decision pending]** Select and document the actual assignment algorithm.
+**[Resolved — PO confirmed 20 Sep 2026]** Select and document the actual assignment algorithm. The rules below are the decided algorithm.
 
-**[Implemented, pending ratification — SPM-8, 30 Sep 2026]** The SPM-8 story's business rules, as supplied by the Product Owner, are implemented in `shared/coordinatorAssignment.js` and applied on submission by `backend/src/services/coordinatorAssignmentService.js`. They are recorded here so the build is traceable; the team has not yet recorded them as a ratified decision:
+**[Team decision, PO confirmed 20 Sep 2026; implemented in SPM-8, 30 Sep 2026]** The SPM-8 story's business rules, as supplied by the Product Owner, are implemented in `shared/coordinatorAssignment.js` and applied on submission by `backend/src/services/coordinatorAssignmentService.js`:
 
 - every user holding the Event Coordinator role is eligible; no specialisation matching;
 - the request goes to the eligible Coordinator with the fewest active assigned events — those at Submitted, Under Review, Returned, Planning or Confirmed; Draft, Completed, Cancelled and Rejected do not count;
 - a tie on the lowest count is broken at random;
-- a user who is both Event Organiser and Event Coordinator is never assigned a request they submitted;
 - a request that already has a Coordinator keeps them;
 - the system is expected always to have an eligible Coordinator, so an empty pool is treated as a server error: the submission is rejected and the request stays a Draft, rather than being saved without a Coordinator;
 - each assignment is recorded in the request's activity history with "System" as the actor.
 
+**[Team decision, Sprint Planning 20 Sep 2026 (PO confirmed); implemented in SPM-8, 30 Sep 2026]** A user who is both Event Organiser and Event Coordinator is never assigned a request they submitted (`excludeUid` in `selectCoordinator`, `shared/coordinatorAssignment.js`).
+
 The assignment is stored in a single `assignedCoordinatorUid` field. The customer says only that reassignment is "initiated by the assigned Coordinator after offline agreement" (Clarification 2). Under the SPM-65 team decision (1 Oct 2026, §SPM-42), a reassigned event leaves the previous Coordinator's scope; nothing is retained.
+
+#### SPM-26 — Reassign an Event to a Different Event Coordinator
+
+**[Customer-confirmed]** Exactly one Coordinator is assigned to an event, and the assigned Coordinator may initiate reassignment after offline agreement (Clarification 2 §4). The agreement itself happens outside the system.
+
+**[Implemented — SPM-26, 3 Oct 2026]** Rules in `shared/coordinatorReassignment.js`, applied by `backend/src/services/coordinatorReassignmentService.js`:
+
+- **Who:** only the event's assigned Coordinator (`isAssignedCoordinator` in `shared/requestActors.js`). An unassigned Coordinator is refused with 404, as for a missing event (SPM-65); any other role gets 403.
+- **When:** at any status except Completed, Cancelled and Rejected — Submitted, Under Review, Returned, Planning and Confirmed.
+- **To whom:** another user holding the Coordinator role, never the current Coordinator. The user must also confirm that the handover was agreed outside the system.
+- **What changes:** only `assignedCoordinatorUid` (and `updatedAt`). Status, sections, sign-off and any cancellation request are untouched. Reassignment is not a status change and writes no `status_changed` entry.
+- **Record:** a `coordinator_reassigned` entry in `eventRequests/{id}/activity`, with `previousCoordinatorUid`, `coordinatorUid` (the new one), `actor` and `at`. It is written in the same transaction as the change, which also reads and writes SPM-8's lock document `systemLocks/coordinatorAssignment`.
+- **Routes:** `GET /api/event-requests/:id/reassignment/candidates` returns `{ coordinators: [{ uid, name }] }`. `POST /api/event-requests/:id/reassignment` takes `{ coordinatorUid, handoverAgreed: true }` and returns `{ reassigned: true, coordinator: { name } }`. The success response is not the projected request, because the caller has just lost access to it. Both routes are under the existing `/api/event-requests` prefix; this is not a new route set.
+- **Change 5:** the permission check (`mayReassignCoordinator`) is separate from the change itself (`reassignCoordinatorInTransaction`), so Week 7 Change 5's Event Coordinator Lead should need only the permission check replaced.
+
+**[Team decision, 3 Oct 2026]** Choices the story left open:
+
+- reassignment is allowed while an Organiser's cancellation request is pending; the request stays with the event for the new Coordinator to decide;
+- no handover note is recorded; the agreement is a required confirmation only.
+
+**[Team decision, Sprint Planning 20 Sep 2026 (PO confirmed) — applied to reassignment, 3 Oct 2026]** The event's submitter, if they also hold the Coordinator role, is never a reassignment candidate. This applies the existing submitter-exclusion decision above ("never assigned a request they submitted") to reassignment, so reassignment cannot route around it. It is not a new decision.
+
+**[Not in scope]** Notifying either Coordinator or the Organiser (§20). There is no Confirmed → Planning transition in `shared/statusTransitions.js`, and SPM-26 does not add one.
 
 ### 6. Event Status Management
 

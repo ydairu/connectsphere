@@ -25,6 +25,10 @@ export const EXTRA_USERS = Object.freeze({
   venueTechnicalStaff: SEED_ACCOUNTS.venueTechnicalStaff,
   // SPM-24's empty-state criterion: an Organiser who owns nothing.
   organiserWithoutRequests: SEED_ACCOUNTS.organiserA3,
+  // SPM-26: a second Coordinator to hand an event to. Its seeded events (A1 cancelled, A2 submitted, B1
+  // planning) belong to it already, so SPM-65's coordinator views are unchanged. No E2E spec submits through
+  // the UI, so SPM-8's selection in the double is not exercised by its presence.
+  secondCoordinator: SEED_ACCOUNTS.coordinator2,
 })
 
 export const ALL_TEST_USERS = Object.freeze([...ALL_ROLE_USERS, ...Object.values(EXTRA_USERS)])

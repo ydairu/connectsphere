@@ -110,7 +110,11 @@ function addActivity(tx, docRef, entry) {
   tx.set(docRef.collection(ACTIVITY_SUBCOLLECTION).doc(), entry)
 }
 
-function requireRequestScope(user, request) {
+/**
+ * Refuses a user who may not see the request: 404 for anyone holding the Coordinator role (SPM-65 — another
+ * Coordinator's event is not confirmed to exist), 403 for everyone else. Shared with SPM-26 reassignment.
+ */
+export function requireRequestScope(user, request) {
   if (inScope(user, request)) return
   // Match SPM-65's read/edit refusal, after evaluating the union of all roles' scopes.
   if (rolesOf(user).includes(COORDINATOR)) throw new EventRequestNotFoundError()

@@ -57,9 +57,9 @@ a { color: inherit; }
 .auth-heading p, .profile-heading p { margin: 0; color: var(--muted); line-height: 1.55; }
 .field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .field label, .role-selector legend { font-size: 14px; font-weight: 600; }
-.field input, .field textarea { width: 100%; min-height: 46px; padding: 12px 13px; border: 1px solid #cbd4ce; border-radius: 9px; outline: none; background: white; color: var(--ink); }
+.field input, .field textarea, .field select { width: 100%; min-height: 46px; padding: 12px 13px; border: 1px solid #cbd4ce; border-radius: 9px; outline: none; background: white; color: var(--ink); }
 .field textarea { resize: vertical; line-height: 1.5; }
-.field input:focus, .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(25, 92, 67, 0.12); }
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(25, 92, 67, 0.12); }
 .field input[aria-invalid='true'], .field textarea[aria-invalid='true'] { border-color: #b83a3a; }
 .field-error { color: #a52d2d; font-size: 13px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }

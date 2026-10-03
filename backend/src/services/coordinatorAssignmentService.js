@@ -27,19 +27,30 @@ export class NoEligibleCoordinatorError extends Error {
   }
 }
 
-// Coordinators by `roles`, plus profiles written before the roles migration that only carry the legacy
-// `role` field. rolesOf() then decides, so a legacy `role` is ignored whenever `roles` exists.
-async function loadCoordinatorUids(tx, db) {
+/**
+ * Every user holding the Event Coordinator role, as { uid, name }: by `roles`, plus profiles written before
+ * the roles migration that only carry the legacy `role` field. rolesOf() then decides, so a legacy `role`
+ * is ignored whenever `roles` exists. Nothing else from the profile is returned.
+ *
+ * `read` runs a query: pass `(query) => tx.get(query)` inside a transaction (SPM-8 assignment, SPM-26
+ * reassignment); the default reads outside one (SPM-26's candidate list).
+ */
+export async function loadCoordinators(db, read = (query) => query.get()) {
   const users = db.collection('users')
   const [byRoles, byLegacyRole] = await Promise.all([
-    tx.get(users.where('roles', 'array-contains', COORDINATOR)),
-    tx.get(users.where('role', '==', COORDINATOR)),
+    read(users.where('roles', 'array-contains', COORDINATOR)),
+    read(users.where('role', '==', COORDINATOR)),
   ])
-  const uids = new Set()
+  const coordinators = new Map()
   for (const doc of [...byRoles.docs, ...byLegacyRole.docs]) {
-    if (rolesOf(doc.data()).includes(COORDINATOR)) uids.add(doc.id)
+    const profile = doc.data()
+    if (rolesOf(profile).includes(COORDINATOR)) coordinators.set(doc.id, { uid: doc.id, name: profile.name ?? null })
   }
-  return [...uids]
+  return [...coordinators.values()]
+}
+
+async function loadCoordinatorUids(tx, db) {
+  return (await loadCoordinators(db, (query) => tx.get(query))).map((coordinator) => coordinator.uid)
 }
 
 async function loadActiveCounts(tx, db) {
