@@ -7,6 +7,7 @@
 // multi-role leak; CLAUDE.md, "Evaluate per role, then union the results").
 
 import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf } from '../../../shared/permissions.js'
+import { canReassignCoordinator } from '../../../shared/coordinatorReassignment.js'
 import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.js'
 import { allAvailableActions, arrangementsSummary, cancellationNotice, cancellationSummary, clarificationSummary } from '../../../shared/requestActions.js'
 
@@ -50,6 +51,7 @@ export function presentRequest(user, request, { coordinatorName = null } = {}) {
     arrangements: arrangementsSummary(user, request),
     cancellationRequest: cancellationSummary(user, request),
     clarificationRequests: clarificationSummary(user, request),
+    canReassignCoordinator: canReassignCoordinator(user, request),
     assignedCoordinator: assignedCoordinatorSummary(user, request, coordinatorName),
     cancellation: cancellationNotice(user, request),
   }

@@ -16,6 +16,10 @@ export function createEventRequestRoutes({ authenticate, getDb, getUserDb = getD
   router.post('/:id/submit', authenticate, requireRole(ORGANISER), controller.submitEventRequest)
   // SPM-9 lifecycle actions. No role check here: shared/statusTransitions.js decides who may do what.
   router.post('/:id/transitions', authenticate, controller.transitionEventRequest)
+  // SPM-26 reassignment. Not a transition: the status does not change. No role check here either:
+  // shared/coordinatorReassignment.js decides who may reassign.
+  router.get('/:id/reassignment/candidates', authenticate, controller.listReassignmentCandidates)
+  router.post('/:id/reassignment', authenticate, controller.reassignEventRequest)
 
   return router
 }

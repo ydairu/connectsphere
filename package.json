@@ -26,6 +26,7 @@
     "test:integration": "vitest run tests/spm-1/integration/ tests/spm-2/integration/ tests/spm-3/integration/ tests/spm-4/integration/ tests/spm-6/integration/ tests/spm-7/integration/ tests/lint/",
     "test:e2e": "playwright test",
     "test:spm6": "vitest run tests/spm-6/",
+    "test:spm26": "vitest run tests/spm-26/ && playwright test tests/spm-26",
     "test:spm46": "vitest run tests/spm-46/ && playwright test tests/spm-46",
     "test:coverage": "vitest run --coverage",
     "install:all": "npm install",

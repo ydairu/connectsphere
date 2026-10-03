@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { DRAFT } from '../../../shared/status.js'
 import AssignedCoordinator from '../components/AssignedCoordinator.jsx'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import ClarificationRequests from '../components/ClarificationRequests.jsx'
+import CoordinatorReassignment from '../components/CoordinatorReassignment.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import StatusActions from '../components/StatusActions.jsx'
@@ -29,6 +30,8 @@ import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSect
 // SPM-25: the Coordinator's clarification messages (clarificationRequests in the response) are shown
 // first, so a returned request's Organiser reads what to amend before editing.
 //
+// SPM-26: the assigned Coordinator can hand the event to another Coordinator (canReassignCoordinator in the
+// response). They lose access to it at once (SPM-65), so on success they are taken to their list.
 // SPM-46: an Organiser sees the event's assigned Coordinator (assignedCoordinator in the response) above
 // everything else. The API sends only the name, and null to other roles.
 
@@ -76,12 +79,14 @@ function EditableField({ section, field, value, onChange }) {
 function RequestDetailPage() {
   const { id } = useParams()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [request, setRequest] = useState(null)
   const [editableSections, setEditableSections] = useState([])
   const [availableActions, setAvailableActions] = useState([])
   const [arrangements, setArrangements] = useState(null)
   const [cancellationRequest, setCancellationRequest] = useState(null)
   const [clarificationRequests, setClarificationRequests] = useState(null)
+  const [canReassign, setCanReassign] = useState(false)
   const [assignedCoordinator, setAssignedCoordinator] = useState(null)
   const [cancellation, setCancellation] = useState(null)
   const [acting, setActing] = useState(false)
@@ -98,6 +103,7 @@ function RequestDetailPage() {
     setArrangements(response.arrangements ?? null)
     setCancellationRequest(response.cancellationRequest ?? null)
     setClarificationRequests(response.clarificationRequests ?? null)
+    setCanReassign(response.canReassignCoordinator === true)
     setAssignedCoordinator(response.assignedCoordinator ?? null)
     setCancellation(response.cancellation ?? null)
     setForm(toFormValues(response.request))
@@ -227,6 +233,15 @@ function RequestDetailPage() {
               busy={acting || saving}
               onAction={handleAction}
             />
+
+            {canReassign && (
+              <CoordinatorReassignment
+                user={user}
+                requestId={id}
+                busy={acting || saving}
+                onReassigned={(name) => navigate('/requests', { replace: true, state: { notice: `Event reassigned to ${name}.` } })}
+              />
+            )}
 
             {visibleSections.map((section) => {
               const editable = editableSections.includes(section)

@@ -17,6 +17,7 @@ import {
   StatusTransitionError,
   transitionEventRequest,
 } from '../services/statusTransitionService.js'
+import { ReassignmentError, listReassignmentCandidates, reassignEventRequest } from '../services/coordinatorReassignmentService.js'
 
 const FORBIDDEN_REASONS = Object.freeze([NOT_PERMITTED, NOT_ASSIGNED_STAFF])
 const BAD_REQUEST_REASONS = Object.freeze([UNKNOWN_ACTION, UNKNOWN_ARRANGEMENT, REASON_REQUIRED, REASON_INVALID])
@@ -32,6 +33,10 @@ export function sendEventRequestError(error, res, next) {
   if (error instanceof StatusTransitionError) {
     const code = FORBIDDEN_REASONS.includes(error.reason) ? 403 : BAD_REQUEST_REASONS.includes(error.reason) ? 400 : 409
     return res.status(code).json({ message: error.message, reason: error.reason })
+  }
+  // SPM-26: the status code comes with the refusal reason (shared/coordinatorReassignment.js).
+  if (error instanceof ReassignmentError) {
+    return res.status(error.status).json({ message: error.message, reason: error.reason })
   }
   if (error instanceof EventRequestValidationError) {
     return res.status(400).json({ message: 'Validation failed', errors: error.errors })
@@ -99,6 +104,30 @@ export function createEventRequestController(getDb, loadCoordinatorName = async 
         })
         const coordinatorName = await loadCoordinatorName(req.user, eventRequest)
         return res.json(presentRequest(req.user, eventRequest, { coordinatorName }))
+      } catch (error) {
+        return sendEventRequestError(error, res, next)
+      }
+    },
+
+    // SPM-26 — the Coordinators this event may be handed to: { coordinators: [{ uid, name }] }.
+    async listReassignmentCandidates(req, res, next) {
+      try {
+        const coordinators = await listReassignmentCandidates(req.params.id, req.user, getDb())
+        return res.json({ coordinators })
+      } catch (error) {
+        return sendEventRequestError(error, res, next)
+      }
+    },
+
+    // SPM-26 — body { coordinatorUid, handoverAgreed: true }. The caller has just lost access to the event
+    // (SPM-65), so the response is not the projected request but only who now has it.
+    async reassignEventRequest(req, res, next) {
+      try {
+        const { coordinator } = await reassignEventRequest(req.params.id, req.user, {
+          coordinatorUid: req.body?.coordinatorUid,
+          handoverAgreed: req.body?.handoverAgreed,
+        }, getDb())
+        return res.json({ reassigned: true, coordinator: { name: coordinator.name } })
       } catch (error) {
         return sendEventRequestError(error, res, next)
       }

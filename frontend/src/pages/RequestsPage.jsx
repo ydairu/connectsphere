@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ORGANISER } from '../../../shared/permissions.js'
 import { DRAFT } from '../../../shared/status.js'
 import { TERMINAL_STATUSES } from '../../../shared/statusTransitions.js'
@@ -19,6 +19,7 @@ import { requestListCopy } from '../utils/requestListCopy.js'
 // Drafts are excluded because they have their own page. Only `status === DRAFT` is tested; the
 // submitted-side status names are never enumerated.
 //
+// SPM-26: a page that sends the user here after an action may pass `state.notice`, shown at the top.
 // SPM-63 — a Cancelled event "is not in the active events list". Completed, Cancelled and Rejected events
 // (TERMINAL_STATUSES) are listed separately under "Closed events", so they stay reachable.
 
@@ -63,6 +64,7 @@ function RequestList({ requests }) {
 
 function RequestsPage() {
   const { user, roles } = useAuth()
+  const notice = useLocation().state?.notice
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -103,6 +105,8 @@ function RequestsPage() {
           </div>
           {isOrganiser && <Link className="button button-secondary button-small" to="/requests/drafts">Saved drafts</Link>}
         </div>
+
+        {typeof notice === 'string' && <div className="alert alert-success" role="status">{notice}</div>}
 
         {loading && <Card><LoadingSpinner label="Loading requests" /></Card>}
 
