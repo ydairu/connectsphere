@@ -7,7 +7,7 @@
 // multi-role leak; CLAUDE.md, "Evaluate per role, then union the results").
 
 import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf } from '../../../shared/permissions.js'
-import { allAvailableActions, arrangementsSummary, cancellationSummary } from '../../../shared/requestActions.js'
+import { allAvailableActions, arrangementsSummary, cancellationSummary, clarificationSummary } from '../../../shared/requestActions.js'
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -34,7 +34,8 @@ function outOfScope(user, res) {
  * the projected record deliberately omits ownerUid and assignedStaffUids, so the client cannot.
  * `availableActions` (SPM-9) lists the actions this user may take now, for the same reason. `arrangements`
  * and `cancellationRequest` (SPM-9) summarise sign-off and any cancellation request for users who may see
- * them, without the internal record of who decided.
+ * them, without the internal record of who decided. `clarificationRequests` (SPM-25) lists the
+ * Coordinator's return messages, newest first, on the same terms.
  */
 export function presentRequest(user, request) {
   return {
@@ -43,6 +44,7 @@ export function presentRequest(user, request) {
     availableActions: allAvailableActions(user, request),
     arrangements: arrangementsSummary(user, request),
     cancellationRequest: cancellationSummary(user, request),
+    clarificationRequests: clarificationSummary(user, request),
   }
 }
 

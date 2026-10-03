@@ -386,5 +386,92 @@ describe('SPM-5 — reviewing and approving for Planning', () => {
     await user.click(await screen.findByRole('button', { name: 'Approve for planning' }))
     expect(await screen.findByText(/missing required details or has invalid ones/)).toBeTruthy()
     expect(screen.getByText('Under review', { selector: '.status-pill' })).toBeTruthy()
+// SPM-25, presentation side: Return for Clarification takes a required message, and the Organiser of a
+// returned request sees it above editable sections. The API is mocked; the rules are covered in tests/spm-25.
+describe('SPM-25 — returning a request for clarification', () => {
+  const underReview = {
+    request: { id: 'req-1', status: 'under_review', core: { title: 'A1 under review' } },
+    editableSections: ['core'],
+    availableActions: ['return_for_clarification', 'approve', 'reject'],
+  }
+  const returned = {
+    request: {
+      id: 'req-1',
+      status: 'returned_for_clarification',
+      core: { title: 'A1 returned', purpose: 'Partners', expectedAttendees: 80 },
+      venue: { layoutPreference: 'theatre' },
+      equipment: { requirements: ['Projector'], technicalSupportNeeded: false },
+      registration: { enabled: false },
+    },
+    editableSections: ['core', 'venue', 'equipment', 'registration'],
+    availableActions: ['resubmit'],
+    clarificationRequests: [
+      { message: 'Please confirm the expected attendance.', requestedAt: '2026-10-02T02:00:00.000Z' },
+      { message: 'Which room layout do you need?', requestedAt: '2026-10-01T02:00:00.000Z' },
+    ],
+  }
+
+  it('spm25_return_cannot_be_sent_without_a_message', async () => {
+    const user = showRequest(underReview, ['coordinator'])
+    await user.click(await screen.findByRole('button', { name: 'Return for clarification' }))
+
+    const send = () => screen.getByRole('group', { name: 'Confirm status change' }).querySelectorAll('button')[1]
+    const message = screen.getByLabelText('Message to the organiser (required)')
+    expect(send().disabled).toBe(true)
+    await user.type(message, '   ')
+    expect(send().disabled).toBe(true)
+    await user.type(message, 'Please confirm the expected attendance.')
+    expect(send().disabled).toBe(false)
+
+    transitionRequest.mockResolvedValue({
+      request: { ...underReview.request, status: 'returned_for_clarification' },
+      editableSections: ['core'],
+      availableActions: [],
+      clarificationRequests: [{ message: 'Please confirm the expected attendance.', requestedAt: '2026-10-02T02:00:00.000Z' }],
+    })
+    await user.click(send())
+
+    expect(transitionRequest).toHaveBeenCalledWith({ uid: 'u-1' }, 'req-1', 'return_for_clarification', 'Please confirm the expected attendance.')
+    expect(await screen.findByText('Status changed to Returned for clarification.')).toBeTruthy()
+  })
+
+  it('spm25_the_organiser_sees_the_latest_message_and_every_section_is_editable', async () => {
+    showRequest(returned, ['organiser'])
+    expect(await screen.findByText('Clarification requested')).toBeTruthy()
+    expect(screen.getByRole('status', { name: 'Clarification message' }).textContent).toBe('Please confirm the expected attendance.')
+    // The earlier message is kept as history, below the current one.
+    expect(screen.getByText('Earlier messages')).toBeTruthy()
+    expect(screen.getByText('Which room layout do you need?')).toBeTruthy()
+
+    for (const heading of ['Event details', 'Venue', 'Equipment and technical support', 'Registration']) {
+      expect(screen.getByText(heading)).toBeTruthy()
+    }
+    expect(screen.queryByText('Read only')).toBeNull()
+    expect(screen.getByLabelText('Title')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Resubmit request' })).toBeTruthy()
+  })
+
+  it('spm25_after_resubmission_the_messages_remain_as_history', async () => {
+    const user = showRequest(returned, ['organiser'])
+    transitionRequest.mockResolvedValue({
+      ...returned,
+      request: { ...returned.request, status: 'submitted' },
+      editableSections: [],
+      availableActions: [],
+    })
+    await user.click(await screen.findByRole('button', { name: 'Resubmit request' }))
+
+    expect(transitionRequest).toHaveBeenCalledWith({ uid: 'u-1' }, 'req-1', 'resubmit', undefined)
+    expect(await screen.findByText('Status changed to Submitted.')).toBeTruthy()
+    expect(screen.getByText('Clarification history')).toBeTruthy()
+    expect(screen.queryByText('Clarification requested')).toBeNull()
+    expect(screen.getByText('Please confirm the expected attendance.')).toBeTruthy()
+  })
+
+  it('spm25_a_returned_request_without_a_stored_message_shows_no_message_panel', async () => {
+    showRequest({ ...returned, clarificationRequests: null }, ['organiser'])
+    await screen.findByText('A1 returned')
+    expect(screen.queryByText('Clarification requested')).toBeNull()
   })
 })

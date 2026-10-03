@@ -195,6 +195,19 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - The `shared/statusTransitions.test.js` fixture was completed so it passes the guard.
     - **Local verification (Windows):** lint passed; 128 Node tests and 71 frontend tests passed; root Vitest 415 passed (30 opt-in live tests skipped); the production build passed.
     - **Not verified:** these are in-memory doubles only. No live Firebase or manual browser check was run, and no backlog status change is claimed.
+15. **SPM-25 return for clarification (2 Oct 2026, branch `feature/spm-25`):**
+    - **Built:** Return for Clarification now requires a message (`REASON_REQUIRED_ACTIONS` in `shared/requestActions.js`). Each return appends `{ message, requestedByUid, requestedAt }` to the top-level `clarificationRequests` metadata in the same transaction as the status change. `clarificationSummary()` gives the messages, newest first and without the sender, to the owning Organiser and to Coordinators. The request page shows the latest message while the request is Returned, and the full list as history afterwards. Return, Organiser editing and resubmission were already provided by SPM-9 and SPM-42.
+    - **Not met — "the Organiser is notified":** no notification system exists (effective-requirements.md §20). The Organiser sees the status and message only on opening the request. SPM-25 is not Done until that criterion is met or the Product Owner agrees to defer it.
+    - **Pending team decisions:** the in-app notice standing in for a notification, and keeping messages after resubmission (effective-requirements.md §4).
+    - **Risk carried over:** `PATCH /api/requests/:id` does not validate field values (AGENTS.md §6), so a malformed value in an Organiser's edit to a returned request is stored until resubmission, where `validateEventRequestSubmission` refuses it. Booleans are coerced rather than rejected there, and edits after resubmission are not checked.
+    - **Evidence:**
+      - `tests/spm-25/unit/clarificationRequests.test.js`
+      - `tests/spm-25/integration/returnForClarificationApi.test.js`
+      - `tests/spm-25/e2e/spm25.returnForClarification.spec.js`
+      - SPM-25 cases in `frontend/src/pages/requestDetail.test.jsx`
+      - The SPM-9 return steps now send a message.
+    - **Local verification (Windows):** lint passed; 128 Node tests and 71 frontend tests passed; root Vitest 414 passed (30 opt-in live tests skipped); the production build passed with the existing bundle-size warning; Playwright Chromium passed all 40 tests.
+    - **Not verified:** these are in-memory doubles only. No live Firebase, emulator or manual browser check was run, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

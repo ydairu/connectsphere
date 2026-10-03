@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { DRAFT } from '../../../shared/status.js'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
+import ClarificationRequests from '../components/ClarificationRequests.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import StatusActions from '../components/StatusActions.jsx'
@@ -21,6 +22,9 @@ import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSect
 //
 // SPM-9: the status is shown in the heading, and the status actions this user may take (availableActions
 // in the response) are offered above the sections.
+//
+// SPM-25: the Coordinator's clarification messages (clarificationRequests in the response) are shown
+// first, so a returned request's Organiser reads what to amend before editing.
 
 function ReadOnlyValue({ type, value }) {
   if (type === 'boolean') return <strong>{value === true ? 'Yes' : 'No'}</strong>
@@ -71,6 +75,7 @@ function RequestDetailPage() {
   const [availableActions, setAvailableActions] = useState([])
   const [arrangements, setArrangements] = useState(null)
   const [cancellationRequest, setCancellationRequest] = useState(null)
+  const [clarificationRequests, setClarificationRequests] = useState(null)
   const [acting, setActing] = useState(false)
   const [form, setForm] = useState({})
   const [loading, setLoading] = useState(true)
@@ -84,6 +89,7 @@ function RequestDetailPage() {
     setAvailableActions(response.availableActions ?? [])
     setArrangements(response.arrangements ?? null)
     setCancellationRequest(response.cancellationRequest ?? null)
+    setClarificationRequests(response.clarificationRequests ?? null)
     setForm(toFormValues(response.request))
   }, [])
 
@@ -197,6 +203,8 @@ function RequestDetailPage() {
         {!loading && !loadError && request && (
           <form onSubmit={handleSave}>
             {status && <div className={`alert alert-${status.type}`} role="alert">{status.message}</div>}
+
+            <ClarificationRequests status={request.status} entries={clarificationRequests} />
 
             <StatusActions
               status={request.status}

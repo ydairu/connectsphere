@@ -232,6 +232,12 @@ The current backlog says a draft remains until submitted or deleted. Deletion it
 **[Team decision pending — SPM-5]** "When they open it for review" is served by the Coordinator's **Start review** action, not by viewing the request: opening a page does not change the status, so a Coordinator can look at a request without starting review.
 
 **[Engineering recommendation — SPM-5]** "With sufficient information" is enforced as a minimum: Approve is refused while the request fails the submission check (mandatory fields present and every field well-formed, `validateEventRequestSubmission`), because section edits after submission are not validated (AGENTS.md §6). Whether the information is sufficient beyond that remains the Coordinator's judgement.
+**[Implemented — SPM-25, 2 Oct 2026]** Return for Clarification (Under Review → Returned, assigned Coordinator only) requires a clarification message. The message is stored with the request as top-level metadata (`clarificationRequests`), so no section edit can write it, and is shown to the owning Organiser, who may then edit every section and resubmit. Resubmission keeps the same request and its Coordinator and returns it to Submitted (§6). The rule that a request which still cannot meet its essential requirements is rejected is met by the existing Reject action; no limit on the number of returns is applied, because no source sets one.
+
+**[Team decision pending — SPM-25]** Two choices the criteria leave open, proposed with the SPM-25 build and not yet confirmed by the team:
+
+- until a Notification System (§20) exists, "the Organiser is notified" is served in-app only: the Returned status in the Organiser's request list and the message on the request page. No message is sent to the Organiser. The criterion stays open until notifications exist or the Product Owner agrees to defer it;
+- every clarification message is kept after resubmission, newest first, so a second return does not erase the first. Who sent each message is kept internally and is not shown.
 
 ### 5. Coordinator Assignment
 

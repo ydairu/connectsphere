@@ -19,7 +19,7 @@ import { canRefuseCancellation, canRequestCancellation } from './cancellationReq
 import { COORDINATOR, EQUIPMENT, VENUE, rolesOf, viewableSectionsFor } from './permissions.js'
 import { isOwningOrganiser } from './requestActors.js'
 import { DRAFT } from './status.js'
-import { CANCEL, availableActions } from './statusTransitions.js'
+import { CANCEL, RETURN_FOR_CLARIFICATION, availableActions } from './statusTransitions.js'
 
 export const REQUEST_CANCELLATION = 'request_cancellation'
 export const REFUSE_CANCELLATION = 'refuse_cancellation'
@@ -36,10 +36,11 @@ const ARRANGEMENT_ACTIONS = Object.freeze({
 })
 
 // Coordinator-initiated cancellation is "for a stated reason". — Clarification 2, Cancellation.
-export const REASON_REQUIRED_ACTIONS = Object.freeze([CANCEL])
+// SPM-25: "Return action requires a clarification message from the Coordinator."
+export const REASON_REQUIRED_ACTIONS = Object.freeze([CANCEL, RETURN_FOR_CLARIFICATION])
 
-// Actions that accept an optional reason, stored with the request or decision.
-export const REASON_ACCEPTED_ACTIONS = Object.freeze([CANCEL, REQUEST_CANCELLATION, REFUSE_CANCELLATION])
+// Actions that accept a reason, stored with the request or decision.
+export const REASON_ACCEPTED_ACTIONS = Object.freeze([CANCEL, RETURN_FOR_CLARIFICATION, REQUEST_CANCELLATION, REFUSE_CANCELLATION])
 
 export const MAX_REASON_LENGTH = 1000
 
@@ -79,6 +80,20 @@ export function arrangementsSummary(user, request) {
     }
   }
   return Object.keys(summary).length > 0 ? summary : null
+}
+
+/**
+ * SPM-25 — every clarification message the Coordinator sent with a return, newest first, as the owning
+ * Organiser or a Coordinator sees it, or null when there are none. Each return adds an entry to the
+ * top-level `clarificationRequests` metadata, so no section edit can write it and a resubmission does not
+ * erase it ([Team decision pending], effective-requirements.md §4). Who sent it is internal and is not
+ * included.
+ */
+export function clarificationSummary(user, request) {
+  const entries = Array.isArray(request.clarificationRequests) ? request.clarificationRequests : []
+  if (entries.length === 0) return null
+  if (!isOwningOrganiser(user, request) && !rolesOf(user).includes(COORDINATOR)) return null
+  return entries.map((entry) => ({ message: entry.message, requestedAt: entry.requestedAt ?? null })).reverse()
 }
 
 /**
