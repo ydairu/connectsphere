@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { PLANNING } from '../../../shared/status.js'
-import { CONFIRM, REJECT } from '../../../shared/statusTransitions.js'
+import { PLANNING, UNDER_REVIEW } from '../../../shared/status.js'
+import { APPROVE, CONFIRM, REJECT } from '../../../shared/statusTransitions.js'
 import { actionConfirmation, actionLabel, actionReason, actionReasonLabel } from '../utils/statusActions.js'
 import Button from './Button.jsx'
 import Card from './Card.jsx'
@@ -54,6 +54,8 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, bus
 
   // The assigned Coordinator at Planning can reject but not yet confirm: say why there is no Confirm.
   const confirmBlocked = status === PLANNING && actions.includes(REJECT) && !actions.includes(CONFIRM)
+  // SPM-5: likewise at Under Review, when required details are missing or invalid there is no Approve.
+  const approveBlocked = status === UNDER_REVIEW && actions.includes(REJECT) && !actions.includes(APPROVE)
   const reasonMode = pending ? actionReason(pending) : null
 
   function choose(action) {
@@ -110,6 +112,11 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, bus
 
           {confirmBlocked && (
             <p className="form-note">The event can be confirmed once all mandatory venue and technical arrangements are approved.</p>
+          )}
+          {approveBlocked && (
+            <p className="form-note">
+              The request can be approved for planning once its required details are complete and valid. Complete them below, or return it for clarification.
+            </p>
           )}
         </Card>
       )}

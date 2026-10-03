@@ -313,6 +313,82 @@ describe('SPM-9 — arrangement sign-off and cancellation requests on the page',
   })
 })
 
+// SPM-5, presentation side: the Coordinator reviews the request's details and approves it for Planning.
+// The API is mocked; the rules are covered in tests/spm-5.
+describe('SPM-5 — reviewing and approving for Planning', () => {
+  const reviewRequest = {
+    id: 'req-1',
+    status: 'submitted',
+    core: { title: 'Partner Forum', purpose: 'Partner updates', expectedAttendees: 80, durationHours: 4, preferredDateTime: '2026-11-20T09:00' },
+    venue: { layoutPreference: 'theatre', accessibilityRequired: true, accessibilityNeeds: 'Wheelchair access' },
+    equipment: { requirements: ['projector'], technicalSupportNeeded: true },
+  }
+
+  it('spm5_the_coordinator_sees_every_review_input_and_starts_review', async () => {
+    const user = showRequest(
+      { request: reviewRequest, editableSections: ['core', 'venue', 'equipment'], availableActions: ['start_review'] },
+      ['coordinator'],
+    )
+    expect(await screen.findByRole('button', { name: 'Start review' })).toBeTruthy()
+    expect(screen.getByLabelText('Title').value).toBe('Partner Forum')
+    expect(screen.getByLabelText('Expected attendees').value).toBe('80')
+    expect(screen.getByLabelText('Duration (hours)').value).toBe('4')
+    expect(screen.getByLabelText('Preferred date and time').value).toBe('2026-11-20T09:00')
+    expect(screen.getByLabelText('Layout preference').value).toBe('theatre')
+    expect(screen.getByLabelText('Accessibility required').checked).toBe(true)
+    expect(screen.getByLabelText('Accessibility needs').value).toBe('Wheelchair access')
+    expect(screen.getByLabelText('Equipment required (one per line)').value).toBe('projector')
+
+    transitionRequest.mockResolvedValue({
+      request: { ...reviewRequest, status: 'under_review' },
+      editableSections: ['core', 'venue', 'equipment'],
+      availableActions: ['return_for_clarification', 'approve', 'reject'],
+    })
+    await user.click(screen.getByRole('button', { name: 'Start review' }))
+    expect(transitionRequest).toHaveBeenCalledWith({ uid: 'u-1' }, 'req-1', 'start_review', undefined)
+    expect(await screen.findByText('Status changed to Under review.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Approve for planning' })).toBeTruthy()
+  })
+
+  it('spm5_without_approve_at_under_review_the_coordinator_is_told_why', async () => {
+    showRequest(
+      {
+        request: { ...reviewRequest, status: 'under_review', core: { ...reviewRequest.core, title: null } },
+        editableSections: ['core'],
+        availableActions: ['return_for_clarification', 'reject'],
+      },
+      ['coordinator'],
+    )
+    expect(await screen.findByText(/can be approved for planning once its required details are complete and valid/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Approve for planning' })).toBeNull()
+  })
+
+  it('spm5_no_note_when_approve_is_available', async () => {
+    showRequest(
+      { request: { ...reviewRequest, status: 'under_review' }, editableSections: ['core'], availableActions: ['return_for_clarification', 'approve', 'reject'] },
+      ['coordinator'],
+    )
+    await screen.findByRole('button', { name: 'Approve for planning' })
+    expect(screen.queryByText(/can be approved for planning once/)).toBeNull()
+  })
+
+  it('spm5_an_approval_refused_for_missing_details_shows_the_api_message', async () => {
+    const user = showRequest(
+      { request: { ...reviewRequest, status: 'under_review' }, editableSections: ['core'], availableActions: ['return_for_clarification', 'approve', 'reject'] },
+      ['coordinator'],
+    )
+    transitionRequest.mockRejectedValue(
+      new ApiRequestError('API_REQUEST_FAILED', {
+        status: 409,
+        details: { message: 'The request is missing required details or has invalid ones. Complete them, or return it for clarification.', reason: 'insufficient_information' },
+      }),
+    )
+    await user.click(await screen.findByRole('button', { name: 'Approve for planning' }))
+    expect(await screen.findByText(/missing required details or has invalid ones/)).toBeTruthy()
+    expect(screen.getByText('Under review', { selector: '.status-pill' })).toBeTruthy()
+  })
+})
+
 // SPM-25, presentation side: Return for Clarification takes a required message, and the Organiser of a
 // returned request sees it above editable sections. The API is mocked; the rules are covered in tests/spm-25.
 describe('SPM-25 — returning a request for clarification', () => {

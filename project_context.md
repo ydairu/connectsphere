@@ -183,6 +183,18 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
     - Local verification on Windows, Node 22.17.0: lint passed; existing suites passed (128 Node tests and 67 frontend tests); coverage suites passed (395 tests, 30 opt-in live tests skipped); production build passed with a bundle-size warning; Playwright Chromium passed all 39 tests. Vite-based checks required execution outside the restricted sandbox.
     - These API and E2E checks use in-memory Firebase doubles. No live Firebase, emulator, deployed-rules or manual browser verification was performed. GitHub Actions verification of the updated branch remains pending; no deployment or operational story-status update is claimed.
 
+16. **SPM-5 review and approve for Planning (2 Oct 2026, branch `feature/spm-5`):**
+    - **Built:** start review, approve and the assigned-Coordinator-only rule already existed from SPM-9 and SPM-65. SPM-5 adds an Approve guard, `hasSufficientInformation()` in `shared/statusTransitions.js`, which refuses approval with 409 `insufficient_information` while the request fails the submission check. The request page explains why Approve is missing.
+    - **Pending team decision:** "open it for review" is the **Start review** action, not viewing the page (effective-requirements.md §4).
+    - **Backlog note:** reject, which SPM-5 assigns to SPM-45, was already built by SPM-9.
+    - **Evidence:**
+      - `tests/spm-5/unit/approveForPlanning.test.js`
+      - `tests/spm-5/integration/reviewAndApproveApi.test.js`
+      - `tests/spm-5/e2e/spm5.reviewAndApprove.spec.js`
+      - SPM-5 cases in `frontend/src/pages/requestDetail.test.jsx`
+      - The `shared/statusTransitions.test.js` fixture was completed so it passes the guard.
+    - **Local verification (Windows):** lint passed; 128 Node tests and 71 frontend tests passed; root Vitest 415 passed (30 opt-in live tests skipped); the production build passed.
+    - **Not verified:** these are in-memory doubles only. No live Firebase or manual browser check was run, and no backlog status change is claimed.
 15. **SPM-25 return for clarification (2 Oct 2026, branch `feature/spm-25`):**
     - **Built:** Return for Clarification now requires a message (`REASON_REQUIRED_ACTIONS` in `shared/requestActions.js`). Each return appends `{ message, requestedByUid, requestedAt }` to the top-level `clarificationRequests` metadata in the same transaction as the status change. `clarificationSummary()` gives the messages, newest first and without the sender, to the owning Organiser and to Coordinators. The request page shows the latest message while the request is Returned, and the full list as history afterwards. Return, Organiser editing and resubmission were already provided by SPM-9 and SPM-42.
     - **Not met — "the Organiser is notified":** no notification system exists (effective-requirements.md §20). The Organiser sees the status and message only on opening the request. SPM-25 is not Done until that criterion is met or the Product Owner agrees to defer it.
