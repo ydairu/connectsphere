@@ -2,7 +2,8 @@
 //
 // Three kinds, each decided by its own module; this file only names and combines them:
 //   status transitions          shared/statusTransitions.js   (submit, approve, confirm, cancel, ...)
-//   cancellation request        shared/cancellationRequests.js (request, refuse; approving is a transition)
+//   cancellation request        shared/cancellationRequests.js (request, return, resubmit, refuse;
+//                                                              approving is a transition)
 //   arrangement sign-off        shared/arrangements.js        (venue / technical approve or reject)
 // All are sent to POST /api/event-requests/:id/transitions as { action, reason? }.
 
@@ -15,7 +16,12 @@ import {
   decidableArrangements,
   requiredArrangements,
 } from './arrangements.js'
-import { canRefuseCancellation, canRequestCancellation } from './cancellationRequests.js'
+import {
+  canRefuseCancellation,
+  canRequestCancellation,
+  canResubmitCancellation,
+  canReturnCancellation,
+} from './cancellationRequests.js'
 import { COORDINATOR, EQUIPMENT, VENUE, rolesOf, viewableSectionsFor } from './permissions.js'
 import { isOwningOrganiser } from './requestActors.js'
 import { DRAFT } from './status.js'
@@ -23,6 +29,10 @@ import { CANCEL, RETURN_FOR_CLARIFICATION, availableActions } from './statusTran
 
 export const REQUEST_CANCELLATION = 'request_cancellation'
 export const REFUSE_CANCELLATION = 'refuse_cancellation'
+// SPM-47 — the assigned Coordinator returns a pending request for more information; the Organiser updates
+// its reason and resubmits it.
+export const RETURN_CANCELLATION = 'return_cancellation'
+export const RESUBMIT_CANCELLATION = 'resubmit_cancellation'
 export const APPROVE_VENUE = 'approve_venue'
 export const REJECT_VENUE = 'reject_venue'
 export const APPROVE_TECHNICAL = 'approve_technical'
@@ -35,12 +45,21 @@ const ARRANGEMENT_ACTIONS = Object.freeze({
   [REJECT_TECHNICAL]: { arrangement: TECHNICAL_ARRANGEMENT, decision: ARRANGEMENT_REJECTED },
 })
 
-// Coordinator-initiated cancellation is "for a stated reason". — Clarification 2, Cancellation.
+// Coordinator-initiated cancellation is "for a stated reason". — Clarification 2, Cancellation; SPM-63.
 // SPM-25: "Return action requires a clarification message from the Coordinator."
-export const REASON_REQUIRED_ACTIONS = Object.freeze([CANCEL, RETURN_FOR_CLARIFICATION])
+// SPM-47: the Organiser's request needs a reason; the Coordinator rejects it "with a reason" and returns it
+// "with a message"; a resubmission carries the updated reason.
+export const REASON_REQUIRED_ACTIONS = Object.freeze([
+  CANCEL,
+  RETURN_FOR_CLARIFICATION,
+  REQUEST_CANCELLATION,
+  REFUSE_CANCELLATION,
+  RETURN_CANCELLATION,
+  RESUBMIT_CANCELLATION,
+])
 
 // Actions that accept a reason, stored with the request or decision.
-export const REASON_ACCEPTED_ACTIONS = Object.freeze([CANCEL, RETURN_FOR_CLARIFICATION, REQUEST_CANCELLATION, REFUSE_CANCELLATION])
+export const REASON_ACCEPTED_ACTIONS = REASON_REQUIRED_ACTIONS
 
 export const MAX_REASON_LENGTH = 1000
 
@@ -52,8 +71,10 @@ export function arrangementAction(action) {
 /** Every action this user may take on this request now: transitions, then cancellation, then sign-off. */
 export function allAvailableActions(user, request, now = new Date()) {
   const actions = [...availableActions(user, request, now)]
-  if (canRequestCancellation(user, request).allowed) actions.push(REQUEST_CANCELLATION)
+  if (canRequestCancellation(user, request, now).allowed) actions.push(REQUEST_CANCELLATION)
+  if (canResubmitCancellation(user, request, now).allowed) actions.push(RESUBMIT_CANCELLATION)
   if (canRefuseCancellation(user, request).allowed) actions.push(REFUSE_CANCELLATION)
+  if (canReturnCancellation(user, request, now).allowed) actions.push(RETURN_CANCELLATION)
   for (const arrangement of decidableArrangements(user, request)) {
     actions.push(arrangement === VENUE_ARRANGEMENT ? APPROVE_VENUE : APPROVE_TECHNICAL)
     actions.push(arrangement === VENUE_ARRANGEMENT ? REJECT_VENUE : REJECT_TECHNICAL)
@@ -108,7 +129,28 @@ export function cancellationSummary(user, request) {
     status: current.status,
     reason: current.reason ?? null,
     requestedAt: current.requestedAt ?? null,
+    returnMessage: current.returnMessage ?? null,
+    returnedAt: current.returnedAt ?? null,
     decidedAt: current.decidedAt ?? null,
     decisionReason: current.decisionReason ?? null,
+  }
+}
+
+/**
+ * SPM-63 — why and when a Cancelled event was cancelled, for every user the request is presented to (the
+ * caller has already checked scope), or null. Stored as top-level `cancellation` metadata in the same
+ * transaction as the status change. `requestedByOrganiser` is true when the Coordinator approved the
+ * Organiser's request (SPM-47), whose reason it carries. Who cancelled it is internal and is not included.
+ *
+ * Until a Notification System (effective-requirements.md §20) exists, this in-app notice is the only way
+ * the Organiser and assigned staff learn the reason; nothing is sent to them.
+ */
+export function cancellationNotice(user, request) {
+  const cancellation = request.cancellation
+  if (!cancellation) return null
+  return {
+    reason: cancellation.reason ?? null,
+    cancelledAt: cancellation.cancelledAt ?? null,
+    requestedByOrganiser: cancellation.requestedByOrganiser === true,
   }
 }

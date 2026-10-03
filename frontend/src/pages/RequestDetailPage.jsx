@@ -24,6 +24,8 @@ import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSect
 // SPM-9: the status is shown in the heading, and the status actions this user may take (availableActions
 // in the response) are offered above the sections.
 //
+// SPM-63: a Cancelled event shows its cancellation reason and time (cancellation in the response).
+//
 // SPM-25: the Coordinator's clarification messages (clarificationRequests in the response) are shown
 // first, so a returned request's Organiser reads what to amend before editing.
 //
@@ -81,6 +83,7 @@ function RequestDetailPage() {
   const [cancellationRequest, setCancellationRequest] = useState(null)
   const [clarificationRequests, setClarificationRequests] = useState(null)
   const [assignedCoordinator, setAssignedCoordinator] = useState(null)
+  const [cancellation, setCancellation] = useState(null)
   const [acting, setActing] = useState(false)
   const [form, setForm] = useState({})
   const [loading, setLoading] = useState(true)
@@ -96,6 +99,7 @@ function RequestDetailPage() {
     setCancellationRequest(response.cancellationRequest ?? null)
     setClarificationRequests(response.clarificationRequests ?? null)
     setAssignedCoordinator(response.assignedCoordinator ?? null)
+    setCancellation(response.cancellation ?? null)
     setForm(toFormValues(response.request))
   }, [])
 
@@ -219,6 +223,7 @@ function RequestDetailPage() {
               actions={availableActions}
               arrangements={arrangements}
               cancellationRequest={cancellationRequest}
+              cancellation={cancellation}
               busy={acting || saving}
               onAction={handleAction}
             />

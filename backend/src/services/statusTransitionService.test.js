@@ -399,8 +399,8 @@ describe('SPM-9 — Organiser cancellation request', () => {
 
   test('refused: the event stays Confirmed, and the Organiser may ask again', async () => {
     const db = fakeDb(readyRequest(CONFIRMED))
-    await transitionEventRequest('request-1', REQUEST_CANCELLATION, owner, db, NOW)
-    await assertRefused(transitionEventRequest('request-1', REQUEST_CANCELLATION, owner, db, NOW), CANCELLATION_ALREADY_PENDING)
+    await transitionEventRequest('request-1', REQUEST_CANCELLATION, owner, db, NOW, { reason: 'Budget cut' })
+    await assertRefused(transitionEventRequest('request-1', REQUEST_CANCELLATION, owner, db, NOW, { reason: 'Budget cut' }), CANCELLATION_ALREADY_PENDING)
 
     const refused = await transitionEventRequest('request-1', REFUSE_CANCELLATION, assigned, db, NOW, { reason: 'Contract terms' })
     assert.equal(refused.status, CONFIRMED)
@@ -408,14 +408,14 @@ describe('SPM-9 — Organiser cancellation request', () => {
     assert.equal(refused.cancellationRequest.decisionReason, 'Contract terms')
     assert.deepEqual(statusChangesOf(db), [])
 
-    const again = await transitionEventRequest('request-1', REQUEST_CANCELLATION, owner, db, NOW)
+    const again = await transitionEventRequest('request-1', REQUEST_CANCELLATION, owner, db, NOW, { reason: 'Budget cut again' })
     assert.equal(again.cancellationRequest.status, CANCELLATION_PENDING)
     assert.equal(activityOf(db).filter((entry) => entry.type === CANCELLATION_REQUESTED).length, 2)
   })
 
   test('the Coordinator cannot cancel directly while a cancellation request is pending', async () => {
     const db = fakeDb(readyRequest(CONFIRMED))
-    await transitionEventRequest('request-1', REQUEST_CANCELLATION, owner, db, NOW)
+    await transitionEventRequest('request-1', REQUEST_CANCELLATION, owner, db, NOW, { reason: 'Budget cut' })
     await assertRefused(
       transitionEventRequest('request-1', CANCEL, assigned, db, NOW, { reason: 'Venue closed' }),
       CANCELLATION_REQUEST_PENDING,

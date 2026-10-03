@@ -7,6 +7,8 @@ import {
   REJECT_TECHNICAL,
   REJECT_VENUE,
   REQUEST_CANCELLATION,
+  RESUBMIT_CANCELLATION,
+  RETURN_CANCELLATION,
 } from '../../../shared/requestActions.js'
 import {
   APPROVE,
@@ -32,6 +34,7 @@ const ACTIONS = {
     label: 'Return for clarification',
     confirm: 'Return this request to the organiser for clarification or amendments?',
     reasonLabel: 'Message to the organiser',
+    reasonPrompt: 'Enter a message to the organiser to continue.',
   },
   [APPROVE]: { label: 'Approve for planning' },
   [CONFIRM]: { label: 'Confirm event' },
@@ -59,6 +62,17 @@ const ACTIONS = {
     label: 'Refuse cancellation',
     confirm: 'Refuse the organiser’s cancellation request? The event stays confirmed.',
   },
+  [RETURN_CANCELLATION]: {
+    label: 'Return cancellation request',
+    confirm: 'Return the organiser’s cancellation request for more information? The event stays confirmed.',
+    reasonLabel: 'Message to the organiser',
+    reasonPrompt: 'Enter a message to the organiser to continue.',
+  },
+  [RESUBMIT_CANCELLATION]: {
+    label: 'Resubmit cancellation request',
+    confirm: 'Send your updated cancellation request to the event coordinator? The event stays confirmed until they decide.',
+    reasonLabel: 'Updated reason',
+  },
   [APPROVE_VENUE]: { label: 'Approve venue arrangement' },
   [REJECT_VENUE]: {
     label: 'Reject venue arrangement',
@@ -84,6 +98,12 @@ export function actionReason(action) {
   if (REASON_REQUIRED_ACTIONS.includes(action)) return 'required'
   if (REASON_ACCEPTED_ACTIONS.includes(action)) return 'optional'
   return null
+}
+
+/** What to tell the user while a required reason is empty. SPM-47, SPM-63: "a message asks for a reason". */
+export function actionReasonPrompt(action) {
+  if (actionReason(action) !== 'required') return null
+  return ACTIONS[action]?.reasonPrompt ?? 'Enter a reason to continue.'
 }
 
 /** The label for the action's reason box, e.g. 'Reason (required)'. */

@@ -108,3 +108,12 @@ export function transitionRequest(user, id, action, reason) {
     body: JSON.stringify(reason === undefined ? { action } : { action, reason }),
   })
 }
+
+// SPM-47, SPM-63 — the signed-in user's own in-app notifications, newest first.
+export function listNotifications(user) {
+  return authenticatedRequest(user, '/api/notifications')
+}
+
+export function markNotificationRead(user, id) {
+  return authenticatedRequest(user, `/api/notifications/${id}/read`, { method: 'POST' })
+}

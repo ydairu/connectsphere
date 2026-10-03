@@ -7,8 +7,8 @@
 // multi-role leak; CLAUDE.md, "Evaluate per role, then union the results").
 
 import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf } from '../../../shared/permissions.js'
-import { allAvailableActions, arrangementsSummary, cancellationSummary, clarificationSummary } from '../../../shared/requestActions.js'
 import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.js'
+import { allAvailableActions, arrangementsSummary, cancellationNotice, cancellationSummary, clarificationSummary } from '../../../shared/requestActions.js'
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -39,6 +39,8 @@ function outOfScope(user, res) {
  * Coordinator's return messages, newest first, on the same terms. `assignedCoordinator` (SPM-46) is the
  * assigned Coordinator's display name for an Organiser who may view the event, and null for everyone else;
  * `coordinatorName` is what services/assignedCoordinatorService.js loaded from users/{uid}.
+ * Coordinator's return messages, newest first, on the same terms. `cancellation` (SPM-63) gives a Cancelled
+ * event's reason and time to every user it is presented to.
  */
 export function presentRequest(user, request, { coordinatorName = null } = {}) {
   return {
@@ -49,6 +51,7 @@ export function presentRequest(user, request, { coordinatorName = null } = {}) {
     cancellationRequest: cancellationSummary(user, request),
     clarificationRequests: clarificationSummary(user, request),
     assignedCoordinator: assignedCoordinatorSummary(user, request, coordinatorName),
+    cancellation: cancellationNotice(user, request),
   }
 }
 

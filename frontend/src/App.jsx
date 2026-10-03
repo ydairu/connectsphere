@@ -6,6 +6,7 @@ import CreateVenuePage from './pages/CreateVenuePage.jsx'
 import DraftRequestsPage from './pages/DraftRequestsPage.jsx'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+import NotificationsPage from './pages/NotificationsPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 import RequestDetailPage from './pages/RequestDetailPage.jsx'
 import RequestsPage from './pages/RequestsPage.jsx'
@@ -23,6 +24,7 @@ function App() {
         {/* Every role may list requests; the API decides which records they receive (SPM-42). */}
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/requests/:id" element={<RequestDetailPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
       </Route>
       {/* Drafts and the request form belong to Event Organisers. The API enforces this too:
           requireRole(ORGANISER) on /api/event-requests, and owner-only scope on drafts. */}
