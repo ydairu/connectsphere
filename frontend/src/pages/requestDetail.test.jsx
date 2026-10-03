@@ -386,6 +386,9 @@ describe('SPM-5 — reviewing and approving for Planning', () => {
     await user.click(await screen.findByRole('button', { name: 'Approve for planning' }))
     expect(await screen.findByText(/missing required details or has invalid ones/)).toBeTruthy()
     expect(screen.getByText('Under review', { selector: '.status-pill' })).toBeTruthy()
+  })
+})
+
 // SPM-25, presentation side: Return for Clarification takes a required message, and the Organiser of a
 // returned request sees it above editable sections. The API is mocked; the rules are covered in tests/spm-25.
 describe('SPM-25 — returning a request for clarification', () => {
