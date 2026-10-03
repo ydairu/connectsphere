@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { PLANNING } from '../../../shared/status.js'
 import { CONFIRM, REJECT } from '../../../shared/statusTransitions.js'
-import { actionConfirmation, actionLabel, actionReason } from '../utils/statusActions.js'
+import { actionConfirmation, actionLabel, actionReason, actionReasonLabel } from '../utils/statusActions.js'
 import Button from './Button.jsx'
 import Card from './Card.jsx'
 
@@ -77,7 +77,7 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, bus
               <p>{actionConfirmation(pending)}</p>
               {reasonMode && (
                 <div className="field">
-                  <label htmlFor="status-action-reason">{reasonMode === 'required' ? 'Reason (required)' : 'Reason (optional)'}</label>
+                  <label htmlFor="status-action-reason">{actionReasonLabel(pending)}</label>
                   <textarea id="status-action-reason" rows={3} value={reason} onChange={(event) => setReason(event.target.value)} />
                 </div>
               )}

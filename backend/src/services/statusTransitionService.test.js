@@ -148,7 +148,10 @@ describe('SPM-9 — each status change records previous status, new status, who 
     test(`${from} → ${to} on ${action}, by the assigned Coordinator`, async () => {
       const db = fakeDb(readyRequest(from))
 
-      const options = action === CANCEL ? { reason: 'Venue closed for repairs' } : {}
+      const options =
+        action === CANCEL ? { reason: 'Venue closed for repairs' }
+          : action === RETURN_FOR_CLARIFICATION ? { reason: 'Please confirm the expected attendance' }
+            : {}
       const updated = await transitionEventRequest('request-1', action, assigned, db, NOW, options)
 
       assert.equal(updated.status, to)

@@ -42,6 +42,7 @@ import {
   EVENT_NOT_ENDED,
   NOT_PERMITTED,
   RESUBMIT,
+  RETURN_FOR_CLARIFICATION,
   SUBMIT,
   TERMINAL_STATUS,
   UNKNOWN_ACTION,
@@ -168,6 +169,14 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       refuse(decision)
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }
+      // SPM-25: the clarification message is kept as record metadata for the Organiser, and every earlier
+      // one is kept with it, so a second return does not overwrite the first.
+      if (action === RETURN_FOR_CLARIFICATION) {
+        update.clarificationRequests = [
+          ...(existing.clarificationRequests ?? []),
+          { message: reason, requestedByUid: user.uid, requestedAt: at },
+        ]
+      }
       if (action === APPROVE_CANCELLATION) {
         update.cancellationRequest = { ...existing.cancellationRequest, status: CANCELLATION_APPROVED, decidedByUid: user.uid, decidedAt: at }
         addActivity(tx, docRef, { type: CANCELLATION_DECIDED, decision: CANCELLATION_APPROVED, reason: null, actor, at })

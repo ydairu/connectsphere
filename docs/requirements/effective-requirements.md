@@ -227,6 +227,13 @@ The current backlog says a draft remains until submitted or deleted. Deletion it
 
 **[Customer-confirmed]** Event Coordinators review submitted requests, seek clarification, return for amendment, approve/allow planning, or reject. Returned requests are edited and resubmitted; rejected unfulfillable requests close. Initial feasibility considers attendance, date/time, venue, and equipment availability.
 
+**[Implemented — SPM-25, 2 Oct 2026]** Return for Clarification (Under Review → Returned, assigned Coordinator only) requires a clarification message. The message is stored with the request as top-level metadata (`clarificationRequests`), so no section edit can write it, and is shown to the owning Organiser, who may then edit every section and resubmit. Resubmission keeps the same request and its Coordinator and returns it to Submitted (§6). The rule that a request which still cannot meet its essential requirements is rejected is met by the existing Reject action; no limit on the number of returns is applied, because no source sets one.
+
+**[Team decision pending — SPM-25]** Two choices the criteria leave open, proposed with the SPM-25 build and not yet confirmed by the team:
+
+- until a Notification System (§20) exists, "the Organiser is notified" is served in-app only: the Returned status in the Organiser's request list and the message on the request page. No message is sent to the Organiser. The criterion stays open until notifications exist or the Product Owner agrees to defer it;
+- every clarification message is kept after resubmission, newest first, so a second return does not erase the first. Who sent each message is kept internally and is not shown.
+
 ### 5. Coordinator Assignment
 
 **[Customer-confirmed]** Assignment is automatic with exactly one Coordinator per event. Round-robin or load-based are acceptable examples. The assigned Coordinator may initiate reassignment following offline agreement.
