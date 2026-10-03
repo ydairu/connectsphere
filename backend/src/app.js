@@ -14,11 +14,13 @@ import { firestoreEventRequestStore } from './services/eventRequestStore.js'
 // Dependencies are injectable so the API tests can serve the real routes and middleware over HTTP
 // against in-memory users and requests. server.js uses the defaults: Firebase Auth and Firestore.
 // getEventRequestDb returns the Firestore-shaped database the draft routes use; it is called per request.
+// getUserDb returns the database holding users/{uid}, read for the assigned Coordinator's name (SPM-46).
 // Notifications are written in the event request transaction, so by default they are read from the same one.
 export function createApp({
   authenticate = firebaseAuthenticate,
   eventRequestStore = firestoreEventRequestStore,
   getEventRequestDb = getAdminDb,
+  getUserDb = getEventRequestDb,
   getVenueDb = getAdminDb,
   getNotificationDb = getEventRequestDb,
 } = {}) {
@@ -33,10 +35,10 @@ export function createApp({
   })
 
   app.use('/api/health', healthRoutes)
-  app.use('/api/event-requests', createEventRequestRoutes({ authenticate, getDb: getEventRequestDb }))
+  app.use('/api/event-requests', createEventRequestRoutes({ authenticate, getDb: getEventRequestDb, getUserDb }))
   app.use('/api/notifications', createNotificationRoutes({ authenticate, getDb: getNotificationDb }))
   app.use('/api/profile', profileRoutes)
-  app.use('/api/requests', createRequestRoutes({ authenticate, store: eventRequestStore }))
+  app.use('/api/requests', createRequestRoutes({ authenticate, store: eventRequestStore, getUserDb }))
   app.use('/api/venues', createVenueRoutes({ authenticate, getDb: getVenueDb }))
 
   app.use((_req, res) => {

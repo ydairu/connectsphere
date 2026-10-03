@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { DRAFT } from '../../../shared/status.js'
+import AssignedCoordinator from '../components/AssignedCoordinator.jsx'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import ClarificationRequests from '../components/ClarificationRequests.jsx'
@@ -27,6 +28,9 @@ import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSect
 //
 // SPM-25: the Coordinator's clarification messages (clarificationRequests in the response) are shown
 // first, so a returned request's Organiser reads what to amend before editing.
+//
+// SPM-46: an Organiser sees the event's assigned Coordinator (assignedCoordinator in the response) above
+// everything else. The API sends only the name, and null to other roles.
 
 function ReadOnlyValue({ type, value }) {
   if (type === 'boolean') return <strong>{value === true ? 'Yes' : 'No'}</strong>
@@ -78,6 +82,7 @@ function RequestDetailPage() {
   const [arrangements, setArrangements] = useState(null)
   const [cancellationRequest, setCancellationRequest] = useState(null)
   const [clarificationRequests, setClarificationRequests] = useState(null)
+  const [assignedCoordinator, setAssignedCoordinator] = useState(null)
   const [cancellation, setCancellation] = useState(null)
   const [acting, setActing] = useState(false)
   const [form, setForm] = useState({})
@@ -93,6 +98,7 @@ function RequestDetailPage() {
     setArrangements(response.arrangements ?? null)
     setCancellationRequest(response.cancellationRequest ?? null)
     setClarificationRequests(response.clarificationRequests ?? null)
+    setAssignedCoordinator(response.assignedCoordinator ?? null)
     setCancellation(response.cancellation ?? null)
     setForm(toFormValues(response.request))
   }, [])
@@ -207,6 +213,8 @@ function RequestDetailPage() {
         {!loading && !loadError && request && (
           <form onSubmit={handleSave}>
             {status && <div className={`alert alert-${status.type}`} role="alert">{status.message}</div>}
+
+            <AssignedCoordinator coordinator={assignedCoordinator} />
 
             <ClarificationRequests status={request.status} entries={clarificationRequests} />
 

@@ -173,6 +173,15 @@ export function inScope(user, request) {
   return rolesOf(user).some((role) => roleInScope(role, user, request))
 }
 
+/**
+ * Does this one role, held by this user, put the record in scope? False when the user does not hold the
+ * role. For information shown to a single role, e.g. the assigned Coordinator's name, which only the
+ * Organiser role receives (SPM-46) — so another of the user's roles cannot widen it.
+ */
+export function inScopeAs(role, user, request) {
+  return rolesOf(user).includes(role) && roleInScope(role, user, request)
+}
+
 // --- State gate -----------------------------------------------------------------------------------
 
 function roleGateOpen(role, user, request) {
