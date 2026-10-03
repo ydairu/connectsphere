@@ -13,7 +13,14 @@
 
 import { arrangementsApproved } from './arrangements.js'
 import { hasValidationErrors, validateEventRequestSubmission } from './eventRequest.js'
-import { CANCELLATION_REQUEST_PENDING, NO_PENDING_CANCELLATION, hasPendingCancellation } from './cancellationRequests.js'
+import {
+  CANCELLATION_REQUEST_PENDING,
+  EVENT_STARTED,
+  NO_PENDING_CANCELLATION,
+  eventHasStarted,
+  hasOpenCancellation,
+  hasPendingCancellation,
+} from './cancellationRequests.js'
 import { NOT_PERMITTED, isAssignedCoordinator, isOwningOrganiser } from './requestActors.js'
 import {
   CANCELLED,
@@ -52,12 +59,13 @@ export { NOT_PERMITTED }
 export const ARRANGEMENTS_NOT_APPROVED = 'arrangements_not_approved'
 export const EVENT_NOT_ENDED = 'event_not_ended'
 export const INSUFFICIENT_INFORMATION = 'insufficient_information'
+export { EVENT_STARTED }
 
 // --- Guards ---------------------------------------------------------------------------------------
 // Actors (owning Organiser, assigned Coordinator) are in shared/requestActors.js. The Confirm guard,
 // arrangementsApproved(), is in shared/arrangements.js and re-exported here.
 
-export { arrangementsApproved }
+export { arrangementsApproved, eventHasStarted }
 
 /**
  * Has the event taken place? True once preferredDateTime + durationHours is at or before `now`.
@@ -129,20 +137,24 @@ const TRANSITIONS = Object.freeze({
   },
   // "Given a Confirmed event, when ... the Coordinator cancels it directly, then it moves to Cancelled."
   // Coordinator-initiated cancellation is "for a stated reason" (Clarification 2): the API requires one.
-  // While the Organiser's request is pending, the Coordinator approves or refuses it instead.
+  // SPM-63: "only a Confirmed event, up to its start date/time." While an Organiser's request is open
+  // (pending, or returned for more information), the Coordinator decides it instead (SPM-47).
   [CANCEL]: {
     from: [CONFIRMED],
     to: CANCELLED,
     actor: isAssignedCoordinator,
-    guard: (request) => (hasPendingCancellation(request) ? CANCELLATION_REQUEST_PENDING : null),
+    guard: (request, now) =>
+      eventHasStarted(request, now) ? EVENT_STARTED : hasOpenCancellation(request) ? CANCELLATION_REQUEST_PENDING : null,
   },
   // "Given a Confirmed event, when a cancellation request is approved ..., then it moves to Cancelled."
-  // Requesting and refusing are in shared/cancellationRequests.js; they do not change the status.
+  // SPM-47: "when the event's start date/time passes before a decision, then it can no longer be approved."
+  // Requesting, returning and refusing are in shared/cancellationRequests.js; they do not change the status.
   [APPROVE_CANCELLATION]: {
     from: [CONFIRMED],
     to: CANCELLED,
     actor: isAssignedCoordinator,
-    guard: (request) => (hasPendingCancellation(request) ? null : NO_PENDING_CANCELLATION),
+    guard: (request, now) =>
+      !hasPendingCancellation(request) ? NO_PENDING_CANCELLATION : eventHasStarted(request, now) ? EVENT_STARTED : null,
   },
 })
 

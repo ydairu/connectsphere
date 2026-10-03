@@ -18,6 +18,7 @@ function Navbar() {
           {user ? (
             <>
               <NavLink className="nav-link" to="/requests">Requests</NavLink>
+              <NavLink className="nav-link" to="/notifications">Notifications</NavLink>
               {isOrganiser && <NavLink className="nav-link" to="/requests/drafts">My drafts</NavLink>}
               {isOrganiser && <NavLink className="nav-link" to="/event-requests/new">Create request</NavLink>}
               {isVenueStaff && <NavLink className="nav-link" to="/venues/new">Add venue</NavLink>}
