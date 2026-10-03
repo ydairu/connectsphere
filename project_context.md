@@ -208,6 +208,17 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - The SPM-9 return steps now send a message.
     - **Local verification (Windows):** lint passed; 128 Node tests and 71 frontend tests passed; root Vitest 414 passed (30 opt-in live tests skipped); the production build passed with the existing bundle-size warning; Playwright Chromium passed all 40 tests.
     - **Not verified:** these are in-memory doubles only. No live Firebase, emulator or manual browser check was run, and no backlog status change is claimed.
+17. **SPM-46 view the assigned Event Coordinator (3 Oct 2026, branch `SPM-46`):**
+    - **Built:** an Organiser viewing an event they may see under SPM-42 (owner or same-organisation colleague) gets `assignedCoordinator` in the response. It is `{ assigned, name }`, with the name read from `users/{uid}.name`. The request page shows "Event Coordinator: <name>", "Not yet assigned" or "Assigned (name unavailable)". Drafts and every other role get `null`. Neither the uid nor any other profile field is sent. Rules: `shared/assignedCoordinator.js`; lookup: `backend/src/services/assignedCoordinatorService.js`; `createApp` takes `getUserDb` (defaulting to `getEventRequestDb`).
+    - **Team decisions (3 Oct 2026):** colleague visibility, the "name unavailable" fallback, and keeping "Not yet assigned" for Week 7 Change 5 (effective-requirements.md §5, SPM-46).
+    - **Gaps:** there is no reassignment route (SPM-26), so criterion 3 is tested by changing `assignedCoordinatorUid` in the fixture. The E2E double holds a profile for one Coordinator only, so reassignment, "Not yet assigned" and "name unavailable" are tested at API and page level, not E2E. The requests list does not show the Coordinator.
+    - **Evidence:**
+      - `tests/spm-46/unit/assignedCoordinator.test.js`
+      - `tests/spm-46/integration/assignedCoordinatorApi.test.js`
+      - `tests/spm-46/integration/assignedCoordinatorPage.test.jsx`
+      - `tests/spm-46/e2e/spm46.assignedCoordinator.spec.js`
+    - **Local verification (macOS):** lint passed; 128 Node tests and 75 frontend tests passed; root Vitest 505 passed (30 opt-in live tests skipped); Playwright Chromium passed all 45 tests; the production build passed with the existing bundle-size warning.
+    - **Not verified:** these are in-memory doubles only. No live Firebase, emulator or manual browser check was run, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

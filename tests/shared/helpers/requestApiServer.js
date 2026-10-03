@@ -10,6 +10,7 @@
 import { createApp } from '../../../backend/src/app.js'
 import { env } from '../../../backend/src/config/env.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
+import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
 import { createMemoryEventRequestStore } from '../../../backend/src/testing/memoryEventRequestStore.js'
 import { SEED_ACCOUNTS, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 
@@ -42,9 +43,13 @@ export async function startInMemoryApi({ extraAccounts = [], extraRequests = [],
     },
   })
 
+  // users/{uid} for SPM-46's assigned Coordinator name, from the same profiles.
+  const userDb = createFakeFirestore({ users: Object.fromEntries([...profiles].map(([uid, { uid: _uid, ...profile }]) => [uid, profile])) })
+
   const app = createApp({
     authenticate,
     eventRequestStore: eventRequestStore ?? createMemoryEventRequestStore([...SEED_REQUESTS, ...extraRequests]),
+    getUserDb: () => userDb,
   })
   const { server, baseUrl } = await listen(app)
 

@@ -8,6 +8,7 @@
 
 import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf } from '../../../shared/permissions.js'
 import { allAvailableActions, arrangementsSummary, cancellationSummary, clarificationSummary } from '../../../shared/requestActions.js'
+import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.js'
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -35,9 +36,11 @@ function outOfScope(user, res) {
  * `availableActions` (SPM-9) lists the actions this user may take now, for the same reason. `arrangements`
  * and `cancellationRequest` (SPM-9) summarise sign-off and any cancellation request for users who may see
  * them, without the internal record of who decided. `clarificationRequests` (SPM-25) lists the
- * Coordinator's return messages, newest first, on the same terms.
+ * Coordinator's return messages, newest first, on the same terms. `assignedCoordinator` (SPM-46) is the
+ * assigned Coordinator's display name for an Organiser who may view the event, and null for everyone else;
+ * `coordinatorName` is what services/assignedCoordinatorService.js loaded from users/{uid}.
  */
-export function presentRequest(user, request) {
+export function presentRequest(user, request, { coordinatorName = null } = {}) {
   return {
     request: projectRequest(user, request),
     editableSections: SECTIONS.filter((section) => canEdit(user, request, section)),
@@ -45,6 +48,7 @@ export function presentRequest(user, request) {
     arrangements: arrangementsSummary(user, request),
     cancellationRequest: cancellationSummary(user, request),
     clarificationRequests: clarificationSummary(user, request),
+    assignedCoordinator: assignedCoordinatorSummary(user, request, coordinatorName),
   }
 }
 
@@ -65,7 +69,7 @@ export function authoriseList(req, res, next) {
  */
 export function authoriseRead(req, res, next) {
   if (!inScope(req.user, req.eventRequest)) return outOfScope(req.user, res)
-  res.locals.body = presentRequest(req.user, req.eventRequest)
+  res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName })
   return next()
 }
 

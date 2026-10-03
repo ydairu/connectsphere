@@ -257,6 +257,20 @@ The current backlog says a draft remains until submitted or deleted. Deletion it
 
 The assignment is stored in a single `assignedCoordinatorUid` field. The customer says only that reassignment is "initiated by the assigned Coordinator after offline agreement" (Clarification 2). Under the SPM-65 team decision (1 Oct 2026, §SPM-42), a reassigned event leaves the previous Coordinator's scope; nothing is retained.
 
+#### SPM-46 — View the Assigned Event Coordinator
+
+**[Customer-confirmed]** "The assigned Event Coordinator acts as the primary point of contact for the Organiser." — G8 Session 1 ([`clarification-session-1.md`](clarification-session-1.md) §4). There is strictly one Coordinator per event (Session 1 §4; Session 2 §4).
+
+**[Team decision, 3 Oct 2026]** How the Organiser sees the Coordinator, recorded with the SPM-46 owner:
+
+- **Who sees it:** anyone whose Organiser role puts the event in scope under SPM-42 — the owner and same-organisation colleagues. Only the Organiser role receives it; Coordinator, Venue Staff, Technical Support Staff and Attendee responses are unchanged.
+- **What is shown:** the Coordinator's display name, `users/{uid}.name`, and nothing else — never the uid, email or roles.
+- **Drafts:** no Coordinator is shown.
+- **Submitted with no Coordinator:** shown as "Not yet assigned". The SPM-8 rule that an empty pool fails the submission means this does not arise today, except through data; it is kept as a supported state for the unassigned queue expected in Week 7 Change 5.
+- **Assigned, but no usable name:** if the profile is missing, has no name, or cannot be read, the Organiser sees "Assigned (name unavailable)", never "Not yet assigned".
+
+Implemented by `shared/assignedCoordinator.js` (visibility and response shape) and `backend/src/services/assignedCoordinatorService.js` (the `users/{uid}` read). The response field is `assignedCoordinator` on `GET`/`PATCH /api/requests/:id` and `POST /api/event-requests/:id/transitions`. Reassignment itself is SPM-26.
+
 ### 6. Event Status Management
 
 **[Customer-confirmed]** Draft, Submitted, Under Review, Planning, Confirmed, Completed, Cancelled, Rejected, and a returned/amendment condition are required concepts.

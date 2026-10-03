@@ -2,11 +2,12 @@ import { Router } from 'express'
 import { ORGANISER } from '../../../shared/permissions.js'
 import { createEventRequestController } from '../controllers/eventRequestController.js'
 import { requireRole } from '../middleware/requireRole.js'
+import { createCoordinatorNameLoader } from '../services/assignedCoordinatorService.js'
 
 // Draft create, load, save and submit (SPM-7, SPM-4, SPM-3). authenticate and getDb come from
 // createApp, like the /api/requests routes, so the API tests and the E2E double can serve these too.
-export function createEventRequestRoutes({ authenticate, getDb }) {
-  const controller = createEventRequestController(getDb)
+export function createEventRequestRoutes({ authenticate, getDb, getUserDb = getDb }) {
+  const controller = createEventRequestController(getDb, createCoordinatorNameLoader(getUserDb))
   const router = Router()
 
   router.post('/', authenticate, requireRole(ORGANISER), controller.createEventRequest)
