@@ -42,6 +42,7 @@ import {
   APPROVE_VENUE,
   REFUSE_CANCELLATION,
   REQUEST_CANCELLATION,
+  RETURN_CANCELLATION,
 } from '../../../shared/requestActions.js'
 import { createFakeFirestoreEventRequestStore } from '../../shared/firebase-double/fakeFirestoreEventRequestStore.js'
 
@@ -307,7 +308,8 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
 
     const coordinatorView = await view(coordinator3, 'a1-confirmed')
     expect(coordinatorView.json.cancellationRequest.status).toBe('pending')
-    expect(coordinatorView.json.availableActions).toEqual([APPROVE_CANCELLATION, REFUSE_CANCELLATION])
+    // SPM-47 added Return cancellation request.
+    expect(coordinatorView.json.availableActions).toEqual([APPROVE_CANCELLATION, REFUSE_CANCELLATION, RETURN_CANCELLATION])
     // While the request is pending the Coordinator decides it rather than cancelling directly.
     expect((await act(coordinator3, 'a1-confirmed', CANCEL, 'Venue closed')).json.reason).toBe('cancellation_request_pending')
 
@@ -323,7 +325,7 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
   })
 
   it('spm9_a_refused_cancellation_request_leaves_the_event_confirmed', async () => {
-    await act(organiserA1, 'a1-confirmed', REQUEST_CANCELLATION)
+    await act(organiserA1, 'a1-confirmed', REQUEST_CANCELLATION, 'Budget cut')
     const refused = await act(coordinator3, 'a1-confirmed', REFUSE_CANCELLATION, 'Outside the cancellation terms')
     expect(refused.status).toBe(200)
     expect(refused.json.request.status).toBe(CONFIRMED)
@@ -337,7 +339,7 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
   it('spm9_only_the_owner_requests_and_only_the_assigned_coordinator_decides_cancellation', async () => {
     expect((await act(organiserA2, 'a1-confirmed', REQUEST_CANCELLATION)).status).toBe(403)
     expect((await act(coordinator3, 'a1-confirmed', REQUEST_CANCELLATION)).status).toBe(403)
-    await act(organiserA1, 'a1-confirmed', REQUEST_CANCELLATION)
+    await act(organiserA1, 'a1-confirmed', REQUEST_CANCELLATION, 'Budget cut')
     expect((await act(coordinator, 'a1-confirmed', APPROVE_CANCELLATION)).status).toBe(404)
     expect((await act(coordinator, 'a1-confirmed', REFUSE_CANCELLATION)).status).toBe(404)
     expect((await act(organiserA1, 'a1-planning', REQUEST_CANCELLATION)).status).toBe(409)

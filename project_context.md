@@ -208,6 +208,25 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - The SPM-9 return steps now send a message.
     - **Local verification (Windows):** lint passed; 128 Node tests and 71 frontend tests passed; root Vitest 414 passed (30 opt-in live tests skipped); the production build passed with the existing bundle-size warning; Playwright Chromium passed all 40 tests.
     - **Not verified:** these are in-memory doubles only. No live Firebase, emulator or manual browser check was run, and no backlog status change is claimed.
+17. **SPM-63 Coordinator cancellation and SPM-47 Organiser cancellation request (3 Oct 2026, branch `feature/spm-47-63`):**
+    - **Built:** the start date/time cut-off; required reasons on request, refuse and direct cancel; return of a request for more information, with resubmission; and the `cancellation` record with an in-app notice on the event page. Cancelled, Completed and Rejected events are listed under "Closed events". There are in-app notifications for the assigned Coordinator (request, resubmission), the Organiser (return, refusal, cancellation) and assigned staff (cancellation), on a new Notifications page (effective-requirements.md §6, §20).
+    - **Not met:** releasing venue and equipment reservations, because no reservation records exist; and notifying registered Attendees, because Attendee Registration does not exist. Neither story is Done until these are met or the Product Owner agrees to defer them.
+    - **Team decision (3 Oct 2026):** an unassigned Coordinator cannot view an event's cancellation request, replacing SPM-47's "(they may view it)" to match SPM-65. The backlog criterion's wording is still to be updated (effective-requirements.md §6).
+    - **Pending team decisions:** the cut-off rules, the returned-request rules, and in-app as the only notification channel.
+    - **Changed behaviour:** SPM-9's undated cancellation is now bounded by the start date/time. Requesting and refusing cancellation now require a reason. The SPM-9 tests were updated to match.
+    - **Evidence:**
+      - `tests/spm-63/unit/coordinatorCancel.test.js`
+      - `tests/spm-63/unit/cancellationNotifications.test.js`
+      - `tests/spm-63/integration/coordinatorCancelApi.test.js`
+      - `tests/spm-63/e2e/spm63.coordinatorCancel.spec.js`
+      - `tests/spm-47/unit/cancellationRequestRules.test.js`
+      - `tests/spm-47/integration/cancellationRequestApi.test.js`
+      - `tests/spm-47/e2e/spm47.cancellationRequest.spec.js`
+      - `frontend/src/pages/cancellation.test.jsx`
+      - `frontend/src/pages/notifications.test.jsx`
+    - **Local verification (Windows, 3 Oct):** lint passed; 128 Node tests and 90 frontend tests passed; root Vitest 503 passed (30 opt-in live tests skipped); the production build passed with the existing bundle-size warning; Playwright Chromium passed all 44 tests.
+    - **Not verified:** these are in-memory doubles only. No live Firebase, emulator or manual browser check was run. `firestore.rules` was not changed or deployed. No backlog status change is claimed.
+    - **Date risk:** the seeded events start on 20 Nov 2026. After that date, the E2E cancellation specs (SPM-9, SPM-47, SPM-63) will fail on the cut-off, as SPM-9's would. The API suites move the event's start relative to the real clock.
 
 ## Documentation Boundaries
 

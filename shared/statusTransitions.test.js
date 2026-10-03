@@ -28,6 +28,7 @@ import {
   arrangementsApproved,
   availableActions,
   canTransition,
+  EVENT_STARTED,
   eventHasEnded,
   targetStatus,
 } from './statusTransitions.js'
@@ -77,11 +78,14 @@ function requestAt(status, overrides = {}) {
 const approved = (by) => ({ decision: ARRANGEMENT_APPROVED, byUid: by.uid, at: '2026-09-30T00:00:00.000Z' })
 const bothApproved = { venue: approved(venueStaff), technical: approved(technicalStaff) }
 const pendingCancellation = { status: CANCELLATION_PENDING, reason: 'Keynote withdrew', requestedByUid: owner.uid }
+// SPM-63/SPM-47: cancellation is possible only before the event starts.
+const upcoming = { core: { ...requestAt(CONFIRMED).core, preferredDateTime: '2026-12-01T09:00:00.000Z' } }
 
 // What a request needs, beyond its status, for an action's guard to pass.
 const GUARD_SETUP = {
   [CONFIRM]: { arrangementApprovals: bothApproved },
-  [APPROVE_CANCELLATION]: { cancellationRequest: pendingCancellation },
+  [CANCEL]: upcoming,
+  [APPROVE_CANCELLATION]: { ...upcoming, cancellationRequest: pendingCancellation },
 }
 
 // The SPM-9 lifecycle, as [action, from, to, actor].
@@ -286,9 +290,9 @@ describe('SPM-9 — completion guard: the event has taken place', () => {
   })
 
   test("direct cancel is refused while an Organiser's cancellation request is pending", () => {
-    const request = requestAt(CONFIRMED, { cancellationRequest: pendingCancellation })
+    const request = requestAt(CONFIRMED, { ...upcoming, cancellationRequest: pendingCancellation })
     assert.equal(canTransition(assigned, request, CANCEL, NOW).reason, CANCELLATION_REQUEST_PENDING)
-    assert.deepEqual(availableActions(assigned, request, NOW), [COMPLETE, APPROVE_CANCELLATION])
+    assert.deepEqual(availableActions(assigned, request, NOW), [APPROVE_CANCELLATION])
   })
 
   test('approving cancellation needs a pending request; a refused one does not count', () => {
@@ -297,8 +301,10 @@ describe('SPM-9 — completion guard: the event has taken place', () => {
     assert.equal(canTransition(assigned, refused, APPROVE_CANCELLATION, NOW).reason, NO_PENDING_CANCELLATION)
   })
 
-  test('cancelling a Confirmed event does not depend on the date', () => {
+  // Superseded by SPM-63: "only a Confirmed event, up to its start date/time" (tests/spm-63).
+  test('a Confirmed event can be cancelled before it starts, and not after', () => {
     assert.equal(canTransition(assigned, at('2026-12-01T09:00:00.000Z', 2), CANCEL, NOW).allowed, true)
+    assert.equal(canTransition(assigned, at('2026-09-29T09:00:00.000Z', 2), CANCEL, NOW).reason, EVENT_STARTED)
   })
 })
 
@@ -309,7 +315,9 @@ describe('SPM-9 — availableActions', () => {
     assert.deepEqual(availableActions(assigned, requestAt(SUBMITTED), NOW), [START_REVIEW])
     assert.deepEqual(availableActions(assigned, requestAt(UNDER_REVIEW), NOW), [RETURN_FOR_CLARIFICATION, APPROVE, REJECT])
     assert.deepEqual(availableActions(assigned, requestAt(PLANNING), NOW), [REJECT])
-    assert.deepEqual(availableActions(assigned, requestAt(CONFIRMED), NOW), [COMPLETE, CANCEL])
+    // The fixture's event has ended: it can be completed, and (SPM-63) no longer cancelled.
+    assert.deepEqual(availableActions(assigned, requestAt(CONFIRMED), NOW), [COMPLETE])
+    assert.deepEqual(availableActions(assigned, requestAt(CONFIRMED, upcoming), NOW), [CANCEL])
     assert.deepEqual(availableActions(owner, requestAt(RETURNED), NOW), [RESUBMIT])
   })
 })
