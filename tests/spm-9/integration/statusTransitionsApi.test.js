@@ -161,7 +161,8 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
 
   it('spm9_the_assigned_coordinator_rejects_from_under_review_or_planning', async () => {
     for (const slug of ['a1-under-review', 'a1-planning']) {
-      const response = await act(coordinator, slug, REJECT)
+      // SPM-45: a rejection requires a reason.
+      const response = await act(coordinator, slug, REJECT, 'No venue can hold the expected attendance')
       expect(response.status, slug).toBe(200)
       expect(response.json.request.status).toBe(REJECTED)
     }

@@ -1,8 +1,12 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ORGANISER } from '../../../shared/permissions.js'
 import { REFUSE_CANCELLATION } from '../../../shared/requestActions.js'
 import { PLANNING, UNDER_REVIEW } from '../../../shared/status.js'
 import { APPROVE, APPROVE_CANCELLATION, CONFIRM, REJECT } from '../../../shared/statusTransitions.js'
+import { useAuth } from '../hooks/useAuth.js'
 import { actionConfirmation, actionLabel, actionReason, actionReasonLabel, actionReasonPrompt } from '../utils/statusActions.js'
+import { statusLabel } from '../utils/statusLabels.js'
 import Button from './Button.jsx'
 import Card from './Card.jsx'
 
@@ -84,9 +88,71 @@ function CancellationNotice({ cancellation }) {
   )
 }
 
+// SPM-45 — a Rejected request is closed: why, when and at which stage. It cannot be edited or resubmitted,
+// so an Organiser who wants to pursue the event with different requirements starts a new request.
+function RejectionNotice({ rejection }) {
+  const { roles } = useAuth()
+  if (!rejection) return null
+  const when = formatDateTime(rejection.rejectedAt)
+  return (
+    <Card className="request-form-section">
+      <div className="section-heading">
+        <h2>Request rejected</h2>
+      </div>
+      <p className="form-note">This request is closed. It cannot be edited or resubmitted.</p>
+      <div className="profile-row">
+        <span>Reason</span>
+        <strong>{rejection.reason ?? 'No reason recorded'}</strong>
+      </div>
+      {rejection.previousStatus && (
+        <div className="profile-row">
+          <span>Rejected at stage</span>
+          <strong>{statusLabel(rejection.previousStatus)}</strong>
+        </div>
+      )}
+      {when && (
+        <div className="profile-row">
+          <span>Rejected on</span>
+          <strong>{when}</strong>
+        </div>
+      )}
+      {roles?.includes(ORGANISER) && (
+        <p className="form-note">
+          To pursue this event with different requirements, <Link to="/event-requests/new">create a new event request</Link>.
+        </p>
+      )}
+    </Card>
+  )
+}
+
+// SPM-27 — when a Completed event was marked complete, and by whom for Coordinators (the API decides).
+function CompletionNotice({ completion }) {
+  if (!completion) return null
+  const when = formatDateTime(completion.completedAt)
+  return (
+    <Card className="request-form-section">
+      <div className="section-heading">
+        <h2>Event completed</h2>
+      </div>
+      {when && (
+        <div className="profile-row">
+          <span>Marked completed on</span>
+          <strong>{when}</strong>
+        </div>
+      )}
+      {completion.completedByName !== undefined && (
+        <div className="profile-row">
+          <span>Marked completed by</span>
+          <strong>{completion.completedByName ?? 'Unknown'}</strong>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 // SPM-9 — the actions this user may take now. `actions` comes from the API (availableActions), so the
 // page shows only what the backend will accept; the backend checks again on every action.
-function StatusActions({ status, actions, arrangements, cancellationRequest, cancellation, busy, onAction }) {
+function StatusActions({ status, actions, arrangements, cancellationRequest, cancellation, rejection, completion, busy, onAction }) {
   const [pending, setPending] = useState(null)
   const [reason, setReason] = useState('')
 
@@ -109,6 +175,8 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, can
   return (
     <>
       <CancellationNotice cancellation={cancellation} />
+      <RejectionNotice rejection={rejection} />
+      <CompletionNotice completion={completion} />
       <StatusDetails arrangements={arrangements} cancellationRequest={cancellationRequest} />
 
       {actions.length > 0 && (

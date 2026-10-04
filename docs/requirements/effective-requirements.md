@@ -354,6 +354,24 @@ Implemented by `shared/assignedCoordinator.js` (visibility and response shape) a
 - **Registered Attendees are not notified.** "All registered Attendees receive a cancellation notification" is not met: Attendee Registration (§18) does not exist, so no event has registered Attendees. `cancellationNotifications()` already accepts their uids, and the backend passes none.
 - **Notified staff are the assigned staff only.** "Affected" Venue Staff and Technical Support Staff are taken to be those in `assignedStaffUids`. No feature assigns staff yet (see the SPM-9 gaps), so an event created in the app notifies no staff.
 
+**[Implemented — SPM-45, 4 Oct 2026]** Rejection builds on SPM-9's Reject transition (Under Review or Planning → Rejected, assigned Coordinator only):
+
+- Reject now requires a reason (`REASON_REQUIRED_ACTIONS` in `shared/requestActions.js`); without one the request is not changed;
+- every rejection records top-level `rejection` metadata (reason, previous status, deciding Coordinator, time) in the same transaction as the status change, and the `status_changed` activity entry carries the reason;
+- the event page shows a Rejected request as closed, with the reason, the stage it was rejected at and the time, to every user who can view it; who rejected it is not shown. An Organiser is pointed to create a new event request;
+- a venue or technical arrangement rejection keeps the event in Planning, and Venue and Technical Support Staff cannot reject the overall event (unchanged from SPM-9, now tested under SPM-45).
+
+**[Implemented — SPM-27, 4 Oct 2026]** Completion builds on SPM-9's Complete transition (Confirmed → Completed, assigned Coordinator only, once `core.preferredDateTime` plus `core.durationHours` has passed). Every completion records top-level `completion` metadata (who, display name, time) in the same transaction, beside the `status_changed` activity entry, and the event page shows when the event was marked completed. Completed events are listed under "Closed events" (SPM-63).
+
+**[Team decision pending — SPM-27]** Who marked an event completed is shown on the event page to Coordinators only; other users see when. This follows the other notices, which keep who decided internal. The activity history records both for every completion.
+
+**[Known gaps — SPM-45/SPM-27]**
+
+- The activity history is still recorded but not displayed; SPM-27's "when the activity history is viewed" is met by the stored entry and the completion notice on the event page.
+- At Planning, Reject does not require a rejected venue or technical arrangement first; the criterion describes when the Coordinator "may" reject, not a precondition.
+- The Organiser is not notified of a rejection; they see it on opening the request. The criteria do not ask for a notification.
+- Seeded Rejected and Completed requests predate these records, so they show no reason or completion time.
+
 ### 7. Event Information Management
 
 **[Customer-confirmed]** Field and section permissions follow role and ownership. Routine contact or descriptive edits are normal. Significant date/time, duration, attendance, venue/layout, or equipment changes trigger formal re-review and may alter Planning/confirmation status.

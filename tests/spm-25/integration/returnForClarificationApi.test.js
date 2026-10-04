@@ -216,7 +216,8 @@ describe('SPM-25 — Return for Clarification (API, in-memory only)', () => {
     await act(coordinator, RETURN_FOR_CLARIFICATION, MESSAGE)
     await act(organiserA1, RESUBMIT)
     await act(coordinator, START_REVIEW)
-    const rejected = await act(coordinator, REJECT)
+    // SPM-45: a rejection requires a reason.
+    const rejected = await act(coordinator, REJECT, 'The revised date still cannot be accommodated')
     expect(rejected.status).toBe(200)
     expect(rejected.json.request.status).toBe(REJECTED)
   })

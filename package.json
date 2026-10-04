@@ -28,6 +28,8 @@
     "test:spm6": "vitest run tests/spm-6/",
     "test:spm26": "vitest run tests/spm-26/ && playwright test tests/spm-26",
     "test:spm46": "vitest run tests/spm-46/ && playwright test tests/spm-46",
+    "test:spm45": "vitest run tests/spm-45/ && playwright test tests/spm-45",
+    "test:spm27": "vitest run tests/spm-27/ && playwright test tests/spm-27",
     "test:coverage": "vitest run --coverage",
     "install:all": "npm install",
     "test:api:live": "vitest run tests/spm-42/integration/requestApi.live.test.js tests/spm-24/integration/draftListApi.live.test.js"

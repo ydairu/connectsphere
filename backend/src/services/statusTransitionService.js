@@ -48,9 +48,11 @@ import {
   APPROVE_CANCELLATION,
   ARRANGEMENTS_NOT_APPROVED,
   CANCEL,
+  COMPLETE,
   EVENT_NOT_ENDED,
   INSUFFICIENT_INFORMATION,
   NOT_PERMITTED,
+  REJECT,
   RESUBMIT,
   RETURN_FOR_CLARIFICATION,
   SUBMIT,
@@ -227,6 +229,15 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
           cancelledByUid: user.uid,
           cancelledAt: at,
         }
+      }
+      // SPM-45: what "Rejected" records. The deciding Coordinator, the new status and the time are also in the
+      // status_changed entry below.
+      if (action === REJECT) {
+        update.rejection = { reason, previousStatus: decision.from, rejectedByUid: user.uid, rejectedAt: at }
+      }
+      // SPM-27: who marked the event complete and when, kept with the record for later reference.
+      if (action === COMPLETE) {
+        update.completion = { completedByUid: user.uid, completedByName: user.name ?? null, completedAt: at }
       }
       recordStatusChange(tx, docRef, {
         action,
