@@ -5,18 +5,21 @@
 //   list()                       → request[]
 //   listAssignedToCoordinator(uid) → request[] whose assignedCoordinatorUid is uid (SPM-65)
 //   get(id)                      → { request, version } | null
-//   update(id, patch, { version }) → { request, version }; throws StaleWriteError if the record changed
+//   update(id, patch, { version, recordChanges? })
+//                                → { request, version }; throws StaleWriteError if the record changed
 //                                  since `version` was read, so a write is never applied to a record
 //                                  whose status or assignment differs from the one that was authorised.
+//                                  recordChanges(before, after) (SPM-28) returns activity entries, which
+//                                  are written with `at` in the same transaction as the fields, so a
+//                                  failed save leaves no entries and a successful one always has them.
+//   listFieldHistory(id)         → the request's field_changed activity entries, each with its `id` (SPM-28)
 
 import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore'
+import { FIELD_CHANGED } from '../../../shared/changeHistory.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
+import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 
 export const EVENT_REQUESTS_COLLECTION = 'eventRequests'
-
-// gRPC status codes returned by Firestore.
-const NOT_FOUND = 5
-const FAILED_PRECONDITION = 9
 
 export class StaleWriteError extends Error {
   constructor(id) {
@@ -58,21 +61,33 @@ export const firestoreEventRequestStore = {
     return snapshot.exists ? { request: toRequest(snapshot), version: snapshot.updateTime } : null
   },
 
-  async update(id, patch, { version }) {
+  async update(id, patch, { version, recordChanges = () => [] }) {
     // FieldPath, not dotted strings, so a field name containing '.' cannot address another section.
     const pairs = Object.entries(patch).flatMap(([section, fields]) =>
       Object.entries(fields).flatMap(([field, value]) => [new FieldPath(section, field), value]),
     )
-    try {
-      await collection()
-        .doc(id)
-        .update(...pairs, 'updatedAt', FieldValue.serverTimestamp(), { lastUpdateTime: version })
-    } catch (error) {
-      if (error.code === FAILED_PRECONDITION || error.code === NOT_FOUND) throw new StaleWriteError(id)
-      throw error
-    }
+    const ref = collection().doc(id)
+    await getAdminDb().runTransaction(async (tx) => {
+      const snapshot = await tx.get(ref)
+      // The same stale-write rule the lastUpdateTime precondition enforced before SPM-28.
+      if (!snapshot.exists || !snapshot.updateTime.isEqual(version)) throw new StaleWriteError(id)
+
+      const before = toRequest(snapshot)
+      const after = { ...before }
+      for (const [section, fields] of Object.entries(patch)) after[section] = { ...before[section], ...fields }
+
+      tx.update(ref, ...pairs, 'updatedAt', FieldValue.serverTimestamp())
+      for (const entry of recordChanges(before, after)) {
+        tx.set(ref.collection(ACTIVITY_SUBCOLLECTION).doc(), { ...entry, at: FieldValue.serverTimestamp() })
+      }
+    })
     const updated = await this.get(id)
     if (!updated) throw new StaleWriteError(id)
     return updated
+  },
+
+  async listFieldHistory(id) {
+    const snapshot = await collection().doc(id).collection(ACTIVITY_SUBCOLLECTION).where('type', '==', FIELD_CHANGED).get()
+    return snapshot.docs.map(toRequest)
   },
 }

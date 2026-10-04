@@ -137,3 +137,22 @@ export const SEED_REQUESTS = Object.freeze([
   eventRequest({ slug: 'b1-draft', status: DRAFT, owner: organiserB1, title: 'B1 draft (private to B1)', draft: true, createdAt: '2026-09-11T10:00:00+08:00' }),
   eventRequest({ slug: 'b1-planning', coordinator: coordinator2, status: PLANNING, owner: organiserB1, title: 'B1 planning (technical staff only)', assigned: [technicalStaff, venueTechnicalStaff], createdAt: '2026-09-11T11:00:00+08:00' }),
 ])
+
+// SPM-28 — field change history on A1's planning event, so the Change history panel can be checked on the
+// seed: the assigned Coordinator sees all three entries, the owning Organiser (A1) the two that are not
+// internal planning. Each newValue is the value seeded above, so the history ends at the current record.
+// Stored as activity documents with these fixed ids; seed.js overwrites them on every run.
+const PLANNING_REQUEST_ID = `${SEED_ID_PREFIX}req-a1-planning`
+const planningRequest = SEED_REQUESTS.find((request) => request.id === PLANNING_REQUEST_ID)
+
+function historyEntry(id, field, oldValue, newValue, account, role, at) {
+  return { id: `${SEED_ID_PREFIX}history-${id}`, type: 'field_changed', field, oldValue, newValue, actor: { type: 'user', uid: account.uid, name: account.name, role }, at }
+}
+
+export const SEED_FIELD_HISTORY = Object.freeze({
+  [PLANNING_REQUEST_ID]: Object.freeze([
+    historyEntry('a1-planning-1', 'core.expectedAttendees', 60, planningRequest.core.expectedAttendees, coordinator, 'coordinator', '2026-09-12T10:00:00.000Z'),
+    historyEntry('a1-planning-2', 'venue.layoutPreference', 'banquet', planningRequest.venue.layoutPreference, venueStaff, 'venue_staff', '2026-09-13T10:00:00.000Z'),
+    historyEntry('a1-planning-3', 'internal.planningNotes', '', planningRequest.internal.planningNotes, coordinator, 'coordinator', '2026-09-14T10:00:00.000Z'),
+  ]),
+})

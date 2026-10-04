@@ -385,6 +385,11 @@ Implemented by `shared/assignedCoordinator.js` (visibility and response shape) a
 - **AC1/AC2:** an Organiser edits only requests they own, and only at Draft (SPM-7/SPM-4 routes) or Returned (SPM-25). Changes after submission otherwise go through Event Change Requests (§19, SPM-20), which do not exist yet; no "Request change" option is shown.
 - **AC3:** at Submitted, Under Review, Planning and Confirmed the Organiser's own event is read-only: the API refuses every section edit with 403 naming the fields, and the page shows no editable field.
 - **AC4/AC6:** the list holds the Organiser's own events and their organisation's submitted events, never another client's. A same-organisation colleague's event is read-only — per the team decision of 3 Oct 2026 (§3).
+- **AC4/AC6 follow-up (4 Oct 2026, shipped with SPM-28):** Organisers can tell their own requests from colleagues' requests.
+  - **API:** for an Organiser, list items and the request response carry `ownerName` (the owner's display name from `users/{uid}`) and `isOwnRequest`. Other roles do not receive either field, and no owner uid is ever sent (`shared/requestOwner.js`).
+  - **Requests list:** each request says "Submitted by: You" or the colleague's name. An "All" / "My requests" filter runs on the client over what the API returned. "My requests" with no results says "You haven't submitted any requests yet."
+  - **Colleague's request page:** opens with "This request was submitted by <name> from your organisation. You can view it but not edit it."
+  - **Unchanged:** scoping and permissions.
 - **AC5:** the event page shows the status and a "Your event arrangements" summary of date and time, venue and equipment, each labelled **Requested**, with the venue and technical sign-off state. Venue bookings (§12–13) and equipment reservations (§17) do not exist, so nothing is shown as booked or confirmed; those stories should replace "Requested" with what was secured.
 - The `internal` section is never sent to an Organiser, owner or colleague, at any status (now tested explicitly).
 
@@ -396,6 +401,30 @@ Implemented by `shared/assignedCoordinator.js` (visibility and response shape) a
 - **At every status:** a decided sign-off reads "Approved" or "Rejected", and one the event does not need reads "Not required".
 
 Both the SPM-64 summary and SPM-9's "Arrangements and cancellation" card use this wording (`frontend/src/utils/eventArrangements.js`), for every role, so one page never shows two labels for the same sign-off.
+
+#### SPM-28 — View the Change History of an Event
+
+**[Customer-confirmed]** "Important actions must retain what changed, who changed it, and when, visible to authorised users where appropriate." (§3, Audit and Security Enforcement)
+
+**[Team decision, 4 Oct 2026 — pending PO confirmation]** The revised SPM-28 criteria:
+
+- **Viewers:** only the assigned Event Coordinator and the owning Event Organiser may view an event's change history. A same-organisation colleague, an unassigned Coordinator, Venue Staff, Technical Support Staff and Attendees may not. The Organiser sees every entry except changes to internal planning fields, which are removed by the server.
+- **Submitted onwards:** history is recorded for edits to an event at Submitted or any later status. Draft saves record nothing, through either the SPM-4 draft route or `PATCH /api/requests/:id`.
+- **Field edits only:** one entry per field whose value changed. Status transitions, Coordinator assignment and reassignment, sign-off and cancellation keep their own activity types and are not shown in the change history. A save that changes nothing, or that is refused or fails, records nothing.
+
+**[Implemented — SPM-28, 4 Oct 2026]**
+
+- **Recording:** `PATCH /api/requests/:id` is the only path that writes event fields after submission. It covers Organiser edits while Returned, Venue and Technical Support Staff edits to their sections, and Coordinator edits including internal planning. It now runs in a Firestore transaction: the field write and one `field_changed` entry per changed field go into `eventRequests/{id}/activity` together. Entries take the shape every activity entry uses: `{ type: 'field_changed', field: 'section.field', oldValue, newValue, actor: { type, uid, name, role }, at }`. Values are compared by value (arrays and objects included) and stored JSON-safe, with missing values stored as `null`. `actor.role` is the role that permitted editing that section; `at` is the server time. The request/response contract and the permission checks are unchanged, except that the response gains a `canViewChangeHistory` flag.
+- **Reading:** `GET /api/requests/:id/history` returns the visible entries newest first, without the actor's uid. Out of scope gets the SPM-42/SPM-65 refusal (404 for a Coordinator, 403 otherwise); a user who may see the event but not its history gets 403.
+- **Immutability:** there is no route to edit or delete an entry. `firestore.rules` already denies the browser `eventRequests/**`, subcollections included.
+- **Page:** a "Change history" panel on the request page shows each entry's field label, old → new value, user and time; it says "No changes recorded yet" when there are none.
+- Rules are in `shared/changeHistory.js`; tests are in `tests/spm-28/`.
+
+**[Known gaps — SPM-28]**
+
+- **Unvalidated values.** `PATCH /api/requests/:id` still does not validate or normalise field values (AGENTS.md §6, known gap), so history records whatever was stored; for example, `"80"` replacing `80` is recorded as a change. This is the same validation gap SPM-10 needs closed before it can compare old and new values reliably to detect significant changes. Closing it will make history entries consistent too.
+- **Live API runs add entries.** Live API runs add entries to the real seeded events. `backend/scripts/seed.js --write` removes them: only `field_changed` entries under seeded requests that are not part of the seeded history.
+- **Ordering within one save.** One save's entries share a timestamp and are ordered by field.
 
 ### 8. Venue Catalogue
 

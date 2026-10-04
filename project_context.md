@@ -282,6 +282,34 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - `tests/spm-64/e2e/spm64.viewMyRequest.spec.js`
     - **Local verification (macOS, 4 Oct 2026):** lint passed; 128 Node tests and 99 frontend tests passed; root Vitest 786 passed (30 opt-in live tests skipped); Playwright Chromium passed all 57 tests; the production build passed with the existing bundle-size warning. One SPM-25 page test (`requestDetail.test.jsx`) now finds section headings by role, because the new summary also has a "Venue" row.
     - **Not verified:** no live Firebase, emulator or manual browser check was run, and no backlog status change is claimed.
+    - **Follow-up, AC4/AC6 (4 Oct 2026, built on branch `SPM-28`, shipping in the SPM-28 PR as a separate section):**
+      - **What it adds:** "Submitted by: You / <name>" on the Organiser's requests list, an "All" / "My requests" filter (client-side), and a view-only note on a colleague's request page.
+      - **API:** Organisers receive `ownerName` and `isOwnRequest`, in list items and in the request response, which covers GET, PATCH and transitions. `isOwnRequest` is needed because the response carries no owner uid and names are not unique. Other roles' responses are unchanged.
+      - **Code:** `shared/requestOwner.js` and `backend/src/services/requestOwnerService.js` (one `users/{uid}` read per colleague owner).
+      - **Evidence:** `tests/spm-64/integration/requestOwnerApi.test.js`, `tests/spm-64/integration/ownerLabels.test.jsx`. In-memory doubles only.
+      - **Local verification (macOS, 4 Oct 2026, with SPM-28):** lint passed; `test:spm64` 104 Vitest + 3 Playwright and `test:spm28` 81 Vitest + 3 Playwright passed; 128 Node and 99 frontend tests passed; root Vitest 896 passed (30 opt-in live tests skipped); Playwright 60/60; the build passed. No existing test needed changing.
+21. **SPM-28 view the change history of an event (4 Oct 2026, branch `SPM-28`):**
+    - **Built:**
+      - Section edits through `PATCH /api/requests/:id` (the only post-submission field-write path) now run in a transaction that also writes one `field_changed` activity entry per changed field.
+      - `GET /api/requests/:id/history` serves the entries to the assigned Coordinator and the owning Organiser, without internal planning for the Organiser and without actor uids.
+      - The request page has a "Change history" panel.
+      - Rules: `shared/changeHistory.js`.
+      - Store contract: `update(id, patch, { version, recordChanges })` and `listFieldHistory(id)`, in all three stores.
+    - **Seed:** `SEED_FIELD_HISTORY` puts three entries on `seed-req-a1-planning`, one of them internal planning. `seed.js --write` also removes stray `field_changed` entries under seeded requests, within four guardrails (`backend/scripts/seedHistory.js`, unit-tested).
+    - **Decisions:** viewers, Submitted onwards and field edits only are team decisions of 4 Oct 2026, pending PO confirmation (effective-requirements.md §7).
+    - **Gaps:**
+      - Values are unvalidated (the SPM-10 validation gap).
+      - Entries from one save share a timestamp.
+      - Live API runs add entries until the next seed.
+      - Transaction behaviour is verified only on the in-memory fake, not on the emulator or the deployed project.
+    - **Evidence:**
+      - `tests/spm-28/unit/changeHistory.test.js`
+      - `tests/spm-28/unit/seedHistory.test.js`
+      - `tests/spm-28/integration/changeHistoryApi.test.js`
+      - `tests/spm-28/integration/changeHistoryPage.test.jsx`
+      - `tests/spm-28/e2e/spm28.changeHistory.spec.js`
+    - **Local verification (macOS, 4 Oct 2026):** lint passed; `test:spm28` 81 Vitest + 3 Playwright passed; 128 Node tests and 99 frontend tests passed; root Vitest 867 passed (30 opt-in live tests skipped); Playwright Chromium passed all 60 tests; the production build passed with the existing bundle-size warning. No existing test needed changing.
+    - **Not verified:** no live Firebase, emulator or manual browser check was run, the seed was not run against the real project, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

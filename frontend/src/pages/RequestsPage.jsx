@@ -22,6 +22,20 @@ import { requestListCopy } from '../utils/requestListCopy.js'
 // SPM-26: a page that sends the user here after an action may pass `state.notice`, shown at the top.
 // SPM-63 — a Cancelled event "is not in the active events list". Completed, Cancelled and Rejected events
 // (TERMINAL_STATUSES) are listed separately under "Closed events", so they stay reachable.
+//
+// SPM-64 follow-up — an Organiser sees who submitted each request ("You", or the colleague's name, from
+// ownerName / isOwnRequest in the API response) and can narrow the list to their own requests. The filter
+// runs over what the API already returned; it changes nothing about which requests the Organiser may see.
+// Other roles receive neither field and get neither the label nor the filter.
+
+const ALL = 'all'
+const MINE = 'mine'
+
+function submittedBy(request) {
+  if (request.isOwnRequest === true) return 'You'
+  if (request.isOwnRequest === false) return request.ownerName ?? 'A colleague'
+  return null
+}
 
 function requestTitle(request) {
   const title = request.core?.title
@@ -36,11 +50,12 @@ function requestDate(request) {
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-function RequestList({ requests }) {
+function RequestList({ requests, showOwner }) {
   return (
     <ul className="request-list">
       {requests.map((request) => {
         const date = requestDate(request)
+        const owner = showOwner ? submittedBy(request) : null
         return (
           <li key={request.id}>
             <Card className="request-item">
@@ -49,6 +64,7 @@ function RequestList({ requests }) {
                 <p className="request-meta">
                   {[request.organisationName, date].filter(Boolean).join(' · ') || 'No preferred date yet'}
                 </p>
+                {owner && <p className="request-meta">Submitted by: {owner}</p>}
               </div>
               <div className="request-item-actions">
                 <StatusPill status={request.status} />
@@ -68,10 +84,12 @@ function RequestsPage() {
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [show, setShow] = useState(ALL)
   const isOrganiser = roles.includes(ORGANISER)
   const copy = requestListCopy(roles)
-  const activeRequests = requests.filter((request) => !TERMINAL_STATUSES.includes(request.status))
-  const closedRequests = requests.filter((request) => TERMINAL_STATUSES.includes(request.status))
+  const shown = isOrganiser && show === MINE ? requests.filter((request) => request.isOwnRequest === true) : requests
+  const activeRequests = shown.filter((request) => !TERMINAL_STATUSES.includes(request.status))
+  const closedRequests = shown.filter((request) => TERMINAL_STATUSES.includes(request.status))
 
   useEffect(() => {
     let active = true
@@ -120,14 +138,32 @@ function RequestsPage() {
           </Card>
         )}
 
-        {!loading && !error && activeRequests.length > 0 && <RequestList requests={activeRequests} />}
+        {!loading && !error && isOrganiser && requests.length > 0 && (
+          <fieldset className="role-selector" style={{ maxWidth: 420 }}>
+            <legend>Show</legend>
+            {[[ALL, 'All'], [MINE, 'My requests']].map(([value, label]) => (
+              <label key={value} className={`role-option${show === value ? ' selected' : ''}`}>
+                <input type="radio" name="request-owner-filter" value={value} checked={show === value} onChange={() => setShow(value)} />
+                <span>{label}</span>
+              </label>
+            ))}
+          </fieldset>
+        )}
+
+        {!loading && !error && requests.length > 0 && shown.length === 0 && (
+          <Card className="empty-state">
+            <p>You haven't submitted any requests yet.</p>
+          </Card>
+        )}
+
+        {!loading && !error && activeRequests.length > 0 && <RequestList requests={activeRequests} showOwner={isOrganiser} />}
 
         {!loading && !error && closedRequests.length > 0 && (
           <section aria-labelledby="closed-requests-heading">
             <div className="section-heading">
               <h2 id="closed-requests-heading">Closed events</h2>
             </div>
-            <RequestList requests={closedRequests} />
+            <RequestList requests={closedRequests} showOwner={isOrganiser} />
           </section>
         )}
       </main>
