@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { ORGANISER } from '../../../shared/permissions.js'
 import { DRAFT } from '../../../shared/status.js'
+import ArrangementsSummary from '../components/ArrangementsSummary.jsx'
 import AssignedCoordinator from '../components/AssignedCoordinator.jsx'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -36,6 +38,9 @@ import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSect
 // response). They lose access to it at once (SPM-65), so on success they are taken to their list.
 // SPM-46: an Organiser sees the event's assigned Coordinator (assignedCoordinator in the response) above
 // everything else. The API sends only the name, and null to other roles.
+// SPM-64: below it, an Organiser sees their event's arrangements — date and time, venue and equipment as
+// requested, with the sign-off state. Every value shown is already in the response; the role check only
+// decides where the summary appears, other roles see the same data in the sections.
 
 function ReadOnlyValue({ type, value }) {
   if (type === 'boolean') return <strong>{value === true ? 'Yes' : 'No'}</strong>
@@ -80,7 +85,7 @@ function EditableField({ section, field, value, onChange }) {
 
 function RequestDetailPage() {
   const { id } = useParams()
-  const { user } = useAuth()
+  const { user, roles } = useAuth()
   const navigate = useNavigate()
   const [request, setRequest] = useState(null)
   const [editableSections, setEditableSections] = useState([])
@@ -227,6 +232,8 @@ function RequestDetailPage() {
             {status && <div className={`alert alert-${status.type}`} role="alert">{status.message}</div>}
 
             <AssignedCoordinator coordinator={assignedCoordinator} />
+
+            {roles?.includes(ORGANISER) && <ArrangementsSummary request={request} arrangements={arrangements} />}
 
             <ClarificationRequests status={request.status} entries={clarificationRequests} />
 

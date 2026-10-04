@@ -2,9 +2,10 @@
 // Coordinator's name; an Organiser of another organisation and the Coordinator see no Coordinator row.
 // Firebase is the in-memory double; the API and app are real.
 //
-// The double holds a profile for `coordinator` only (adding the other seeded Coordinators would change
-// SPM-8's selection in other specs), so this uses an event assigned to them. Reassignment, "Not yet
-// assigned" and "name unavailable" are covered in tests/spm-46/integration.
+// This uses an event assigned to `coordinator`. Since SPM-26 the double also holds Seed Coordinator 2
+// (EXTRA_USERS.secondCoordinator); the name after a real reassignment is checked end to end in
+// spm46.reassignedCoordinatorName.spec.js. "Not yet assigned" and "name unavailable" need records the
+// double cannot produce through the app, so they are covered in tests/spm-46/integration.
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { SUBMITTED } from '../../../shared/status.js'

@@ -26,6 +26,8 @@ test.describe('SPM-26 — Reassign an event to a different Coordinator (E2E)', (
 
     await signIn(page, TO)
     await page.goto('/requests')
+    await expect(page.getByRole('heading', { name: 'Events assigned to you', exact: true })).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: 'Loading requests' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: submitted.core.title, exact: true })).toHaveCount(0)
     await logout(page)
 
@@ -43,8 +45,9 @@ test.describe('SPM-26 — Reassign an event to a different Coordinator (E2E)', (
 
     // The former Coordinator is taken to their list, which no longer has the event.
     await expect(page).toHaveURL(/\/requests$/)
-    await expect(page.getByRole('status')).toHaveText(`Event reassigned to ${TO.name}.`)
+    await expect(page.getByRole('status').filter({ hasText: `Event reassigned to ${TO.name}.` })).toHaveText(`Event reassigned to ${TO.name}.`)
     await expect(page.getByRole('heading', { name: 'Events assigned to you', exact: true })).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: 'Loading requests' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: submitted.core.title, exact: true })).toHaveCount(0)
 
     // AC5: a direct link now shows not found.

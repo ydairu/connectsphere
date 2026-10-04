@@ -154,6 +154,7 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
 3. **SPM-2 points:** the workbook's Story Points cell appears formula-based/blank when extracted, while its notes and Sprint Planning identify it as the 3-point reference story. Make the workbook display 3 consistently.
 4. **Approved versus Confirmed:** customer sources sometimes treat these as the same and elsewhere describe Approved as initial feasibility and Confirmed as completed venue/technical arrangements. Resolve the lifecycle before implementing status transitions.
 5. **Same-organisation visibility:** Organisers must not see unrelated client data, but visibility across different Organisers in the same organisation remains a team design choice.
+    - **Follow-up (4 Oct 2026):** resolved as a team decision dated 3 Oct 2026 — same-organisation Organisers view each other's submitted events read-only (effective-requirements.md §3).
 6. **Password policy:** no customer rule exists. The current frontend enforces six characters; record this as a team decision if retained.
 7. **Role model:** roles arrays and shared permission checks exist, but complete five-role workflows and organisation membership still require verification before SPM-42 can be Done.
 8. **Testing and CI:** automated shared/backend and frontend tests exist. On 19 Sep, `npm test` passed 68 Node tests and 17 Vitest tests; frontend lint and production build passed (build reports a bundle-size warning). Organisation persistence/authentication checks use mocks or in-memory storage, including real Express HTTP routing with mocked Firebase. No live Firebase, emulator, deployed security-rule, or manual browser verification was performed for that increment. On 20 Sep, `npm test` passed 107 Node tests and 53 Vitest tests; frontend lint and production build passed with the same bundle-size warning; an opt-in API suite passed 28 tests against the real Firebase project using real sign-ins, and 16 checks passed against the deployed rules using signed-in client requests. `firestore.rules` is in the repository and deployed. A CI workflow was added on 24 Sep (item 9). The operational workbook/Sprint record remains absent from the repository.
@@ -268,6 +269,19 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - `frontend/src/pages/rejectionCompletion.test.jsx`
     - **Local verification (Windows, 4 Oct):** lint passed; 128 Node tests and 99 frontend tests passed; root Vitest 706 passed (30 opt-in live tests skipped); the production build passed with the existing bundle-size warning; Playwright Chromium passed all 53 tests.
     - **Not verified:** these are in-memory doubles only. No live Firebase, emulator or manual browser check was run. `firestore.rules` was not changed or deployed. No backlog status change is claimed.
+
+20. **SPM-64 view and edit my event request (4 Oct 2026, branch `SPM-64`):**
+    - **Built:** a "Your event arrangements" card on the request page for Organisers: date and time, venue and equipment labelled "Requested", with the venue and technical sign-off state (`frontend/src/components/ArrangementsSummary.jsx`, `frontend/src/utils/eventArrangements.js`). The sign-off wording now lives in `eventArrangements.js` and is shared with SPM-9's "Arrangements and cancellation" card. Before Planning an undecided sign-off reads "Not started — reviewed during planning", and on a closed event "Not reviewed — event closed", on both cards (team decision, 4 Oct 2026). No API or permission change: AC1–AC4 and AC6 were already met by SPM-42 and are now tested per status. No "Request change" option (SPM-20).
+    - **Docs:** same-organisation visibility is recorded as a team decision of 3 Oct 2026 (effective-requirements.md §3; §9 item 3 resolved). "(Assumption)" on AC6 is to be removed in the backlog workbook.
+    - **Cross-story (SPM-46 × SPM-26):** after a real reassignment the Organiser sees the new Coordinator's name (`tests/spm-46/integration/reassignedCoordinatorName.test.js`, `tests/spm-46/e2e/spm46.reassignedCoordinatorName.spec.js`). The SPM-46 E2E comment about the double holding one Coordinator is updated.
+    - **Gaps:** "confirmed arrangements" cannot show anything booked: venue booking and equipment reservation do not exist. On a Completed, Cancelled or Rejected event an undecided sign-off reads "Not reviewed — event closed" (follow-up, 4 Oct 2026).
+    - **Evidence:**
+      - `tests/spm-64/unit/eventArrangements.test.js`
+      - `tests/spm-64/integration/organiserViewEditApi.test.js`
+      - `tests/spm-64/integration/organiserViewEditPage.test.jsx`
+      - `tests/spm-64/e2e/spm64.viewMyRequest.spec.js`
+    - **Local verification (macOS, 4 Oct 2026):** lint passed; 128 Node tests and 99 frontend tests passed; root Vitest 786 passed (30 opt-in live tests skipped); Playwright Chromium passed all 57 tests; the production build passed with the existing bundle-size warning. One SPM-25 page test (`requestDetail.test.jsx`) now finds section headings by role, because the new summary also has a "Venue" row.
+    - **Not verified:** no live Firebase, emulator or manual browser check was run, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

@@ -6,11 +6,11 @@ import { PLANNING, UNDER_REVIEW } from '../../../shared/status.js'
 import { APPROVE, APPROVE_CANCELLATION, CONFIRM, REJECT } from '../../../shared/statusTransitions.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { actionConfirmation, actionLabel, actionReason, actionReasonLabel, actionReasonPrompt } from '../utils/statusActions.js'
+import { signOffText } from '../utils/eventArrangements.js'
 import { statusLabel } from '../utils/statusLabels.js'
 import Button from './Button.jsx'
 import Card from './Card.jsx'
 
-const DECISION_TEXT = { approved: 'Approved', rejected: 'Rejected' }
 const CANCELLATION_TEXT = {
   pending: 'Cancellation requested — awaiting the event coordinator’s decision.',
   returned: 'Cancellation request returned — the event coordinator needs more information.',
@@ -18,8 +18,10 @@ const CANCELLATION_TEXT = {
   refused: 'Cancellation request refused. The event remains confirmed.',
 }
 
-function ArrangementRow({ label, arrangement }) {
-  const text = !arrangement.required ? 'Not required' : DECISION_TEXT[arrangement.decision] ?? 'Awaiting approval'
+// The wording is shared with the SPM-64 arrangements summary (utils/eventArrangements.js), so one page never
+// shows two labels for the same sign-off.
+function ArrangementRow({ label, arrangement, status }) {
+  const text = signOffText(arrangement, status)
   return (
     <div className="profile-row">
       <span>{label}</span>
@@ -29,15 +31,15 @@ function ArrangementRow({ label, arrangement }) {
 }
 
 // SPM-9 — sign-off progress and any cancellation request, as summarised by the API for this user.
-function StatusDetails({ arrangements, cancellationRequest }) {
+function StatusDetails({ status, arrangements, cancellationRequest }) {
   if (!arrangements && !cancellationRequest) return null
   return (
     <Card className="request-form-section">
       <div className="section-heading">
         <h2>Arrangements and cancellation</h2>
       </div>
-      {arrangements?.venue && <ArrangementRow label="Venue arrangement" arrangement={arrangements.venue} />}
-      {arrangements?.technical && <ArrangementRow label="Technical arrangement" arrangement={arrangements.technical} />}
+      {arrangements?.venue && <ArrangementRow label="Venue arrangement" arrangement={arrangements.venue} status={status} />}
+      {arrangements?.technical && <ArrangementRow label="Technical arrangement" arrangement={arrangements.technical} status={status} />}
       {cancellationRequest && (
         <div className="profile-row">
           <span>{CANCELLATION_TEXT[cancellationRequest.status] ?? cancellationRequest.status}</span>
@@ -177,7 +179,7 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, can
       <CancellationNotice cancellation={cancellation} />
       <RejectionNotice rejection={rejection} />
       <CompletionNotice completion={completion} />
-      <StatusDetails arrangements={arrangements} cancellationRequest={cancellationRequest} />
+      <StatusDetails status={status} arrangements={arrangements} cancellationRequest={cancellationRequest} />
 
       {actions.length > 0 && (
         <Card className="request-form-section">

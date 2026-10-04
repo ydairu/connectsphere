@@ -449,8 +449,9 @@ describe('SPM-25 — returning a request for clarification', () => {
     expect(screen.getByText('Earlier messages')).toBeTruthy()
     expect(screen.getByText('Which room layout do you need?')).toBeTruthy()
 
+    // By heading: SPM-64's arrangements summary also has a "Venue" row for Organisers.
     for (const heading of ['Event details', 'Venue', 'Equipment and technical support', 'Registration']) {
-      expect(screen.getByText(heading)).toBeTruthy()
+      expect(screen.getByRole('heading', { name: heading })).toBeTruthy()
     }
     expect(screen.queryByText('Read only')).toBeNull()
     expect(screen.getByLabelText('Title')).toBeTruthy()
