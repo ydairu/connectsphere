@@ -25,7 +25,7 @@ import {
 import { COORDINATOR, EQUIPMENT, VENUE, rolesOf, viewableSectionsFor } from './permissions.js'
 import { isOwningOrganiser } from './requestActors.js'
 import { DRAFT } from './status.js'
-import { CANCEL, RETURN_FOR_CLARIFICATION, availableActions } from './statusTransitions.js'
+import { CANCEL, REJECT, RETURN_FOR_CLARIFICATION, availableActions } from './statusTransitions.js'
 
 export const REQUEST_CANCELLATION = 'request_cancellation'
 export const REFUSE_CANCELLATION = 'refuse_cancellation'
@@ -49,8 +49,10 @@ const ARRANGEMENT_ACTIONS = Object.freeze({
 // SPM-25: "Return action requires a clarification message from the Coordinator."
 // SPM-47: the Organiser's request needs a reason; the Coordinator rejects it "with a reason" and returns it
 // "with a message"; a resubmission carries the updated reason.
+// SPM-45: "Rejection requires a reason."
 export const REASON_REQUIRED_ACTIONS = Object.freeze([
   CANCEL,
+  REJECT,
   RETURN_FOR_CLARIFICATION,
   REQUEST_CANCELLATION,
   REFUSE_CANCELLATION,
@@ -153,4 +155,34 @@ export function cancellationNotice(user, request) {
     cancelledAt: cancellation.cancelledAt ?? null,
     requestedByOrganiser: cancellation.requestedByOrganiser === true,
   }
+}
+
+/**
+ * SPM-45 — why, when and from which status a Rejected request was closed, for every user the request is
+ * presented to (the caller has already checked scope), or null. Stored as top-level `rejection` metadata in
+ * the same transaction as the status change, so no section edit can write it. Who rejected it is internal
+ * and is not included; it is kept in `rejectedByUid` and in the `status_changed` activity entry.
+ */
+export function rejectionNotice(user, request) {
+  const rejection = request.rejection
+  if (!rejection) return null
+  return {
+    reason: rejection.reason ?? null,
+    rejectedAt: rejection.rejectedAt ?? null,
+    previousStatus: rejection.previousStatus ?? null,
+  }
+}
+
+/**
+ * SPM-27 — when a Completed event was marked complete, for every user the request is presented to, or null.
+ * Stored as top-level `completion` metadata in the same transaction as the status change.
+ * [Team decision pending, SPM-27] Who marked it complete is shown to Coordinators only, as the other
+ * notices keep who decided internal; every user sees when. The `status_changed` activity entry records both.
+ */
+export function completionNotice(user, request) {
+  const completion = request.completion
+  if (!completion) return null
+  const notice = { completedAt: completion.completedAt ?? null }
+  if (rolesOf(user).includes(COORDINATOR)) notice.completedByName = completion.completedByName ?? null
+  return notice
 }

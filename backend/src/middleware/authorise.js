@@ -9,7 +9,15 @@
 import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf } from '../../../shared/permissions.js'
 import { canReassignCoordinator } from '../../../shared/coordinatorReassignment.js'
 import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.js'
-import { allAvailableActions, arrangementsSummary, cancellationNotice, cancellationSummary, clarificationSummary } from '../../../shared/requestActions.js'
+import {
+  allAvailableActions,
+  arrangementsSummary,
+  cancellationNotice,
+  cancellationSummary,
+  clarificationSummary,
+  completionNotice,
+  rejectionNotice,
+} from '../../../shared/requestActions.js'
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -40,8 +48,9 @@ function outOfScope(user, res) {
  * Coordinator's return messages, newest first, on the same terms. `assignedCoordinator` (SPM-46) is the
  * assigned Coordinator's display name for an Organiser who may view the event, and null for everyone else;
  * `coordinatorName` is what services/assignedCoordinatorService.js loaded from users/{uid}.
- * Coordinator's return messages, newest first, on the same terms. `cancellation` (SPM-63) gives a Cancelled
- * event's reason and time to every user it is presented to.
+ * `cancellation` (SPM-63) gives a Cancelled event's reason and time to every user it is presented to.
+ * `rejection` (SPM-45) does the same for a Rejected request, and `completion` (SPM-27) gives when a
+ * Completed event was marked complete, and by whom to Coordinators.
  */
 export function presentRequest(user, request, { coordinatorName = null } = {}) {
   return {
@@ -54,6 +63,8 @@ export function presentRequest(user, request, { coordinatorName = null } = {}) {
     canReassignCoordinator: canReassignCoordinator(user, request),
     assignedCoordinator: assignedCoordinatorSummary(user, request, coordinatorName),
     cancellation: cancellationNotice(user, request),
+    rejection: rejectionNotice(user, request),
+    completion: completionNotice(user, request),
   }
 }
 

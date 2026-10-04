@@ -26,6 +26,8 @@ import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSect
 // in the response) are offered above the sections.
 //
 // SPM-63: a Cancelled event shows its cancellation reason and time (cancellation in the response).
+// SPM-45: a Rejected request shows its rejection reason and that it is closed (rejection); SPM-27: a
+// Completed event shows when it was marked complete (completion).
 //
 // SPM-25: the Coordinator's clarification messages (clarificationRequests in the response) are shown
 // first, so a returned request's Organiser reads what to amend before editing.
@@ -89,6 +91,8 @@ function RequestDetailPage() {
   const [canReassign, setCanReassign] = useState(false)
   const [assignedCoordinator, setAssignedCoordinator] = useState(null)
   const [cancellation, setCancellation] = useState(null)
+  const [rejection, setRejection] = useState(null)
+  const [completion, setCompletion] = useState(null)
   const [acting, setActing] = useState(false)
   const [form, setForm] = useState({})
   const [loading, setLoading] = useState(true)
@@ -106,6 +110,8 @@ function RequestDetailPage() {
     setCanReassign(response.canReassignCoordinator === true)
     setAssignedCoordinator(response.assignedCoordinator ?? null)
     setCancellation(response.cancellation ?? null)
+    setRejection(response.rejection ?? null)
+    setCompletion(response.completion ?? null)
     setForm(toFormValues(response.request))
   }, [])
 
@@ -230,6 +236,8 @@ function RequestDetailPage() {
               arrangements={arrangements}
               cancellationRequest={cancellationRequest}
               cancellation={cancellation}
+              rejection={rejection}
+              completion={completion}
               busy={acting || saving}
               onAction={handleAction}
             />

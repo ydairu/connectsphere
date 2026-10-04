@@ -163,9 +163,11 @@ describe('SPM-9 — viewing and changing an event status', () => {
 
     transitionRequest.mockResolvedValue({ request: { ...underReview.request, status: 'rejected' }, editableSections: [], availableActions: [] })
     await user.click(screen.getByRole('button', { name: 'Reject request' }))
+    // SPM-45: a rejection requires a reason.
+    await user.type(screen.getByLabelText('Rejection reason (required)'), 'No venue can hold 500 attendees')
     await user.click(screen.getByRole('button', { name: 'Reject request' }))
 
-    expect(transitionRequest).toHaveBeenCalledWith({ uid: 'u-1' }, 'req-1', 'reject', undefined)
+    expect(transitionRequest).toHaveBeenCalledWith({ uid: 'u-1' }, 'req-1', 'reject', 'No venue can hold 500 attendees')
     expect(await screen.findByText('Status changed to Rejected.')).toBeTruthy()
     expect(screen.queryByText('Status actions')).toBeNull()
   })

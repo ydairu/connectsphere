@@ -40,7 +40,10 @@ const ACTIONS = {
   [CONFIRM]: { label: 'Confirm event' },
   [REJECT]: {
     label: 'Reject request',
-    confirm: 'Reject this request? A rejected request is closed and cannot change status again.',
+    confirm:
+      'Reject this request? A rejected request is closed and cannot change status again. It cannot be edited or resubmitted; the organiser would need to create a new request.',
+    reasonLabel: 'Rejection reason',
+    reasonPrompt: 'Enter a rejection reason to continue.',
   },
   [COMPLETE]: {
     label: 'Mark as completed',

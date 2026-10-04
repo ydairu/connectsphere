@@ -151,7 +151,8 @@ describe('SPM-9 — each status change records previous status, new status, who 
       const options =
         action === CANCEL ? { reason: 'Venue closed for repairs' }
           : action === RETURN_FOR_CLARIFICATION ? { reason: 'Please confirm the expected attendance' }
-            : {}
+            : action === REJECT ? { reason: 'No venue can hold the expected attendance' }
+              : {}
       const updated = await transitionEventRequest('request-1', action, assigned, db, NOW, options)
 
       assert.equal(updated.status, to)

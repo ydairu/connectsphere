@@ -252,6 +252,23 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
     - **Local verification (macOS):** lint passed; 128 Node tests and 75 frontend tests passed; root Vitest 517 passed (30 opt-in live tests skipped); Playwright Chromium passed all 44 tests; the production build passed.
     - **Not verified:** these are in-memory doubles only. No live Firebase, emulator or manual browser check was run, and no backlog status change is claimed.
 
+19. **SPM-45 reject a request and SPM-27 mark an event Completed (4 Oct 2026, branch `feature/spm-45-27`):**
+    - **Built (SPM-45):** Reject, built by SPM-9, now requires a reason. Each rejection writes top-level `rejection` metadata (reason, previous status, `rejectedByUid`, time) in the status-change transaction. `rejectionNotice()` in `shared/requestActions.js` gives the reason, previous status and time, without who rejected it. The request page asks for a rejection reason before confirming, and shows a Rejected request as closed, with a link for Organisers to create a new request.
+    - **Built (SPM-27):** Complete, built by SPM-9, now writes top-level `completion` metadata (`completedByUid`, `completedByName`, time). `completionNotice()` gives the time to every user who can view the event, and the name to Coordinators only. The request page shows "Event completed".
+    - **Pending team decision:** showing who completed an event to Coordinators only (effective-requirements.md §6).
+    - **Changed behaviour:** a rejection without a reason is now refused with 400 `reason_required`. The SPM-9 and SPM-25 tests that rejected without a reason were updated to send one.
+    - **Gaps:** the activity history is not displayed. The Organiser is not notified of a rejection. Seeded Rejected and Completed requests have no `rejection`/`completion` record.
+    - **Evidence:**
+      - `tests/spm-45/unit/rejectRequest.test.js`
+      - `tests/spm-45/integration/rejectRequestApi.test.js`
+      - `tests/spm-45/e2e/spm45.rejectRequest.spec.js`
+      - `tests/spm-27/unit/markCompleted.test.js`
+      - `tests/spm-27/integration/markCompletedApi.test.js`
+      - `tests/spm-27/e2e/spm27.markCompleted.spec.js`
+      - `frontend/src/pages/rejectionCompletion.test.jsx`
+    - **Local verification (Windows, 4 Oct):** lint passed; 128 Node tests and 99 frontend tests passed; root Vitest 706 passed (30 opt-in live tests skipped); the production build passed with the existing bundle-size warning; Playwright Chromium passed all 53 tests.
+    - **Not verified:** these are in-memory doubles only. No live Firebase, emulator or manual browser check was run. `firestore.rules` was not changed or deployed. No backlog status change is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.
