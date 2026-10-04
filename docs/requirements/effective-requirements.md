@@ -71,6 +71,8 @@ Labels used below:
 
 **[Unresolved]** Whether two Organisers in the same organisation may view each other's events beyond the owner-specific edit rule is a team design choice. Current SPM-42 permits viewing organisation events but editing only owned requests.
 
+**[Team decision, 3 Oct 2026 — resolves the [Unresolved] item above]** Organisers in the same organisation (the same company ID, `organisationId`) may view each other's submitted events, read-only; only the owning Organiser edits, and only at Draft or Returned. Drafts stay private to their owner (Clarification 2). This fills an area Clarification 1 left to implementation design ("Visibility across separate Organisers in the same organisation was left to implementation design") and does not override the customer rule that Organisers cannot see unrelated clients' data. It was implemented by SPM-42 in `shared/permissions.js` (14 Sep 2026) and first recorded as a team decision with SPM-46 (3 Oct 2026), which shows colleagues the assigned Coordinator; SPM-64 AC4 and AC6 rely on it.
+
 ### Audit and Security Enforcement
 
 **[Customer-confirmed]** Important actions must retain what changed, who changed it, and when, visible to authorised users where appropriate.
@@ -376,6 +378,25 @@ Implemented by `shared/assignedCoordinator.js` (visibility and response shape) a
 
 **[Customer-confirmed]** Field and section permissions follow role and ownership. Routine contact or descriptive edits are normal. Significant date/time, duration, attendance, venue/layout, or equipment changes trigger formal re-review and may alter Planning/confirmation status.
 
+#### SPM-64 — View and Edit My Event Request
+
+**[Implemented — SPM-64, 4 Oct 2026]** Built on SPM-42's permissions; SPM-64 adds the arrangements summary and tests, not new rules:
+
+- **AC1/AC2:** an Organiser edits only requests they own, and only at Draft (SPM-7/SPM-4 routes) or Returned (SPM-25). Changes after submission otherwise go through Event Change Requests (§19, SPM-20), which do not exist yet; no "Request change" option is shown.
+- **AC3:** at Submitted, Under Review, Planning and Confirmed the Organiser's own event is read-only: the API refuses every section edit with 403 naming the fields, and the page shows no editable field.
+- **AC4/AC6:** the list holds the Organiser's own events and their organisation's submitted events, never another client's. A same-organisation colleague's event is read-only — per the team decision of 3 Oct 2026 (§3).
+- **AC5:** the event page shows the status and a "Your event arrangements" summary of date and time, venue and equipment, each labelled **Requested**, with the venue and technical sign-off state. Venue bookings (§12–13) and equipment reservations (§17) do not exist, so nothing is shown as booked or confirmed; those stories should replace "Requested" with what was secured.
+- The `internal` section is never sent to an Organiser, owner or colleague, at any status (now tested explicitly).
+
+**[Team decision, 4 Oct 2026 — SPM-64]** How a venue or technical sign-off reads, by status:
+
+- **Before Planning** (Submitted, Under Review, Returned): an undecided sign-off reads "Not started — reviewed during planning", because staff can decide only at Planning (§6, SPM-9 minimal sign-off).
+- **At Planning and Confirmed:** an undecided sign-off reads "Awaiting approval".
+- **Once closed** (Completed, Cancelled or Rejected — SPM-9's `TERMINAL_STATUSES`): an undecided sign-off reads "Not reviewed — event closed", since it will never be decided.
+- **At every status:** a decided sign-off reads "Approved" or "Rejected", and one the event does not need reads "Not required".
+
+Both the SPM-64 summary and SPM-9's "Arrangements and cancellation" card use this wording (`frontend/src/utils/eventArrangements.js`), for every role, so one page never shows two labels for the same sign-off.
+
 ### 8. Venue Catalogue
 
 **[Customer-confirmed]** Maintain location, capacity, facilities, accessibility, supported layouts, operating information, and availability-related characteristics. Venue Staff can use catalogue information to identify suitable spaces.
@@ -482,7 +503,7 @@ Before implementing affected functionality, resolve and record:
 
 1. Approved versus Confirmed state model.
 2. Official Sprint 1 start date: 13 or 14 September 2026.
-3. Same-organisation Organiser visibility.
+3. ~~Same-organisation Organiser visibility.~~ Resolved — team decision, 3 Oct 2026 (§3, Ownership and Relationships).
 4. Exact multi-role storage and permission evaluation model.
 5. Coordinator assignment algorithm.
 6. Missing venue-facility block/warning policy.
