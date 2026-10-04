@@ -29,6 +29,12 @@ blob-report/
 # Credentials and private keys
 secrets/
 credentials/
+[Ss]ensitive*/
+[Ss]ecrets*/
+[Cc]redentials*/
+[Pp]rivate/
+[Kk]eys/
+[Cc]erts/
 *service-account*.json
 *serviceAccount*.json
 *firebase-adminsdk*.json
@@ -62,3 +68,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Local requirements workbook
+docs/requirements/Product Backlog.xlsx
