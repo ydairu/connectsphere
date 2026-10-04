@@ -9,7 +9,7 @@
 
 import cors from 'cors'
 import express from 'express'
-import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
+import { SEED_FIELD_HISTORY, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
@@ -21,13 +21,21 @@ const EMAIL_PATTERN = /^\S+@\S+\.\S+$/
 
 export function createDouble() {
   // users/{uid} profiles live in the database too, so SPM-8's coordinator selection on submit sees them.
-  // reset() replaces the whole database: seeded requests, no activity entries, no assignment lock.
+  // reset() replaces the whole database: seeded requests and their seeded field history (SPM-28), no other
+  // activity entries, no assignment lock.
   const state = { accounts: new Map(), db: null, profiles: null, nextUid: 1 }
 
   function reset() {
     state.accounts.clear()
     state.db = createFakeFirestore({
       eventRequests: Object.fromEntries(SEED_REQUESTS.map(({ id, ...request }) => [id, request])),
+      // SPM-28: the seeded field history, in each request's activity subcollection.
+      ...Object.fromEntries(
+        Object.entries(SEED_FIELD_HISTORY).map(([requestId, entries]) => [
+          `eventRequests/${requestId}/activity`,
+          Object.fromEntries(entries.map(({ id, ...entry }) => [id, entry])),
+        ]),
+      ),
     })
     state.profiles = state.db.collectionData('users')
     state.nextUid = 1

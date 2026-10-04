@@ -9,6 +9,8 @@
 import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf } from '../../../shared/permissions.js'
 import { canReassignCoordinator } from '../../../shared/coordinatorReassignment.js'
 import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.js'
+import { canViewChangeHistory, visibleChangeHistory } from '../../../shared/changeHistory.js'
+import { requestOwnerFields } from '../../../shared/requestOwner.js'
 import {
   allAvailableActions,
   arrangementsSummary,
@@ -50,9 +52,12 @@ function outOfScope(user, res) {
  * `coordinatorName` is what services/assignedCoordinatorService.js loaded from users/{uid}.
  * `cancellation` (SPM-63) gives a Cancelled event's reason and time to every user it is presented to.
  * `rejection` (SPM-45) does the same for a Rejected request, and `completion` (SPM-27) gives when a
- * Completed event was marked complete, and by whom to Coordinators.
+ * Completed event was marked complete, and by whom to Coordinators. `canViewChangeHistory` (SPM-28) says
+ * whether this user may read GET /api/requests/:id/history. `ownerName` and `isOwnRequest` (SPM-64
+ * follow-up) tell an Organiser who submitted the request; they are absent for every other role, and no uid
+ * is sent. `ownerNames` is what services/requestOwnerService.js loaded from users/{uid}.
  */
-export function presentRequest(user, request, { coordinatorName = null } = {}) {
+export function presentRequest(user, request, { coordinatorName = null, ownerNames } = {}) {
   return {
     request: projectRequest(user, request),
     editableSections: SECTIONS.filter((section) => canEdit(user, request, section)),
@@ -65,6 +70,8 @@ export function presentRequest(user, request, { coordinatorName = null } = {}) {
     cancellation: cancellationNotice(user, request),
     rejection: rejectionNotice(user, request),
     completion: completionNotice(user, request),
+    canViewChangeHistory: canViewChangeHistory(user, request),
+    ...requestOwnerFields(user, request, ownerNames),
   }
 }
 
@@ -73,9 +80,10 @@ export function presentRequest(user, request, { coordinatorName = null } = {}) {
  * owner — SPM-24's last criterion falls out of inScope(), not out of a status filter here.
  */
 export function authoriseList(req, res, next) {
+  // SPM-64 follow-up: an Organiser's items also say who submitted them (shared/requestOwner.js).
   res.locals.requests = req.eventRequests
     .filter((request) => inScope(req.user, request))
-    .map((request) => projectRequest(req.user, request))
+    .map((request) => ({ ...projectRequest(req.user, request), ...requestOwnerFields(req.user, request, req.ownerNames) }))
   return next()
 }
 
@@ -85,8 +93,24 @@ export function authoriseList(req, res, next) {
  */
 export function authoriseRead(req, res, next) {
   if (!inScope(req.user, req.eventRequest)) return outOfScope(req.user, res)
-  res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName })
+  res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName, ownerNames: req.ownerNames })
   return next()
+}
+
+/**
+ * SPM-28 change history: the assigned Coordinator and the owning Organiser only. Out of scope gets
+ * SPM-42/SPM-65's refusal (404 for anyone holding the Coordinator role, 403 otherwise); a user who may see
+ * the event but not its history — a same-organisation colleague, assigned staff — gets 403.
+ */
+export function authoriseHistory(req, res, next) {
+  if (!inScope(req.user, req.eventRequest)) return outOfScope(req.user, res)
+  if (!canViewChangeHistory(req.user, req.eventRequest)) return forbidden(res)
+  return next()
+}
+
+/** Sends the entries this user may see, newest first, with no actor uid (shared/changeHistory.js). */
+export function sendHistory(req, res) {
+  res.json({ entries: visibleChangeHistory(req.user, req.eventRequest, req.fieldHistory ?? []) })
 }
 
 /**

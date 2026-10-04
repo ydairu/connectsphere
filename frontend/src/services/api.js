@@ -98,6 +98,14 @@ export function updateRequest(user, id, patch) {
   return authenticatedRequest(user, `/api/requests/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
 }
 
+// SPM-28: the event's field change history, newest first: { entries: [{ id, field, oldValue, newValue,
+// actor: { type, name, role }, at }] }. Only the assigned Coordinator and the owning Organiser receive it
+// (others get 403, or 404 for a Coordinator outside their scope); internal planning changes are left out
+// for the Organiser.
+export function getRequestHistory(user, id) {
+  return authenticatedRequest(user, `/api/requests/${id}/history`)
+}
+
 // SPM-9 action, e.g. { action: 'start_review' } or { action: 'cancel', reason: '...' }. The response is
 // shaped like getRequest's. A refused action comes back as 403 (not permitted), 400 (malformed, or a
 // required reason missing) or 409 (not allowed in the request's current state), with a message.

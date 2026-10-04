@@ -4,6 +4,7 @@ import { ORGANISER } from '../../../shared/permissions.js'
 import { DRAFT } from '../../../shared/status.js'
 import ArrangementsSummary from '../components/ArrangementsSummary.jsx'
 import AssignedCoordinator from '../components/AssignedCoordinator.jsx'
+import ChangeHistory from '../components/ChangeHistory.jsx'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import ClarificationRequests from '../components/ClarificationRequests.jsx'
@@ -41,6 +42,10 @@ import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSect
 // SPM-64: below it, an Organiser sees their event's arrangements — date and time, venue and equipment as
 // requested, with the sign-off state. Every value shown is already in the response; the role check only
 // decides where the summary appears, other roles see the same data in the sections.
+// SPM-64 follow-up: an Organiser who opens a same-organisation colleague's request is told whose it is and
+// that it is view-only (ownerName / isOwnRequest in the response, sent only to Organisers).
+// SPM-28: the assigned Coordinator and the owning Organiser see the field change history at the end of the
+// page (canViewChangeHistory in the response); it reloads after a save.
 
 function ReadOnlyValue({ type, value }) {
   if (type === 'boolean') return <strong>{value === true ? 'Yes' : 'No'}</strong>
@@ -98,6 +103,9 @@ function RequestDetailPage() {
   const [cancellation, setCancellation] = useState(null)
   const [rejection, setRejection] = useState(null)
   const [completion, setCompletion] = useState(null)
+  const [canViewHistory, setCanViewHistory] = useState(false)
+  const [owner, setOwner] = useState(null)
+  const [historyVersion, setHistoryVersion] = useState(0)
   const [acting, setActing] = useState(false)
   const [form, setForm] = useState({})
   const [loading, setLoading] = useState(true)
@@ -117,6 +125,8 @@ function RequestDetailPage() {
     setCancellation(response.cancellation ?? null)
     setRejection(response.rejection ?? null)
     setCompletion(response.completion ?? null)
+    setCanViewHistory(response.canViewChangeHistory === true)
+    setOwner(typeof response.isOwnRequest === 'boolean' ? { name: response.ownerName ?? null, isOwn: response.isOwnRequest } : null)
     setForm(toFormValues(response.request))
   }, [])
 
@@ -161,6 +171,7 @@ function RequestDetailPage() {
     setStatus(null)
     try {
       applyResponse(await updateRequest(user, id, patch))
+      setHistoryVersion((version) => version + 1)
       setStatus({ type: 'success', message: 'Changes saved.' })
     } catch (error) {
       // SPM-42 #7: a rejected write names the fields it rejected. Show them rather than a generic error.
@@ -231,6 +242,12 @@ function RequestDetailPage() {
           <form onSubmit={handleSave}>
             {status && <div className={`alert alert-${status.type}`} role="alert">{status.message}</div>}
 
+            {roles?.includes(ORGANISER) && owner?.isOwn === false && (
+              <div className="alert alert-info" role="note">
+                This request was submitted by {owner.name ?? 'a colleague'} from your organisation. You can view it but not edit it.
+              </div>
+            )}
+
             <AssignedCoordinator coordinator={assignedCoordinator} />
 
             {roles?.includes(ORGANISER) && <ArrangementsSummary request={request} arrangements={arrangements} />}
@@ -293,6 +310,8 @@ function RequestDetailPage() {
             ) : (
               <p className="form-note">You can view this request but cannot change it.</p>
             )}
+
+            {canViewHistory && <ChangeHistory user={user} requestId={id} refreshKey={historyVersion} />}
           </form>
         )}
       </main>

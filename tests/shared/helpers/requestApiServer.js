@@ -12,7 +12,7 @@ import { env } from '../../../backend/src/config/env.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
 import { createMemoryEventRequestStore } from '../../../backend/src/testing/memoryEventRequestStore.js'
-import { SEED_ACCOUNTS, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
+import { SEED_ACCOUNTS, SEED_FIELD_HISTORY, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 
 const TOKEN_PREFIX = 'test-token:'
 
@@ -48,7 +48,7 @@ export async function startInMemoryApi({ extraAccounts = [], extraRequests = [],
 
   const app = createApp({
     authenticate,
-    eventRequestStore: eventRequestStore ?? createMemoryEventRequestStore([...SEED_REQUESTS, ...extraRequests]),
+    eventRequestStore: eventRequestStore ?? createMemoryEventRequestStore([...SEED_REQUESTS, ...extraRequests], { history: SEED_FIELD_HISTORY }),
     getUserDb: () => userDb,
   })
   const { server, baseUrl } = await listen(app)

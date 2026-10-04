@@ -15,13 +15,22 @@
 //
 // SEED_ACCOUNT_PASSWORD is read from the environment (the root .env works) so no credential is
 // committed. Firebase Auth itself rejects passwords under 6 characters.
+//
+// SPM-28: it also writes SEED_FIELD_HISTORY into the seeded requests' `activity` subcollections, and with
+// --write removes stray field history the live API suite leaves behind. A document is deleted only when
+// ALL of these hold: the run has --write; its parent is a seeded request ID; its type is field_changed; and
+// it is not one of the SEED_FIELD_HISTORY entries. No other activity type and nothing outside the seeded
+// requests is ever deleted.
 
 import { parseArgs } from 'node:util'
 import { Timestamp } from 'firebase-admin/firestore'
 
 import { env } from '../src/config/env.js'
 import { getAdminAuth, getAdminDb } from '../src/config/firebaseAdmin.js'
-import { EVENT_REQUESTS_COLLECTION, SEED_ACCOUNTS, SEED_REQUESTS, SEED_TAG } from './seedData.js'
+import { FIELD_CHANGED } from '../../shared/changeHistory.js'
+import { ACTIVITY_SUBCOLLECTION } from '../src/services/coordinatorAssignmentService.js'
+import { EVENT_REQUESTS_COLLECTION, SEED_ACCOUNTS, SEED_FIELD_HISTORY, SEED_REQUESTS, SEED_TAG } from './seedData.js'
+import { removableFieldHistory } from './seedHistory.js'
 import { banner, resolveWriteMode } from './writeGuard.js'
 
 const ACCOUNT_CREATED_AT = Timestamp.fromDate(new Date('2026-09-01T00:00:00+08:00'))
@@ -61,12 +70,40 @@ async function preflight(auth, db) {
     requests.push({ request, docAction: snapshot.exists ? 'overwrite' : 'create' })
   }
 
-  return { accounts, requests, blockers }
+  // SPM-28: the seeded history entries, and the stray field history that --write would remove.
+  const history = []
+  const strays = []
+  for (const request of SEED_REQUESTS) {
+    const activity = db.collection(EVENT_REQUESTS_COLLECTION).doc(request.id).collection(ACTIVITY_SUBCOLLECTION)
+    for (const entry of SEED_FIELD_HISTORY[request.id] ?? []) {
+      const snapshot = await activity.doc(entry.id).get()
+      if (snapshot.exists && snapshot.get('seedTag') !== SEED_TAG) {
+        blockers.push(`${activity.path}/${entry.id} exists and is not tagged ${SEED_TAG}`)
+      }
+      history.push({ request, entry, docAction: snapshot.exists ? 'overwrite' : 'create' })
+    }
+    // Counted on a dry run too (as if --write), so the plan shows what --write would remove.
+    const fieldChanges = await activity.where('type', '==', FIELD_CHANGED).get()
+    const removable = new Set(removableFieldHistory({
+      write: true,
+      requestId: request.id,
+      entries: fieldChanges.docs.map((doc) => ({ id: doc.id, type: doc.get('type') })),
+    }))
+    const refs = fieldChanges.docs.filter((doc) => removable.has(doc.id)).map((doc) => doc.ref)
+    if (refs.length > 0) strays.push({ request, refs })
+  }
+
+  return { accounts, requests, history, strays, blockers }
 }
 
 function profileDocument(account) {
   const { uid: _uid, ...fields } = account
   return { ...fields, seedTag: SEED_TAG, createdAt: ACCOUNT_CREATED_AT }
+}
+
+function historyDocument(entry) {
+  const { id: _id, at, ...fields } = entry
+  return { ...fields, seedTag: SEED_TAG, at: Timestamp.fromDate(new Date(at)) }
 }
 
 function requestDocument(request) {
@@ -100,7 +137,7 @@ async function main() {
 
   const auth = getAdminAuth()
   const db = getAdminDb()
-  const { accounts, requests, blockers } = await preflight(auth, db)
+  const { accounts, requests, history, strays, blockers } = await preflight(auth, db)
 
   console.log(`\nAccounts (${accounts.length}):`)
   for (const { account, authAction, docAction } of accounts) {
@@ -111,6 +148,14 @@ async function main() {
   for (const { request, docAction } of requests) {
     console.log(`  ${docAction.padEnd(9)} ${request.id.padEnd(28)} ${request.status.padEnd(28)} owner=${request.ownerUid}`)
   }
+
+  console.log(`\nField history (${history.length} seeded entries):`)
+  for (const { request, entry, docAction } of history) {
+    console.log(`  ${docAction.padEnd(9)} ${request.id}/${ACTIVITY_SUBCOLLECTION}/${entry.id}  ${entry.field}`)
+  }
+  console.log(`Stray ${FIELD_CHANGED} entries under seeded requests${mode.write ? ' (to remove)' : ' (--write would remove)'}:`)
+  if (strays.length === 0) console.log('  none')
+  for (const { request, refs } of strays) console.log(`  ${request.id}: ${refs.length}`)
 
   if (blockers.length > 0) {
     console.error('\nRefusing to continue — these are not this seed\'s to overwrite:')
@@ -134,9 +179,28 @@ async function main() {
   const batch = db.batch()
   for (const { account } of accounts) batch.set(db.collection('users').doc(account.uid), profileDocument(account))
   for (const { request } of requests) batch.set(db.collection(EVENT_REQUESTS_COLLECTION).doc(request.id), requestDocument(request))
+  for (const { request, entry } of history) {
+    batch.set(db.collection(EVENT_REQUESTS_COLLECTION).doc(request.id).collection(ACTIVITY_SUBCOLLECTION).doc(entry.id), historyDocument(entry))
+  }
   await batch.commit()
 
-  console.log(`\nWrote ${accounts.length} Auth users, ${accounts.length} users documents and ${requests.length} ${EVENT_REQUESTS_COLLECTION} documents to ${env.firebaseProjectId}.`)
+  // Removal in batches of at most 500 writes, Firestore's limit. Re-checked with the real --write flag
+  // (guardrail 1); every ref already passed guardrails 2–4 in removableFieldHistory().
+  const removed = []
+  for (const { request, refs } of strays) {
+    if (removableFieldHistory({ write: mode.write, requestId: request.id, entries: refs.map((ref) => ({ id: ref.id, type: FIELD_CHANGED })) }).length !== refs.length) {
+      throw new Error(`Refusing to delete activity under ${request.id}: guardrail check failed`)
+    }
+    for (let start = 0; start < refs.length; start += 500) {
+      const deletions = db.batch()
+      for (const ref of refs.slice(start, start + 500)) deletions.delete(ref)
+      await deletions.commit()
+    }
+    removed.push(`${request.id}: ${refs.length}`)
+  }
+
+  console.log(`\nWrote ${accounts.length} Auth users, ${accounts.length} users documents, ${requests.length} ${EVENT_REQUESTS_COLLECTION} documents and ${history.length} field history entries to ${env.firebaseProjectId}.`)
+  console.log(`Removed stray ${FIELD_CHANGED} entries: ${removed.length === 0 ? 'none' : removed.join(', ')}`)
 }
 
 main().catch((error) => {
