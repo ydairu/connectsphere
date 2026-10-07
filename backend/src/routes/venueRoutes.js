@@ -8,6 +8,7 @@ export function createVenueRoutes({ authenticate, getDb }) {
   const router = Router()
 
   router.post('/', authenticate, requireRole(VENUE_STAFF), controller.createVenue)
+  router.get('/', authenticate, requireRole(VENUE_STAFF), controller.listVenues)
   router.get('/:id', authenticate, requireRole(VENUE_STAFF), controller.getVenue)
 
   return router
