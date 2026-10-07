@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
+import { VENUE_FIELD_CHANGED } from '../../../backend/src/services/venueService.js'
 import { COORDINATOR, ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
 
 const TOKEN_PREFIX = 'test-token:'
@@ -105,6 +106,10 @@ async function getVenueAs(uid, id) {
   return { status: response.status, json: await response.json() }
 }
 
+function activity(id) {
+  return [...db.collectionData(`venues/${id}/activity`)].map(([entryId, entry]) => ({ id: entryId, ...entry }))
+}
+
 describe('SPM-29 — venue update API (integration)', () => {
   it('spm29_api_allows_venue_staff_to_update_existing_venue_details', async () => {
     const beforeCount = db.collectionData('venues').size
@@ -133,6 +138,64 @@ describe('SPM-29 — venue update API (integration)', () => {
     expect(db.collectionData('venues').size).toBe(beforeCount)
   })
 
+  it('spm29_api_records_changed_fields_with_previous_values_new_values_actor_and_time', async () => {
+    const response = await patchVenueAs(VENUE_STAFF_USER.uid, 'venue-a', validUpdate)
+
+    expect(response.status).toBe(200)
+    expect(activity('venue-a')).toEqual([
+      expect.objectContaining({
+        type: VENUE_FIELD_CHANGED,
+        field: 'location',
+        oldValue: 'Level 1, Main Campus',
+        newValue: 'Level 2, Main Campus',
+        actor: { type: 'user', uid: VENUE_STAFF_USER.uid, name: 'Venue Staff One', role: VENUE_STAFF },
+        at: expect.any(String),
+      }),
+      expect.objectContaining({
+        type: VENUE_FIELD_CHANGED,
+        field: 'maximumCapacity',
+        oldValue: 180,
+        newValue: 220,
+        actor: { type: 'user', uid: VENUE_STAFF_USER.uid, name: 'Venue Staff One', role: VENUE_STAFF },
+        at: expect.any(String),
+      }),
+      expect.objectContaining({
+        type: VENUE_FIELD_CHANGED,
+        field: 'facilities',
+        oldValue: ['Reception desk', 'Digital signage'],
+        newValue: ['Reception desk', 'Hybrid meeting kit'],
+        actor: { type: 'user', uid: VENUE_STAFF_USER.uid, name: 'Venue Staff One', role: VENUE_STAFF },
+        at: expect.any(String),
+      }),
+      expect.objectContaining({
+        type: VENUE_FIELD_CHANGED,
+        field: 'accessibilityFeatures',
+        oldValue: ['Step-free access'],
+        newValue: ['Step-free access', 'Accessible toilet nearby'],
+        actor: { type: 'user', uid: VENUE_STAFF_USER.uid, name: 'Venue Staff One', role: VENUE_STAFF },
+        at: expect.any(String),
+      }),
+      expect.objectContaining({
+        type: VENUE_FIELD_CHANGED,
+        field: 'supportedLayouts',
+        oldValue: ['Banquet', 'Theatre'],
+        newValue: ['Theatre', 'Classroom', 'Workshop'],
+        actor: { type: 'user', uid: VENUE_STAFF_USER.uid, name: 'Venue Staff One', role: VENUE_STAFF },
+        at: expect.any(String),
+      }),
+      expect.objectContaining({
+        type: VENUE_FIELD_CHANGED,
+        field: 'operatingHours',
+        oldValue: 'Monday-Saturday 08:00-20:00',
+        newValue: 'Monday-Friday 08:00-22:00',
+        actor: { type: 'user', uid: VENUE_STAFF_USER.uid, name: 'Venue Staff One', role: VENUE_STAFF },
+        at: expect.any(String),
+      }),
+    ])
+    expect(db.transactions.at(-1).writes).toContain('venues/venue-a')
+    expect(db.transactions.at(-1).writes.filter((path) => path.startsWith('venues/venue-a/activity/'))).toHaveLength(6)
+  })
+
   it('spm29_api_blocks_invalid_updates_and_preserves_the_saved_record', async () => {
     const before = db.collectionData('venues').get('venue-a')
 
@@ -153,6 +216,7 @@ describe('SPM-29 — venue update API (integration)', () => {
       supportedLayouts: 'Required.',
     })
     expect(db.collectionData('venues').get('venue-a')).toEqual(before)
+    expect(activity('venue-a')).toEqual([])
   })
 
   it('spm29_api_rejects_non_venue_staff_updates', async () => {
