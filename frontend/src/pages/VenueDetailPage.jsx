@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { VENUE_STAFF } from '../../../shared/permissions.js'
 import Card from '../components/Card.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
@@ -7,8 +8,13 @@ import { useAuth } from '../hooks/useAuth.js'
 import { getVenue } from '../services/api.js'
 
 function ListValue({ items }) {
-  if (!Array.isArray(items) || items.length === 0) return <strong className="value-empty">Not set</strong>
+  if (!Array.isArray(items) || items.length === 0) return <strong className="value-empty">Not recorded</strong>
   return <ul className="value-list">{items.map((item) => <li key={item}>{item}</li>)}</ul>
+}
+
+function TextValue({ children }) {
+  if (children === undefined || children === null || children === '') return <strong className="value-empty">Not recorded</strong>
+  return <strong>{children}</strong>
 }
 
 function DetailRow({ label, children }) {
@@ -23,10 +29,11 @@ function DetailRow({ label, children }) {
 function VenueDetailPage() {
   const { id } = useParams()
   const location = useLocation()
-  const { user } = useAuth()
+  const { user, roles } = useAuth()
   const [venue, setVenue] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
+  const canAddVenue = roles.includes(VENUE_STAFF)
 
   useEffect(() => {
     let active = true
@@ -58,7 +65,9 @@ function VenueDetailPage() {
       <main className="container venue-page">
         <div className="page-heading">
           <div>
-            <span className="eyebrow"><Link to="/venues/new">Add another venue</Link></span>
+            <span className="eyebrow">
+              {canAddVenue ? <Link to="/venues/new">Add another venue</Link> : <Link to="/venues">Venue catalogue</Link>}
+            </span>
             <h1>{venue?.name || (loading ? 'Loading venue...' : 'Venue details')}</h1>
             {venue && <p>Catalogue reference {venue.id}</p>}
           </div>
@@ -71,13 +80,13 @@ function VenueDetailPage() {
         {!loading && !loadError && venue && (
           <Card className="request-form-section">
             <h2>Saved venue information</h2>
-            <DetailRow label="Physical location"><strong>{venue.location}</strong></DetailRow>
-            <DetailRow label="Maximum capacity"><strong>{venue.maximumCapacity}</strong></DetailRow>
+            <DetailRow label="Physical location"><TextValue>{venue.location}</TextValue></DetailRow>
+            <DetailRow label="Maximum capacity"><TextValue>{venue.maximumCapacity}</TextValue></DetailRow>
             <DetailRow label="Facilities"><ListValue items={venue.facilities} /></DetailRow>
             <DetailRow label="Accessibility features"><ListValue items={venue.accessibilityFeatures} /></DetailRow>
             <DetailRow label="Supported room layouts"><ListValue items={venue.supportedLayouts} /></DetailRow>
-            <DetailRow label="Operating hours"><strong>{venue.operatingHours}</strong></DetailRow>
-            <DetailRow label="Added by"><strong>{venue.createdByName || venue.createdByUid || 'Venue Staff'}</strong></DetailRow>
+            <DetailRow label="Operating hours"><TextValue>{venue.operatingHours}</TextValue></DetailRow>
+            {canAddVenue && <DetailRow label="Added by"><TextValue>{venue.createdByName || venue.createdByUid}</TextValue></DetailRow>}
           </Card>
         )}
       </main>
