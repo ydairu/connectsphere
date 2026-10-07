@@ -69,7 +69,6 @@ function VenueDetailPage() {
               {canManageVenue ? <Link to="/venues/new">Add another venue</Link> : <Link to="/venues">Venue catalogue</Link>}
             </span>
             <h1>{venue?.name || (loading ? 'Loading venue...' : 'Venue details')}</h1>
-            {venue && <p>Catalogue reference {venue.id}</p>}
           </div>
           {venue && canManageVenue && (
             <Link className="button button-secondary" to={`/venues/${venue.id}/edit`}>

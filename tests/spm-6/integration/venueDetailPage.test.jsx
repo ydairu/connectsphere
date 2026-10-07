@@ -64,7 +64,8 @@ describe('SPM-6 — venue detail reopen view', () => {
     showVenueDetailPage()
 
     expect(await screen.findByRole('heading', { name: 'Conference Hall A' })).toBeTruthy()
-    expect(screen.getByText('Catalogue reference venue-1')).toBeTruthy()
+    expect(screen.queryByText(/Catalogue reference/)).toBeNull()
+    expect(screen.queryByText('venue-1')).toBeNull()
     expect(screen.getByText('Level 3, Singapore Campus')).toBeTruthy()
     expect(screen.getByText('120')).toBeTruthy()
     expect(screen.getByText('Projector')).toBeTruthy()
