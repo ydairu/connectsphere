@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import CreateEventRequestPage from './pages/CreateEventRequestPage.jsx'
 import CreateVenuePage from './pages/CreateVenuePage.jsx'
 import DraftRequestsPage from './pages/DraftRequestsPage.jsx'
+import EditVenuePage from './pages/EditVenuePage.jsx'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import NotificationsPage from './pages/NotificationsPage.jsx'
@@ -41,6 +42,7 @@ function App() {
       </Route>
       <Route element={<ProtectedRoute allowedRoles={[VENUE_STAFF]} />}>
         <Route path="/venues/new" element={<CreateVenuePage />} />
+        <Route path="/venues/:id/edit" element={<EditVenuePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
