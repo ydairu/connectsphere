@@ -21,6 +21,7 @@ function Navbar() {
               <NavLink className="nav-link" to="/notifications">Notifications</NavLink>
               {isOrganiser && <NavLink className="nav-link" to="/requests/drafts">My drafts</NavLink>}
               {isOrganiser && <NavLink className="nav-link" to="/event-requests/new">Create request</NavLink>}
+              {isVenueStaff && <NavLink className="nav-link" to="/venues">Venues</NavLink>}
               {isVenueStaff && <NavLink className="nav-link" to="/venues/new">Add venue</NavLink>}
               <NavLink className="button button-secondary button-small" to="/profile">Profile</NavLink>
             </>

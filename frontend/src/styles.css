@@ -158,6 +158,17 @@ a { color: inherit; }
 .request-item-main h2 { margin: 0; font-size: 19px; letter-spacing: -0.02em; overflow-wrap: anywhere; }
 .request-meta { margin: 0; color: var(--muted); font-size: 14px; }
 
+.venue-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
+.venue-card { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 26px; transition: border-color 150ms, box-shadow 150ms; }
+.venue-card:hover { border-color: #b9c4bd; box-shadow: 0 14px 40px rgba(23, 32, 28, 0.08); }
+.venue-card-main { min-width: 0; display: grid; gap: 12px; }
+.venue-card-main h2 { margin: 0; font-size: 22px; letter-spacing: -0.03em; overflow-wrap: anywhere; }
+.venue-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; margin: 4px 0 0; }
+.venue-summary-grid div { min-width: 0; }
+.venue-summary-grid dt { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.venue-summary-grid dd { margin: 4px 0 0; overflow-wrap: anywhere; line-height: 1.45; }
+.venue-hours { margin: 0; color: var(--muted); line-height: 1.5; }
+
 .empty-state { display: grid; gap: 12px; justify-items: center; padding: 56px 36px; text-align: center; }
 .empty-state h2 { margin: 0; font-size: 22px; letter-spacing: -0.03em; }
 .empty-state p { margin: 0 0 6px; max-width: 420px; color: var(--muted); line-height: 1.55; }
@@ -166,6 +177,9 @@ a { color: inherit; }
   .page-heading { align-items: flex-start; }
   .request-item { align-items: flex-start; }
   .request-item .button { width: 100%; }
+  .venue-card { flex-direction: column; }
+  .venue-card .button { width: 100%; }
+  .venue-summary-grid { grid-template-columns: 1fr; }
 }
 
 /* SPM-24 status pills — class carries the stored status value, see StatusPill.jsx */
