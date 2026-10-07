@@ -1,11 +1,11 @@
-// SPM-49 AC1/AC2/AC4 — Venue Staff can view venue catalogue records through the backend API.
+// SPM-49 AC1/AC2/AC4/AC5/AC6 — authorised Event Coordinators and Venue Staff can view catalogue data.
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
-import { ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
+import { COORDINATOR, ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
 
 const TOKEN_PREFIX = 'test-token:'
 
@@ -21,10 +21,17 @@ const ORGANISER_USER = {
   name: 'Organiser One',
   roles: [ORGANISER],
 }
+const COORDINATOR_USER = {
+  uid: 'coordinator-1',
+  email: 'coordinator@example.test',
+  name: 'Coordinator One',
+  roles: [COORDINATOR],
+}
 
 const profiles = new Map([
   [VENUE_STAFF_USER.uid, VENUE_STAFF_USER],
   [ORGANISER_USER.uid, ORGANISER_USER],
+  [COORDINATOR_USER.uid, COORDINATOR_USER],
 ])
 
 const catalogueVenue = Object.freeze({
@@ -99,6 +106,13 @@ async function listVenuesAs(uid, url = baseUrl) {
   return { status: response.status, json: await response.json() }
 }
 
+async function getVenueAs(uid, id) {
+  const response = await fetch(`${baseUrl}/api/venues/${id}`, {
+    headers: { Authorization: `Bearer ${TOKEN_PREFIX}${uid}` },
+  })
+  return { status: response.status, json: await response.json() }
+}
+
 describe('SPM-49 — venue catalogue API (integration)', () => {
   it('spm49_api_lists_catalogue_fields_for_venue_staff', async () => {
     const response = await listVenuesAs(VENUE_STAFF_USER.uid)
@@ -129,6 +143,19 @@ describe('SPM-49 — venue catalogue API (integration)', () => {
     expect(response.json.venues[0]).not.toHaveProperty('createdByUid')
   })
 
+  it('spm49_api_allows_event_coordinators_to_list_and_view_catalogue_details', async () => {
+    const listed = await listVenuesAs(COORDINATOR_USER.uid)
+    const opened = await getVenueAs(COORDINATOR_USER.uid, 'venue-a')
+
+    expect(listed.status).toBe(200)
+    expect(listed.json.venues.map((venue) => venue.id)).toEqual(['venue-a', 'venue-z'])
+    expect(opened.status).toBe(200)
+    expect(opened.json.venue.supportedLayouts).toEqual(['Banquet', 'Theatre'])
+    expect(db.collectionData('bookings').size).toBe(0)
+    expect(db.collectionData('tentativeHolds').size).toBe(0)
+    expect(db.collectionData('reservations').size).toBe(0)
+  })
+
   it('spm49_api_returns_an_empty_catalogue_when_no_venues_exist', async () => {
     const response = await listVenuesAs(VENUE_STAFF_USER.uid, emptyBaseUrl)
 
@@ -136,7 +163,7 @@ describe('SPM-49 — venue catalogue API (integration)', () => {
     expect(response.json.venues).toEqual([])
   })
 
-  it('spm49_api_rejects_non_venue_staff_users', async () => {
+  it('spm49_api_rejects_unauthorised_users', async () => {
     const response = await listVenuesAs(ORGANISER_USER.uid)
 
     expect(response.status).toBe(403)

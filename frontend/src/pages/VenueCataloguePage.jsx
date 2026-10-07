@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { VENUE_STAFF } from '../../../shared/permissions.js'
 import Card from '../components/Card.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
@@ -7,15 +8,21 @@ import { useAuth } from '../hooks/useAuth.js'
 import { listVenues } from '../services/api.js'
 
 function InlineList({ items }) {
-  if (!Array.isArray(items) || items.length === 0) return <span>Not set</span>
+  if (!Array.isArray(items) || items.length === 0) return <span>Not recorded</span>
   return <span>{items.join(', ')}</span>
 }
 
+function TextValue({ children }) {
+  if (children === undefined || children === null || children === '') return <span>Not recorded</span>
+  return <span>{children}</span>
+}
+
 function VenueCataloguePage() {
-  const { user } = useAuth()
+  const { user, roles } = useAuth()
   const [venues, setVenues] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const canAddVenue = roles.includes(VENUE_STAFF)
 
   useEffect(() => {
     let active = true
@@ -50,7 +57,7 @@ function VenueCataloguePage() {
             <h1>Available venues</h1>
             <p>View location, capacity, facilities, accessibility, layouts, and operating hours for each venue.</p>
           </div>
-          <Link className="button button-secondary button-small" to="/venues/new">Add venue</Link>
+          {canAddVenue && <Link className="button button-secondary button-small" to="/venues/new">Add venue</Link>}
         </div>
 
         {loading && <Card><LoadingSpinner label="Loading venues" /></Card>}
@@ -61,7 +68,7 @@ function VenueCataloguePage() {
           <Card className="empty-state">
             <h2>No venues yet</h2>
             <p>Add the first venue so the catalogue can be used for planning and availability workflows.</p>
-            <Link className="button button-primary" to="/venues/new">Add venue</Link>
+            {canAddVenue && <Link className="button button-primary" to="/venues/new">Add venue</Link>}
           </Card>
         )}
 
@@ -72,11 +79,11 @@ function VenueCataloguePage() {
                 <Card className="venue-card">
                   <div className="venue-card-main">
                     <h2>{venue.name}</h2>
-                    <p className="request-meta">{venue.location}</p>
+                    <p className="request-meta"><TextValue>{venue.location}</TextValue></p>
                     <dl className="venue-summary-grid">
                       <div>
                         <dt>Capacity</dt>
-                        <dd>{venue.maximumCapacity}</dd>
+                        <dd><TextValue>{venue.maximumCapacity}</TextValue></dd>
                       </div>
                       <div>
                         <dt>Layouts</dt>
@@ -91,7 +98,7 @@ function VenueCataloguePage() {
                         <dd><InlineList items={venue.accessibilityFeatures} /></dd>
                       </div>
                     </dl>
-                    <p className="venue-hours">Operating hours: {venue.operatingHours}</p>
+                    <p className="venue-hours">Operating hours: <TextValue>{venue.operatingHours}</TextValue></p>
                   </div>
                   <Link className="button button-secondary button-small" to={`/venues/${venue.id}`}>View details</Link>
                 </Card>

@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { ORGANISER, VENUE_STAFF } from '../../shared/permissions.js'
+import { COORDINATOR, ORGANISER, VENUE_STAFF } from '../../shared/permissions.js'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import CreateEventRequestPage from './pages/CreateEventRequestPage.jsx'
 import CreateVenuePage from './pages/CreateVenuePage.jsx'
@@ -34,11 +34,13 @@ function App() {
         <Route path="/event-requests/new" element={<CreateEventRequestPage />} />
         <Route path="/event-requests/:id/edit" element={<CreateEventRequestPage />} />
       </Route>
-      {/* Venue catalogue creation belongs to Venue Staff. The API enforces this with requireRole(VENUE_STAFF). */}
-      <Route element={<ProtectedRoute allowedRoles={[VENUE_STAFF]} />}>
+      {/* SPM-49 catalogue viewing belongs to Event Coordinators and Venue Staff; creation remains Venue Staff-only. */}
+      <Route element={<ProtectedRoute allowedRoles={[COORDINATOR, VENUE_STAFF]} />}>
         <Route path="/venues" element={<VenueCataloguePage />} />
-        <Route path="/venues/new" element={<CreateVenuePage />} />
         <Route path="/venues/:id" element={<VenueDetailPage />} />
+      </Route>
+      <Route element={<ProtectedRoute allowedRoles={[VENUE_STAFF]} />}>
+        <Route path="/venues/new" element={<CreateVenuePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
