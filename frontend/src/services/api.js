@@ -80,6 +80,13 @@ export function getVenue(user, id) {
   return authenticatedRequest(user, `/api/venues/${id}`)
 }
 
+export function updateVenue(user, id, venue) {
+  return authenticatedRequest(user, `/api/venues/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(venue),
+  })
+}
+
 export function listVenues(user) {
   return authenticatedRequest(user, '/api/venues')
 }

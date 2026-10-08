@@ -1,5 +1,8 @@
-import { buildVenueRecord, hasVenueValidationErrors } from '../../../shared/venue.js'
+import { buildVenueRecord, hasVenueValidationErrors, normaliseVenueInput } from '../../../shared/venue.js'
+import { VENUE_STAFF } from '../../../shared/permissions.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
+
+export const VENUE_FIELD_CHANGED = 'venue_field_changed'
 
 const CATALOGUE_FIELDS = [
   'name',
@@ -10,6 +13,7 @@ const CATALOGUE_FIELDS = [
   'supportedLayouts',
   'operatingHours',
 ]
+const EDITABLE_FIELDS = CATALOGUE_FIELDS.filter((field) => field !== 'name')
 
 export class VenueValidationError extends Error {
   constructor(errors) {
@@ -48,8 +52,65 @@ export async function getVenue(id, db = getAdminDb()) {
   return { id: snapshot.id, ...snapshot.data() }
 }
 
+export async function updateVenue(id, input, venueStaff, db = getAdminDb(), now = new Date()) {
+  const docRef = db.collection('venues').doc(id)
+  const at = now.toISOString()
+
+  return db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(docRef)
+    if (!snapshot.exists) throw new VenueNotFoundError(id)
+
+    const existing = snapshot.data()
+    const { venue, errors } = normaliseVenueInput({ ...input, name: existing.name })
+    if (!venueStaff?.uid) errors.updatedByUid = 'An authenticated Venue Staff member is required.'
+    if (hasVenueValidationErrors(errors)) throw new VenueValidationError(errors)
+
+    const update = {
+      location: venue.location,
+      maximumCapacity: venue.maximumCapacity,
+      facilities: venue.facilities,
+      accessibilityFeatures: venue.accessibilityFeatures,
+      supportedLayouts: venue.supportedLayouts,
+      operatingHours: venue.operatingHours,
+      updatedByUid: venueStaff.uid,
+      updatedByName: venueStaff.name ?? venueStaff.email ?? null,
+      updatedAt: at,
+    }
+    const changedFields = venueFieldChanges(existing, update)
+
+    tx.update(docRef, update)
+    for (const change of changedFields) {
+      tx.set(docRef.collection('activity').doc(), {
+        type: VENUE_FIELD_CHANGED,
+        ...change,
+        actor: {
+          type: 'user',
+          uid: venueStaff.uid,
+          name: venueStaff.name ?? null,
+          role: VENUE_STAFF,
+        },
+        at,
+      })
+    }
+
+    return { id, ...existing, ...update }
+  })
+}
+
 function projectVenueCatalogueItem(venue) {
   const item = { id: venue.id }
   for (const field of CATALOGUE_FIELDS) item[field] = venue[field]
   return item
+}
+
+function sameValue(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function venueFieldChanges(existing, update) {
+  return EDITABLE_FIELDS.filter((field) => !sameValue(existing[field], update[field])).map((field) => ({
+    field,
+    oldValue: existing[field] ?? null,
+    newValue: update[field] ?? null,
+  }))
 }

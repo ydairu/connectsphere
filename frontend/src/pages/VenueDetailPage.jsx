@@ -33,7 +33,7 @@ function VenueDetailPage() {
   const [venue, setVenue] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
-  const canAddVenue = roles.includes(VENUE_STAFF)
+  const canManageVenue = roles.includes(VENUE_STAFF)
 
   useEffect(() => {
     let active = true
@@ -66,14 +66,19 @@ function VenueDetailPage() {
         <div className="page-heading">
           <div>
             <span className="eyebrow">
-              {canAddVenue ? <Link to="/venues/new">Add another venue</Link> : <Link to="/venues">Venue catalogue</Link>}
+              {canManageVenue ? <Link to="/venues/new">Add another venue</Link> : <Link to="/venues">Venue catalogue</Link>}
             </span>
             <h1>{venue?.name || (loading ? 'Loading venue...' : 'Venue details')}</h1>
-            {venue && <p>Catalogue reference {venue.id}</p>}
           </div>
+          {venue && canManageVenue && (
+            <Link className="button button-secondary" to={`/venues/${venue.id}/edit`}>
+              Edit venue
+            </Link>
+          )}
         </div>
 
         {location.state?.created && <div className="alert alert-success" role="status">Venue added to the catalogue.</div>}
+        {location.state?.updated && <div className="alert alert-success" role="status">Venue details updated.</div>}
         {loading && <Card><LoadingSpinner label="Loading venue" /></Card>}
         {!loading && loadError && <div className="alert alert-error" role="alert">{loadError}</div>}
 
@@ -86,7 +91,7 @@ function VenueDetailPage() {
             <DetailRow label="Accessibility features"><ListValue items={venue.accessibilityFeatures} /></DetailRow>
             <DetailRow label="Supported room layouts"><ListValue items={venue.supportedLayouts} /></DetailRow>
             <DetailRow label="Operating hours"><TextValue>{venue.operatingHours}</TextValue></DetailRow>
-            {canAddVenue && <DetailRow label="Added by"><TextValue>{venue.createdByName || venue.createdByUid}</TextValue></DetailRow>}
+            {canManageVenue && <DetailRow label="Added by"><TextValue>{venue.createdByName || venue.createdByUid}</TextValue></DetailRow>}
           </Card>
         )}
       </main>
