@@ -9,7 +9,7 @@
 
 import cors from 'cors'
 import express from 'express'
-import { SEED_FIELD_HISTORY, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
+import { SEED_ACCOUNTS, SEED_FIELD_HISTORY, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
@@ -39,15 +39,17 @@ export function createDouble() {
     })
     state.profiles = state.db.collectionData('users')
     state.nextUid = 1
-    for (const account of ALL_TEST_USERS) {
-      state.accounts.set(account.email.toLowerCase(), {
-        uid: account.uid,
-        email: account.email,
-        password: TEST_PASSWORD,
-        displayName: account.name,
-      })
-      state.profiles.set(account.uid, { ...profileOf(account), createdAt: new Date(0).toISOString() })
-    }
+    for (const account of ALL_TEST_USERS) addAccount(account)
+  }
+
+  function addAccount(account) {
+    state.accounts.set(account.email.toLowerCase(), {
+      uid: account.uid,
+      email: account.email,
+      password: TEST_PASSWORD,
+      displayName: account.name,
+    })
+    state.profiles.set(account.uid, { ...profileOf(account), createdAt: new Date(0).toISOString() })
   }
 
   const accountByUid = (uid) => [...state.accounts.values()].find((account) => account.uid === uid)
@@ -87,6 +89,15 @@ export function createDouble() {
   router.post('/reset', (_req, res) => {
     reset()
     res.status(204).end()
+  })
+  // Signs in one more seeded account (SEED_ACCOUNTS key) until the next reset, for a spec that needs an
+  // account outside ALL_TEST_USERS without changing every other spec's users — e.g. SPM-48 needs the
+  // Coordinator of A1's confirmed event, and a permanent extra Coordinator would change SPM-26's choices.
+  router.post('/accounts/:key', (req, res) => {
+    const account = SEED_ACCOUNTS[req.params.key]
+    if (!account) return res.status(404).json({ message: `No seeded account ${req.params.key}` })
+    addAccount(account)
+    return res.status(204).end()
   })
   router.get('/state', (_req, res) => {
     res.json({

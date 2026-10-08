@@ -3,6 +3,7 @@ import { createRequestController } from '../controllers/requestController.js'
 import { authoriseHistory, authoriseList, authoriseRead, authoriseWrite, sendHistory } from '../middleware/authorise.js'
 import { createCoordinatorNameLoader } from '../services/assignedCoordinatorService.js'
 import { createOwnerNameLoader } from '../services/requestOwnerService.js'
+import { validatePreparation } from '../middleware/validatePreparation.js'
 
 // SPM-42's minimum API surface: list, read and section edit. No create, submit or draft-save routes —
 // those are SPM-7, SPM-3 and SPM-4.
@@ -16,7 +17,8 @@ export function createRequestRoutes({ authenticate, store, getUserDb }) {
 
   router.get('/', authenticate, controller.loadAll, controller.loadOwnerNames, authoriseList, controller.sendList)
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead, controller.sendOne)
-  router.patch('/:id', authenticate, controller.loadOne, authoriseWrite, controller.update)
+  // SPM-48: preparation values are validated after authorisation, so a forbidden field is a 403, not a 400.
+  router.patch('/:id', authenticate, controller.loadOne, authoriseWrite, validatePreparation, controller.update)
   // SPM-28: read-only. There is deliberately no route that updates or deletes a history entry.
   router.get('/:id/history', authenticate, controller.loadOne, authoriseHistory, controller.loadFieldHistory, sendHistory)
 

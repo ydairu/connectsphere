@@ -1,4 +1,4 @@
-import { SECTION_FIELDS, sectionTitle } from './requestSections.js'
+import { SECTION_FIELDS, optionLabel, sectionTitle } from './requestSections.js'
 
 // SPM-28 — how change history entries are shown. Presentation only: which entries a user receives is
 // decided by the API (shared/changeHistory.js).
@@ -13,7 +13,7 @@ function fieldDefinition(path) {
 /** "Event details · Title" for core.title; the raw path for a field the page does not define. */
 export function fieldLabel(path) {
   const { section, definition } = fieldDefinition(path)
-  return definition ? `${sectionTitle(section)} · ${definition.label}` : String(path)
+  return definition ? `${sectionTitle(section)} · ${definition.shortLabel ?? definition.label}` : String(path)
 }
 
 function formatDateTime(value) {
@@ -21,13 +21,15 @@ function formatDateTime(value) {
   return Number.isNaN(date.getTime()) ? null : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-/** A stored value as text: null "—", arrays comma-separated, booleans Yes/No, date fields formatted. */
+/** A stored value as text: null "—", arrays comma-separated, booleans Yes/No, date fields formatted, select options by label. */
 export function formatHistoryValue(path, value) {
   if (value === null || value === undefined || value === '') return EMPTY_VALUE
   if (Array.isArray(value)) return value.length === 0 ? EMPTY_VALUE : value.map((item) => formatHistoryValue(null, item)).join(', ')
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   if (typeof value === 'object') return JSON.stringify(value)
   if (path && fieldDefinition(path).definition?.type === 'datetime') return formatDateTime(value) ?? String(value)
+  // SPM-48: a preparation status is shown by its label, e.g. "In Progress".
+  if (path && fieldDefinition(path).definition?.type === 'select') return String(optionLabel(fieldDefinition(path).definition, value))
   return String(value)
 }
 

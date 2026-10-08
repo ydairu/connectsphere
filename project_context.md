@@ -301,7 +301,7 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - Values are unvalidated (the SPM-10 validation gap).
       - Entries from one save share a timestamp.
       - Live API runs add entries until the next seed.
-      - Transaction behaviour is verified only on the in-memory fake, not on the emulator or the deployed project.
+      - Transaction behaviour is not verified on the Firestore emulator. (Corrected 7 Oct 2026: it was verified against the real project by the live API suite; see below.)
     - **Evidence:**
       - `tests/spm-28/unit/changeHistory.test.js`
       - `tests/spm-28/unit/seedHistory.test.js`
@@ -310,6 +310,33 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - `tests/spm-28/e2e/spm28.changeHistory.spec.js`
     - **Local verification (macOS, 4 Oct 2026):** lint passed; `test:spm28` 81 Vitest + 3 Playwright passed; 128 Node tests and 99 frontend tests passed; root Vitest 867 passed (30 opt-in live tests skipped); Playwright Chromium passed all 60 tests; the production build passed with the existing bundle-size warning. No existing test needed changing.
     - **Not verified:** no live Firebase, emulator or manual browser check was run, the seed was not run against the real project, and no backlog status change is claimed.
+    - **Correction (7 Oct 2026):** the two lines above understated the verification. The SPM-28 transaction (`firestoreEventRequestStore.update` with `recordChanges`) was verified against the real Firebase project by the live API suite (`npm run test:api:live`), which passed 30/30 on 4 Oct 2026, as reported by the team. The emulator and a manual browser check remain unverified.
+22. **SPM-48 Venue Staff and Technical Support Staff update preparation status (7 Oct 2026, branch `SPM-48`):**
+    - **Built:**
+      - Two new sections, `venuePreparation` and `equipmentPreparation` (`{ status, notes }`; Not Started / In Progress / Ready). A section never saved reads as Not Started with empty notes.
+      - Values, defaults, the 2,000-character notes limit, validation and the read-only reasons: `shared/preparation.js`.
+      - **SPM-42 behaviour change** (`SECTION_ACCESS` in `shared/permissions.js`): assigned Venue Staff edit only venue preparation, and assigned Technical Support Staff only equipment preparation. Staff view the requested `venue` / `equipment` read-only and no longer edit them. The assigned Coordinator views both preparation sections read-only. Organisers and Attendees never receive them.
+      - **TEMPORARY condition:** Planning or Confirmed, and the matching SPM-9 sign-off approved. It lives in `canUpdateVenuePreparation` / `canUpdateEquipmentPreparation`, applied per section in `editableSectionsFor`, until SPM-54 / SPM-56 / SPM-62 exist.
+      - **Validation:** `PATCH /api/requests/:id` validates preparation values after authorisation (`backend/src/middleware/validatePreparation.js`); invalid values get 400 and nothing is written.
+      - **History:** recorded through SPM-28 (same PATCH, same transaction). `shared/changeHistory.js` hides preparation entries from the Organiser as it hides internal planning.
+      - **Page:** a Venue preparation / Equipment preparation card for the staff role that edits it, with a read-only reason taken from the API's `preparation` field. The Coordinator sees both read-only. Shown from Planning onwards.
+      - **Refactor:** sign-off constants moved to `shared/arrangementDecisions.js` (re-exported by `shared/arrangements.js`) to avoid a circular import.
+    - **Seed:** `seed-req-a1-confirmed` now has both sign-offs approved (`arrangementApprovals`), so staff may update its preparation. `seed-req-a1-planning` has none, so preparation is read-only there. IDs are unchanged. `seed-history-a1-planning-2` is kept as historical data that predates SPM-48. **A reseed (`seed.js --write`) is needed** before the live API suite or a manual check on the real project.
+    - **Decisions:** the criteria, the temporary condition, the display rule and the notes limit are team decisions of 7 Oct 2026, pending PO confirmation (effective-requirements.md §7).
+    - **Open question for the PO:** G8 Session 1 supports staff editing only their preparation/reservation sections; G8 Session 2's "their respective venue/equipment sections" is the wording SPM-42 was built on and could mean the requested sections (effective-requirements.md §7 and §9 item 12).
+    - **Gaps:**
+      - Nothing in the application sets `assignedStaffUids` (only the seed does), so outside seed data no staff can update preparation. This is existing SPM-42 behaviour, likely for SPM-14 / SPM-17 / SPM-56 (effective-requirements.md §9).
+      - The condition is temporary (above).
+      - [`docs/evidence/spm42-spm24-traceability.md`](docs/evidence/spm42-spm24-traceability.md) still shows the pre-SPM-48 staff edit rule.
+    - **Existing tests changed:** only those encoding the old staff edit rule, listed in the SPM-48 PR. One more, `Coordinator edits a section outside "main details"`, iterated every section and now excludes the preparation sections the Coordinator only views.
+    - **Test-only change:** the E2E double gained `POST /__double__/accounts/:key`, which signs in one extra seeded account until the next reset. The SPM-48 E2E uses it for `coordinator3`, A1 confirmed's Coordinator; a permanent extra Coordinator would change SPM-26's reassignment choices.
+    - **Evidence:**
+      - `tests/spm-48/unit/preparation.test.js`
+      - `tests/spm-48/integration/preparationApi.test.js`
+      - `tests/spm-48/integration/preparationPage.test.jsx`
+      - `tests/spm-48/e2e/spm48.preparation.spec.js`
+    - **Local verification (macOS, 7 Oct 2026):** lint passed; `test:spm48` 96 Vitest + 3 Playwright passed; `test:spm28` 81 Vitest + 3 Playwright passed; 128 Node and 99 frontend tests passed; root Vitest 1004 passed (30 opt-in live tests skipped); Playwright Chromium 63/63 passed; the production build passed with the existing bundle-size warning.
+    - **Not verified:** no live API run, emulator, deployed project or manual browser check, the seed was not run against the real project, `firestore.rules` is unchanged, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

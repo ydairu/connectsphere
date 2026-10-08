@@ -24,8 +24,10 @@ const venueStaffResponse = {
     status: 'planning',
     core: { title: 'A1 planning', purpose: 'Partners', description: null, preferredDateTime: null, durationHours: 4, expectedAttendees: 80 },
     venue: { layoutPreference: 'theatre', accessibilityRequired: true, accessibilityNeeds: null },
+    venuePreparation: { status: 'not_started', notes: '' },
   },
-  editableSections: ['venue'],
+  // SPM-48: Venue Staff edit venue preparation only; the requested venue is read-only to them.
+  editableSections: ['venuePreparation'],
 }
 
 // `response` null means the caller has already set up getRequest's rejection.
@@ -45,12 +47,13 @@ function showRequest(response, roles = ['venue_staff']) {
 }
 
 describe('SPM-42 — viewing a request by role', () => {
-  it('Venue staff see and edit the venue section, and the equipment section is absent', async () => {
+  it('Venue staff see the venue section and edit venue preparation, and the equipment section is absent', async () => {
     showRequest(venueStaffResponse)
     expect(await screen.findByText('Venue')).toBeTruthy()
     expect(screen.queryByText('Equipment and technical support')).toBeNull()
-    // Their own section is editable; the main details they may view are read-only.
-    expect(screen.getByLabelText('Layout preference')).toBeTruthy()
+    // SPM-48: their own section is venue preparation; the requested venue and main details are read-only.
+    expect(screen.getByLabelText('Venue preparation status')).toBeTruthy()
+    expect(screen.queryByLabelText('Layout preference')).toBeNull()
     expect(screen.queryByLabelText('Title')).toBeNull()
     expect(screen.getByText('Event details')).toBeTruthy()
   })
@@ -75,30 +78,29 @@ describe('SPM-42 — viewing a request by role', () => {
 
 describe('SPM-42 #7 — a rejected field is named', () => {
   it('Saving sends only the changed field and reports the fields the API rejected', async () => {
+    // SPM-48: Venue Staff's editable field is in venue preparation.
     const user = showRequest(venueStaffResponse)
-    const layout = await screen.findByLabelText('Layout preference')
-    await user.clear(layout)
-    await user.type(layout, 'banquet')
+    const notes = await screen.findByLabelText('Venue preparation notes')
+    await user.type(notes, 'Chairs booked')
 
     updateRequest.mockRejectedValueOnce(
-      new ApiRequestError('API_REQUEST_FAILED', { status: 403, details: { forbiddenFields: ['venue.layoutPreference'] } }),
+      new ApiRequestError('API_REQUEST_FAILED', { status: 403, details: { forbiddenFields: ['venuePreparation.notes'] } }),
     )
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() => expect(updateRequest).toHaveBeenCalled())
-    expect(updateRequest.mock.calls[0][2]).toEqual({ venue: { layoutPreference: 'banquet' } })
-    expect(await screen.findByText('You are not allowed to change: venue.layoutPreference')).toBeTruthy()
+    expect(updateRequest.mock.calls[0][2]).toEqual({ venuePreparation: { notes: 'Chairs booked' } })
+    expect(await screen.findByText('You are not allowed to change: venuePreparation.notes')).toBeTruthy()
   })
 
   it('A successful save reports the change', async () => {
+    // SPM-48: Venue Staff's editable field is in venue preparation.
     const user = showRequest(venueStaffResponse)
-    const layout = await screen.findByLabelText('Layout preference')
-    await user.clear(layout)
-    await user.type(layout, 'banquet')
+    await user.selectOptions(await screen.findByLabelText('Venue preparation status'), 'in_progress')
 
     updateRequest.mockResolvedValueOnce({
-      request: { ...venueStaffResponse.request, venue: { ...venueStaffResponse.request.venue, layoutPreference: 'banquet' } },
-      editableSections: ['venue'],
+      request: { ...venueStaffResponse.request, venuePreparation: { status: 'in_progress', notes: '' } },
+      editableSections: ['venuePreparation'],
     })
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     expect(await screen.findByText('Changes saved.')).toBeTruthy()

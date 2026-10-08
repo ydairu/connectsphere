@@ -41,7 +41,7 @@ export function toFormValues(request) {
   return form
 }
 
-function toStoredValue(type, value) {
+function toStoredValue({ type, keepEmpty }, value) {
   switch (type) {
     case 'boolean':
       return value === true
@@ -54,9 +54,11 @@ function toStoredValue(type, value) {
     }
     case 'datetime':
       return value === '' ? null : new Date(value).toISOString()
+    case 'select':
+      return value
     default: {
       const text = String(value ?? '').trim()
-      return text === '' ? null : text
+      return text === '' && !keepEmpty ? null : text
     }
   }
 }
@@ -71,11 +73,12 @@ export function buildPatch(request, form, editableSections = []) {
 
   for (const section of SECTION_ORDER) {
     if (!editableSections.includes(section) || !form?.[section]) continue
-    for (const { name, type } of sectionFields(section)) {
+    for (const field of sectionFields(section)) {
+      const { name } = field
       const current = form[section][name]
       if (current === original[section]?.[name]) continue
       patch[section] = patch[section] ?? {}
-      patch[section][name] = toStoredValue(type, current)
+      patch[section][name] = toStoredValue(field, current)
     }
   }
 

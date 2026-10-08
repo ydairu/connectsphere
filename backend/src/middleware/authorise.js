@@ -11,6 +11,7 @@ import { canReassignCoordinator } from '../../../shared/coordinatorReassignment.
 import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.js'
 import { canViewChangeHistory, visibleChangeHistory } from '../../../shared/changeHistory.js'
 import { requestOwnerFields } from '../../../shared/requestOwner.js'
+import { preparationEditing } from '../../../shared/preparationAccess.js'
 import {
   allAvailableActions,
   arrangementsSummary,
@@ -56,6 +57,8 @@ function outOfScope(user, res) {
  * whether this user may read GET /api/requests/:id/history. `ownerName` and `isOwnRequest` (SPM-64
  * follow-up) tell an Organiser who submitted the request; they are absent for every other role, and no uid
  * is sent. `ownerNames` is what services/requestOwnerService.js loaded from users/{uid}.
+ * `preparation` (SPM-48) says, for each preparation section this user's staff role edits, why it is
+ * read-only now (or null), so the page can explain it: the projected record carries no sign-off for staff.
  */
 export function presentRequest(user, request, { coordinatorName = null, ownerNames } = {}) {
   return {
@@ -71,6 +74,7 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
     rejection: rejectionNotice(user, request),
     completion: completionNotice(user, request),
     canViewChangeHistory: canViewChangeHistory(user, request),
+    preparation: preparationEditing(user, request),
     ...requestOwnerFields(user, request, ownerNames),
   }
 }

@@ -21,14 +21,19 @@
 
 import { TECHNICAL_STAFF, VENUE_STAFF, rolesOf } from './permissions.js'
 import { PLANNING } from './status.js'
+import { ARRANGEMENTS, ARRANGEMENT_APPROVED, TECHNICAL_ARRANGEMENT, VENUE_ARRANGEMENT, arrangementDecision } from './arrangementDecisions.js'
 
-export const VENUE_ARRANGEMENT = 'venue'
-export const TECHNICAL_ARRANGEMENT = 'technical'
-export const ARRANGEMENTS = Object.freeze([VENUE_ARRANGEMENT, TECHNICAL_ARRANGEMENT])
-
-export const ARRANGEMENT_APPROVED = 'approved'
-export const ARRANGEMENT_REJECTED = 'rejected'
-export const ARRANGEMENT_DECISIONS = Object.freeze([ARRANGEMENT_APPROVED, ARRANGEMENT_REJECTED])
+// The decision constants and arrangementDecision() live in arrangementDecisions.js (SPM-48: no circular
+// import through preparation.js); they are re-exported so every existing import keeps working.
+export {
+  ARRANGEMENTS,
+  ARRANGEMENT_APPROVED,
+  ARRANGEMENT_DECISIONS,
+  ARRANGEMENT_REJECTED,
+  TECHNICAL_ARRANGEMENT,
+  VENUE_ARRANGEMENT,
+  arrangementDecision,
+} from './arrangementDecisions.js'
 
 // Reasons a decision is refused.
 export const ARRANGEMENT_NOT_REQUIRED = 'arrangement_not_required'
@@ -54,11 +59,6 @@ export function technicalArrangementRequired(request) {
 /** The arrangements this request needs approved before it can be confirmed. Venue is always mandatory. */
 export function requiredArrangements(request) {
   return technicalArrangementRequired(request) ? [VENUE_ARRANGEMENT, TECHNICAL_ARRANGEMENT] : [VENUE_ARRANGEMENT]
-}
-
-/** The recorded decision for one arrangement, or null if none has been made. */
-export function arrangementDecision(request, arrangement) {
-  return request.arrangementApprovals?.[arrangement]?.decision ?? null
 }
 
 /** Are all mandatory venue and required technical arrangements approved? SPM-9's Confirm guard. */

@@ -81,15 +81,18 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     it('Venue staff GETs an assigned event — equipment section absent', async () => {
       const response = await get('venueStaff', A1_PLANNING)
       expect(response.status).toBe(200)
-      expect(Object.keys(response.json.request).sort()).toEqual(['core', 'id', 'status', 'venue'])
+      // SPM-48: venue preparation is theirs to view; equipment preparation is absent like equipment.
+      expect(Object.keys(response.json.request).sort()).toEqual(['core', 'id', 'status', 'venue', 'venuePreparation'])
       expect(!response.text.includes('projector'), 'equipment values absent from the raw body').toBeTruthy()
-      expect(response.json.editableSections).toEqual(['venue'])
+      // SPM-48: the requested venue is read-only, and venue preparation waits for the venue sign-off.
+      expect(response.json.editableSections).toEqual([])
     })
 
     it('Technical staff GETs an assigned event — venue section absent', async () => {
       const response = await get('technicalStaff', A1_PLANNING)
       expect(response.status).toBe(200)
-      expect(Object.keys(response.json.request).sort()).toEqual(['core', 'equipment', 'id', 'status'])
+      // SPM-48: equipment preparation is theirs to view; venue preparation is absent like venue.
+      expect(Object.keys(response.json.request).sort()).toEqual(['core', 'equipment', 'equipmentPreparation', 'id', 'status'])
       expect(!response.text.includes('layoutPreference'), 'venue fields absent from the raw body').toBeTruthy()
     })
 
@@ -154,7 +157,8 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
         equipment: { requirements: ['smoke machine'] },
       })
       expect(response.status).toBe(403)
-      expect(response.json.forbiddenFields).toEqual(['equipment.requirements'])
+      // SPM-48: Venue Staff no longer edit the requested venue either, so both fields are named.
+      expect(response.json.forbiddenFields).toEqual(['venue.layoutPreference', 'equipment.requirements'])
 
       const after = await get('venueStaff', A1_PLANNING)
       expect(after.json.request.venue.layoutPreference).toBe(seeded[A1_PLANNING].venue.layoutPreference)
@@ -167,25 +171,26 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     })
 
     it('Venue+technical dual-role account PATCHes a venue field and an equipment field', async () => {
-      const original = seeded[A1_PLANNING]
-      const response = await patch('venueTechnicalStaff', A1_PLANNING, {
-        venue: { layoutPreference: 'banquet' },
-        equipment: { requirements: ['projector', 'lectern'] },
+      // SPM-48: the combined roles' sections are venue and equipment preparation, on an event whose
+      // sign-offs are approved. Seeded without preparation, so it reads as the defaults.
+      const response = await patch('venueTechnicalStaff', A1_CONFIRMED, {
+        venuePreparation: { status: 'in_progress' },
+        equipmentPreparation: { notes: 'Projector tested' },
       })
       expect(response.status).toBe(200)
-      expect(response.json.request.venue.layoutPreference).toBe('banquet')
-      expect(response.json.request.equipment.requirements).toEqual(['projector', 'lectern'])
-      expect(response.json.editableSections).toEqual(['venue', 'equipment'])
+      expect(response.json.request.venuePreparation.status).toBe('in_progress')
+      expect(response.json.request.equipmentPreparation.notes).toBe('Projector tested')
+      expect(response.json.editableSections).toEqual(['venuePreparation', 'equipmentPreparation'])
 
-      const persisted = await get('coordinator', A1_PLANNING)
-      expect(persisted.json.request.venue.layoutPreference, 'venue change persisted').toBe('banquet')
-      expect(persisted.json.request.equipment.requirements, 'equipment change persisted').toEqual(['projector', 'lectern'])
+      const persisted = await get('coordinator3', A1_CONFIRMED)
+      expect(persisted.json.request.venuePreparation.status, 'venue preparation persisted').toBe('in_progress')
+      expect(persisted.json.request.equipmentPreparation.notes, 'equipment preparation persisted').toBe('Projector tested')
 
-      const restored = await patch('venueTechnicalStaff', A1_PLANNING, {
-        venue: { layoutPreference: original.venue.layoutPreference },
-        equipment: { requirements: original.equipment.requirements },
+      const restored = await patch('venueTechnicalStaff', A1_CONFIRMED, {
+        venuePreparation: { status: 'not_started', notes: '' },
+        equipmentPreparation: { status: 'not_started', notes: '' },
       })
-      expect(restored.status, 'seeded values restored').toBe(200)
+      expect(restored.status, 'seeded (default) values restored').toBe(200)
     })
 
     it('Organiser edits their own request after it is returned for clarification', async () => {
@@ -231,7 +236,8 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     })
 
     it('PATCH with a section that is not an object of fields', async () => {
-      const response = await patch('venueStaff', A1_PLANNING, { venue: 'banquet' })
+      // The Coordinator may edit venue, so the shape check is what refuses it (SPM-48: Venue Staff may not).
+      const response = await patch('coordinator', A1_PLANNING, { venue: 'banquet' })
       expect(response.status).toBe(400)
     })
   })

@@ -29,6 +29,7 @@ import {
   SUBMITTED,
   UNDER_REVIEW,
 } from '../../shared/status.js'
+import { ARRANGEMENT_APPROVED, TECHNICAL_ARRANGEMENT, VENUE_ARRANGEMENT } from '../../shared/arrangementDecisions.js'
 
 export const SEED_TAG = 'spm42-spm24-sprint1'
 export const SEED_ID_PREFIX = 'seed-'
@@ -78,7 +79,8 @@ const { coordinator, coordinator2, coordinator3, venueStaff, technicalStaff, ven
 
 // `coordinator` is set on every non-draft request: a submitted event is always assigned exactly one
 // Coordinator (Clarification 1, Coordinator and Staff Assignment). Drafts carry no assignment field.
-function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, createdAt }) {
+// `approvals` is SPM-9's arrangementApprovals record metadata, set only where a request needs it.
+function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, approvals, createdAt }) {
   const core = draft
     ? { title, purpose: null, description: null, preferredDateTime: null, durationHours: null, expectedAttendees: null, ...draftCore }
     : {
@@ -102,11 +104,20 @@ function eventRequest({ slug, status, owner, title, coordinator, assigned = [], 
     equipment: { requirements: draft ? [] : ['projector', 'wireless microphone'], technicalSupportNeeded: !draft },
     registration: { enabled: registrationEnabled },
     internal: { planningNotes: draft ? '' : `Seed internal note (${status}) — must never reach an attendee.` },
+    ...(approvals ? { arrangementApprovals: approvals } : {}),
     createdAt,
   }
 }
 
 const bothStaffTeams = [venueStaff, technicalStaff, venueTechnicalStaff]
+
+// SPM-48: a Confirmed event has had its venue and technical sign-off approved (SPM-9's Confirm requires
+// both), so assigned staff may update its preparation. A1's planning event has no sign-off yet, so there
+// preparation is read-only.
+const bothArrangementsApproved = {
+  [VENUE_ARRANGEMENT]: { decision: ARRANGEMENT_APPROVED, byUid: venueStaff.uid, at: '2026-09-06T12:00:00+08:00' },
+  [TECHNICAL_ARRANGEMENT]: { decision: ARRANGEMENT_APPROVED, byUid: technicalStaff.uid, at: '2026-09-06T12:30:00+08:00' },
+}
 
 export const SEED_REQUESTS = Object.freeze([
   // Organisation A, organiser A1 — one request in every status.
@@ -117,7 +128,7 @@ export const SEED_REQUESTS = Object.freeze([
   eventRequest({ slug: 'a1-under-review', coordinator, status: UNDER_REVIEW, owner: organiserA1, title: 'A1 under review', createdAt: '2026-09-03T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-returned', coordinator, status: RETURNED, owner: organiserA1, title: 'A1 returned for clarification', createdAt: '2026-09-04T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-planning', coordinator, status: PLANNING, owner: organiserA1, title: 'A1 planning (all staff assigned)', assigned: bothStaffTeams, createdAt: '2026-09-05T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, createdAt: '2026-09-06T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, approvals: bothArrangementsApproved, createdAt: '2026-09-06T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-completed', coordinator, status: COMPLETED, owner: organiserA1, title: 'A1 completed', assigned: bothStaffTeams, createdAt: '2026-09-07T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-cancelled', coordinator: coordinator2, status: CANCELLED, owner: organiserA1, title: 'A1 cancelled', assigned: bothStaffTeams, createdAt: '2026-09-08T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-rejected', coordinator, status: REJECTED, owner: organiserA1, title: 'A1 rejected', createdAt: '2026-09-09T10:00:00+08:00' }),
@@ -152,6 +163,7 @@ function historyEntry(id, field, oldValue, newValue, account, role, at) {
 export const SEED_FIELD_HISTORY = Object.freeze({
   [PLANNING_REQUEST_ID]: Object.freeze([
     historyEntry('a1-planning-1', 'core.expectedAttendees', 60, planningRequest.core.expectedAttendees, coordinator, 'coordinator', '2026-09-12T10:00:00.000Z'),
+    // Historical: predates SPM-48, when Venue Staff could still edit the venue section. Kept as recorded.
     historyEntry('a1-planning-2', 'venue.layoutPreference', 'banquet', planningRequest.venue.layoutPreference, venueStaff, 'venue_staff', '2026-09-13T10:00:00.000Z'),
     historyEntry('a1-planning-3', 'internal.planningNotes', '', planningRequest.internal.planningNotes, coordinator, 'coordinator', '2026-09-14T10:00:00.000Z'),
   ]),
