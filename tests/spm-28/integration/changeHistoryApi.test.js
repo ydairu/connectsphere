@@ -100,10 +100,12 @@ describe('SPM-28 AC1/AC2 — an entry per changed field, after submission', () =
     ])
   })
 
-  it('Venue Staff at Planning, on their section', async () => {
-    expect((await patch(venueStaff, PLANNING_ID, { venue: { layoutPreference: 'banquet' } })).status).toBe(200)
-    expect(recorded(PLANNING_ID)).toEqual([
-      expect.objectContaining({ field: 'venue.layoutPreference', oldValue: 'theatre', newValue: 'banquet', actor: expect.objectContaining({ role: VENUE_STAFF }) }),
+  it('Venue Staff at Confirmed, on their section', async () => {
+    // SPM-48: Venue Staff's section is venue preparation, editable on the Confirmed event whose venue
+    // sign-off is approved. The seed stores no preparation, so the old value is the default.
+    expect((await patch(venueStaff, CONFIRMED_ID, { venuePreparation: { status: 'in_progress' } })).status).toBe(200)
+    expect(recorded(CONFIRMED_ID)).toEqual([
+      expect.objectContaining({ field: 'venuePreparation.status', oldValue: 'not_started', newValue: 'in_progress', actor: expect.objectContaining({ role: VENUE_STAFF }) }),
     ])
   })
 
@@ -113,10 +115,11 @@ describe('SPM-28 AC1/AC2 — an entry per changed field, after submission', () =
   })
 
   it('arrays are compared by value', async () => {
+    // SPM-48: Technical Support Staff no longer edit the requested equipment; the Coordinator does.
     const { requirements } = db.store.get(PLANNING_ID).equipment
-    expect((await patch(technicalStaff, PLANNING_ID, { equipment: { requirements: [...requirements] } })).status).toBe(200)
+    expect((await patch(coordinator, PLANNING_ID, { equipment: { requirements: [...requirements] } })).status).toBe(200)
     expect(recorded(PLANNING_ID)).toEqual([])
-    expect((await patch(technicalStaff, PLANNING_ID, { equipment: { requirements: [...requirements, 'lectern'] } })).status).toBe(200)
+    expect((await patch(coordinator, PLANNING_ID, { equipment: { requirements: [...requirements, 'lectern'] } })).status).toBe(200)
     expect(recorded(PLANNING_ID)).toEqual([expect.objectContaining({ field: 'equipment.requirements', oldValue: requirements, newValue: [...requirements, 'lectern'] })])
   })
 

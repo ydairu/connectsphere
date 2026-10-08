@@ -30,6 +30,8 @@ const OWN_PLANNING_REQUEST = {
   organisationId: 'TEST-ORG',
   organisationName: 'Test Organisation',
   assignedStaffUids: [ORGANISER_VENUE.uid],
+  // SPM-48: venue sign-off approved, so the venue role may update venue preparation.
+  arrangementApprovals: { venue: { decision: 'approved' } },
   core: { title: 'Own request at planning' },
   venue: { layoutPreference: 'theatre' },
   equipment: { requirements: [] },
@@ -101,9 +103,10 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
   })
 
   it('Organiser who is also venue staff PATCHes the venue section of their own request at planning', async () => {
-    const response = await patchAs(ORGANISER_VENUE.uid, OWN_PLANNING_REQUEST.id, { venue: { layoutPreference: 'banquet' } })
+    // SPM-48: the venue role's section is venue preparation; the requested venue is read-only.
+    const response = await patchAs(ORGANISER_VENUE.uid, OWN_PLANNING_REQUEST.id, { venuePreparation: { status: 'in_progress' } })
     expect(response.status).toBe(200)
-    expect(response.json.editableSections).toEqual(['venue'])
+    expect(response.json.editableSections).toEqual(['venuePreparation'])
   })
 
   it('Self-registered organiser lists and opens their own submitted request without organisation ID', async () => {

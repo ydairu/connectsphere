@@ -27,6 +27,10 @@ import {
   CORE,
   VENUE,
   EQUIPMENT,
+  INTERNAL,
+  REGISTRATION,
+  VENUE_PREPARATION,
+  EQUIPMENT_PREPARATION,
   SECTIONS,
   inScope,
   canEdit,
@@ -46,6 +50,9 @@ const venueStaff = { uid: 'u-venue', roles: [VENUE_STAFF] }
 const technicalStaff = { uid: 'u-tech', roles: [TECHNICAL_STAFF] }
 const dualStaff = { uid: 'u-dual', roles: [VENUE_STAFF, TECHNICAL_STAFF] }
 const attendee = { uid: 'u-attendee', roles: [ATTENDEE] }
+
+// SPM-48: staff edit only their preparation section, and only once the matching sign-off is approved.
+const bothSignOffsApproved = { arrangementApprovals: { venue: { decision: 'approved' }, technical: { decision: 'approved' } } }
 
 function request(overrides = {}) {
   return {
@@ -109,8 +116,9 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
   })
 
   it('Venue staff PATCHes an equipment field', () => {
-    const planning = request({ status: PLANNING })
-    const patch = { venue: { layout: 'banquet' }, equipment: { projector: false } }
+    // SPM-48: Venue Staff edit venue preparation only; the requested venue and equipment are read-only.
+    const planning = request({ status: PLANNING, ...bothSignOffsApproved })
+    const patch = { venuePreparation: { status: 'in_progress' }, equipment: { projector: false } }
     expect(forbiddenFields(venueStaff, planning, patch)).toEqual(['equipment.projector'])
   })
 
@@ -123,8 +131,9 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
   })
 
   it('Venue+technical dual-role account PATCHes a venue field and an equipment field', () => {
-    const planning = request({ status: PLANNING })
-    const patch = { venue: { layout: 'banquet' }, equipment: { projector: false } }
+    // SPM-48: the combined roles edit both preparation sections.
+    const planning = request({ status: PLANNING, ...bothSignOffsApproved })
+    const patch = { venuePreparation: { status: 'ready' }, equipmentPreparation: { notes: 'Projector tested' } }
     expect(forbiddenFields(dualStaff, planning, patch)).toEqual([])
   })
 
@@ -139,10 +148,12 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
       status: PLANNING,
       ownerUid: organiserVenueStaff.uid,
       assignedStaffUids: [organiserVenueStaff.uid],
+      ...bothSignOffsApproved,
     })
     expect(canEdit(organiserVenueStaff, ownPlanning, CORE), 'the venue role must not unlock core').toBe(false)
-    expect(canEdit(organiserVenueStaff, ownPlanning, VENUE), 'the venue role still edits venue').toBe(true)
-    expect(forbiddenFields(organiserVenueStaff, ownPlanning, { core: { title: 'Renamed' }, venue: { layout: 'banquet' } })).toEqual(['core.title'])
+    // SPM-48: the venue role's section is venue preparation.
+    expect(canEdit(organiserVenueStaff, ownPlanning, VENUE_PREPARATION), 'the venue role still edits venue preparation').toBe(true)
+    expect(forbiddenFields(organiserVenueStaff, ownPlanning, { core: { title: 'Renamed' }, venuePreparation: { status: 'ready' } })).toEqual(['core.title'])
   })
 
   it('Venue staff GETs an assigned event — equipment section absent', () => {
@@ -172,13 +183,14 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
 
   it('Assigned venue and technical staff PATCH their section on a completed, cancelled or rejected event', () => {
     for (const status of FINISHED) {
-      const finished = request({ status, assignedStaffUids: [venueStaff.uid, technicalStaff.uid, dualStaff.uid] })
-      expect(canEdit(venueStaff, finished, VENUE), `${status}: venue staff`).toBe(false)
-      expect(canEdit(technicalStaff, finished, EQUIPMENT), `${status}: technical staff`).toBe(false)
-      expect(forbiddenFields(dualStaff, finished, { venue: { layout: 'x' }, equipment: { projector: false } }), status).toEqual(['venue.layout', 'equipment.projector'])
+      // SPM-48: their sections are the preparation sections; sign-off stays approved, the event is closed.
+      const finished = request({ status, assignedStaffUids: [venueStaff.uid, technicalStaff.uid, dualStaff.uid], ...bothSignOffsApproved })
+      expect(canEdit(venueStaff, finished, VENUE_PREPARATION), `${status}: venue staff`).toBe(false)
+      expect(canEdit(technicalStaff, finished, EQUIPMENT_PREPARATION), `${status}: technical staff`).toBe(false)
+      expect(forbiddenFields(dualStaff, finished, { venuePreparation: { status: 'ready' }, equipmentPreparation: { status: 'ready' } }), status).toEqual(['venuePreparation.status', 'equipmentPreparation.status'])
     }
-    const confirmed = request({ status: CONFIRMED, assignedStaffUids: [venueStaff.uid] })
-    expect(canEdit(venueStaff, confirmed, VENUE), 'confirmed stays editable for assigned staff').toBe(true)
+    const confirmed = request({ status: CONFIRMED, assignedStaffUids: [venueStaff.uid], ...bothSignOffsApproved })
+    expect(canEdit(venueStaff, confirmed, VENUE_PREPARATION), 'confirmed stays editable for assigned staff').toBe(true)
   })
 
   // Attendees see confirmed events only. Team decision, proposed by Shaun (14 Sep 2026) and ratified
@@ -198,10 +210,13 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
 
   it('Coordinator edits a section outside "main details" on an event assigned to them', () => {
     // No staff are assigned; the coordinator's scope comes from assignedCoordinatorUid alone (SPM-65).
-    const assigned = request({ status: PLANNING, assignedStaffUids: [] })
+    // Sign-off approved, so only the Coordinator role can be what keeps preparation read-only (SPM-48).
+    const assigned = request({ status: PLANNING, assignedStaffUids: [], ...bothSignOffsApproved })
     const patch = { equipment: { projector: false }, internal: { planningNotes: 'Moved to Hall C' } }
     expect(forbiddenFields(coordinator, assigned, patch)).toEqual([])
-    for (const section of SECTIONS) expect(canEdit(coordinator, assigned, section), section).toBe(true)
+    for (const section of [CORE, VENUE, EQUIPMENT, REGISTRATION, INTERNAL]) expect(canEdit(coordinator, assigned, section), section).toBe(true)
+    // SPM-48: the Coordinator views the preparation sections but does not edit them.
+    for (const section of [VENUE_PREPARATION, EQUIPMENT_PREPARATION]) expect(canEdit(coordinator, assigned, section), section).toBe(false)
   })
 
   it("Coordinator edits an event assigned to another coordinator", () => {

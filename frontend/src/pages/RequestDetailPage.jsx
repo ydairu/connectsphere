@@ -17,7 +17,7 @@ import { useAuth } from '../hooks/useAuth.js'
 import { getRequest, transitionRequest, updateRequest } from '../services/api.js'
 import { statusLabel } from '../utils/statusLabels.js'
 import { buildPatch, hasChanges, toFormValues } from '../utils/requestPatch.js'
-import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSections.js'
+import { SECTION_ORDER, optionLabel, preparationReadOnlyText, sectionFields, sectionTitle } from '../utils/requestSections.js'
 
 // SPM-42 — one page for every role. The response carries only the sections the user may view and the
 // list of sections they may edit, so this page renders what it is given: a section that is absent is
@@ -46,8 +46,14 @@ import { SECTION_ORDER, sectionFields, sectionTitle } from '../utils/requestSect
 // that it is view-only (ownerName / isOwnRequest in the response, sent only to Organisers).
 // SPM-28: the assigned Coordinator and the owning Organiser see the field change history at the end of the
 // page (canViewChangeHistory in the response); it reloads after a save.
+// SPM-48: assigned Venue Staff and Technical Support Staff see their preparation card (venuePreparation /
+// equipmentPreparation in the request), editable only while editableSections says so; otherwise it says
+// why (preparation in the response). The assigned Coordinator sees both read-only. The API sends neither to
+// an Organiser or Attendee, so they see nothing new.
 
-function ReadOnlyValue({ type, value }) {
+function ReadOnlyValue({ field, value }) {
+  const { type } = field
+  if (type === 'select') value = optionLabel(field, value)
   if (type === 'boolean') return <strong>{value === true ? 'Yes' : 'No'}</strong>
   if (type === 'list') {
     const items = Array.isArray(value) ? value : []
@@ -74,8 +80,18 @@ function EditableField({ section, field, value, onChange }) {
   return (
     <div className="field">
       <label htmlFor={id}>{field.label}</label>
-      {field.type === 'textarea' || field.type === 'list' ? (
-        <textarea id={id} rows={field.type === 'list' ? 4 : 3} value={value} onChange={(event) => update(event.target.value)} />
+      {field.type === 'select' ? (
+        <select id={id} value={value} onChange={(event) => update(event.target.value)}>
+          {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+      ) : field.type === 'textarea' || field.type === 'list' ? (
+        <textarea
+          id={id}
+          rows={field.type === 'list' ? 4 : 3}
+          maxLength={field.maxLength}
+          value={value}
+          onChange={(event) => update(event.target.value)}
+        />
       ) : (
         <input
           id={id}
@@ -105,6 +121,7 @@ function RequestDetailPage() {
   const [completion, setCompletion] = useState(null)
   const [canViewHistory, setCanViewHistory] = useState(false)
   const [owner, setOwner] = useState(null)
+  const [preparation, setPreparation] = useState(null)
   const [historyVersion, setHistoryVersion] = useState(0)
   const [acting, setActing] = useState(false)
   const [form, setForm] = useState({})
@@ -126,6 +143,7 @@ function RequestDetailPage() {
     setRejection(response.rejection ?? null)
     setCompletion(response.completion ?? null)
     setCanViewHistory(response.canViewChangeHistory === true)
+    setPreparation(response.preparation ?? null)
     setOwner(typeof response.isOwnRequest === 'boolean' ? { name: response.ownerName ?? null, isOwn: response.isOwnRequest } : null)
     setForm(toFormValues(response.request))
   }, [])
@@ -277,12 +295,14 @@ function RequestDetailPage() {
 
             {visibleSections.map((section) => {
               const editable = editableSections.includes(section)
+              const readOnlyReason = editable ? null : preparationReadOnlyText(section, preparation?.[section]?.readOnlyReason)
               return (
                 <Card className="request-form-section" key={section}>
                   <div className="section-heading">
                     <h2>{sectionTitle(section)}</h2>
                     {!editable && <span className="section-readonly">Read only</span>}
                   </div>
+                  {readOnlyReason && <p className="form-note">{readOnlyReason}</p>}
                   {sectionFields(section).map((field) =>
                     editable ? (
                       <EditableField
@@ -295,7 +315,7 @@ function RequestDetailPage() {
                     ) : (
                       <div className="profile-row" key={field.name}>
                         <span>{field.label}</span>
-                        <ReadOnlyValue type={field.type} value={request[section][field.name]} />
+                        <ReadOnlyValue field={field} value={request[section][field.name]} />
                       </div>
                     ),
                   )}

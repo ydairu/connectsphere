@@ -1,5 +1,7 @@
 # SPM-42 and SPM-24 — permission matrix and traceability
 
+> **Changed by SPM-48 (7 Oct 2026):** staff edit rights changed; Venue Staff and Technical Support Staff now edit only their own preparation section, not `venue` / `equipment`. See [effective-requirements.md, §7 SPM-48](../requirements/effective-requirements.md#spm-48--venue-staff-and-technical-support-staff-update-preparation-status).
+
 Owner: Shaun. Sprint 1. Last verified: 1 October 2026 (live API and deployed-rule checks: 26 September 2026).
 
 This record maps each acceptance criterion to the code that implements it and the tests that prove it,

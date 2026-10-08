@@ -28,6 +28,7 @@
     "test:spm6": "vitest run tests/spm-6/",
     "test:spm28": "vitest run tests/spm-28/ && playwright test tests/spm-28",
     "test:spm29": "vitest run tests/spm-29/",
+    "test:spm48": "vitest run tests/spm-48/ && playwright test tests/spm-48",
     "test:spm64": "vitest run tests/spm-64/ && playwright test tests/spm-64",
     "test:spm26": "vitest run tests/spm-26/ && playwright test tests/spm-26",
     "test:spm46": "vitest run tests/spm-46/ && playwright test tests/spm-46",

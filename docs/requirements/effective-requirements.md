@@ -156,6 +156,8 @@ belongs to a section this story does not own:
 
 **[Deferred/KIV]** Registration settings after submission. The Organiser controls whether registration is enabled and when it closes (Clarification 2), but cannot edit a request once submitted unless it is returned — so under the current rules they cannot open registration or change its closing time on a Confirmed event. The registration period, and whether Attendees must also have registration enabled to see a Confirmed event, are deferred to a future Sprint and further team discussion. Changes to a Confirmed event otherwise belong to Event Change Requests (§19), which does not exist yet.
 
+**[Team decision, 7 Oct 2026 — SPM-48, pending PO confirmation]** Staff edit rights changed after SPM-42 shipped. Venue Staff and Technical Support Staff still view the Organiser's requested venue (`venue`) or equipment (`equipment`), but no longer edit it. Each now edits only its own preparation section (`venuePreparation` / `equipmentPreparation`), and only while that section's condition holds. The assigned Coordinator views both preparation sections read-only. See §7, SPM-48, including the unresolved ambiguity recorded there.
+
 **[Boundary]** SPM-42 cannot be Done until all named roles and their relevant information surfaces exist and are tested. If Sprint 1 implements only Event Organiser behaviour, the story must be split or remain incomplete.
 
 ### SPM-7 — Create an Event Request
@@ -426,6 +428,54 @@ Both the SPM-64 summary and SPM-9's "Arrangements and cancellation" card use thi
 - **Live API runs add entries.** Live API runs add entries to the real seeded events. `backend/scripts/seed.js --write` removes them: only `field_changed` entries under seeded requests that are not part of the seeded history.
 - **Ordering within one save.** One save's entries share a timestamp and are ordered by field.
 
+#### SPM-48 — Venue Staff and Technical Support Staff Update Preparation Status
+
+**[Customer-confirmed]** G8 clarification answers, quoted exactly:
+
+- G8 Session 1 (Lim Natthida): "Event Coordinator edits main details; Organiser can request edits; Venue and Tech staff update their respective preparation/reservation sections."
+- G8 Session 1 (Jian Yong): "Venue/Tech staff update preparation details."
+- G8 Session 1 (Yiap En Rui): "Venue Staff and Tech Staff will update the rediness status in event."
+- G8 Session 2 (Leyna): "Venue Staff and Technical Support update their respective venue/equipment sections."
+- Attendees cannot access internal planning information (see [`clarification-session-2.md`](clarification-session-2.md)).
+
+**[Team decision, 7 Oct 2026 — pending PO confirmation]** The SPM-48 criteria (final, 7 Oct 2026):
+
+- **Sections:** two new sections on `eventRequests`, `venuePreparation` and `equipmentPreparation`, each `{ status, notes }`. Status is Not Started, In Progress or Ready (`not_started`, `in_progress`, `ready`). A section never saved reads as `{ status: 'not_started', notes: '' }`; nothing is written on create.
+- **Who edits:** assigned Venue Staff edit only venue preparation; assigned Technical Support Staff edit only equipment preparation. "Assigned" is the existing SPM-42 rule: the user's uid is in `assignedStaffUids`, and the role decides the section. Neither role edits the main event details, the Organiser's requested venue or equipment, or the other role's preparation.
+- **SPM-42 behaviour change:** staff previously edited the `venue` / `equipment` sections. They now view those sections read-only.
+- **Coordinator:** the assigned Coordinator views both preparation sections, read-only. Editing them is not part of this story.
+- **Preparation is internal:** Organisers (owner or colleague) and Attendees never receive either preparation section, nor their change history entries. The server leaves them out of every response.
+- **Display rule:** preparation is shown from Planning onwards, the closed statuses included. This is a display rule only; writes are decided by the condition below.
+- **Notes limit:** notes must be text of at most 2,000 characters (`PREPARATION_NOTES_MAX_LENGTH`). The customer set no limit.
+
+**[Team decision, 7 Oct 2026 — TEMPORARY, pending PO confirmation]** When preparation may be updated:
+
+- **Rule:** a preparation section may be updated only at Planning or Confirmed, with the matching SPM-9 sign-off approved. Venue preparation needs the venue sign-off; equipment preparation needs the technical sign-off.
+- **Why it is temporary:** this stands in for "an approved venue booking" (SPM-54) and "reserved equipment" (SPM-56 / SPM-62) until those stories exist.
+- **Where it lives:** in one place, `canUpdateVenuePreparation` / `canUpdateEquipmentPreparation` in `shared/preparation.js`. Both the server check and the page's read-only reason use it, so replacing it is a change to that file only.
+- **Otherwise read-only:** without the approval, or at Completed, Cancelled or Rejected, the staff member's section is read-only.
+
+**[Unresolved ambiguity — pending PO confirmation]** Which sections staff edit:
+
+- **Session 1** supports SPM-48: staff edit only their own preparation/reservation sections (Lim Natthida, Jian Yong, Yiap En Rui above).
+- **Session 2's** "their respective venue/equipment sections" (Leyna) is the wording SPM-42 was built on. It could mean the Organiser's requested `venue` / `equipment` sections, which SPM-48 AC1/AC6/AC7 make read-only to staff.
+- **Status:** the team has implemented the SPM-48 criteria as written. This is recorded for the PO to confirm, not as a settled rule.
+- **Not a customer source:** the line "Preliminary equipment requirements may be entered by the Organiser and refined by Coordinators and Technical Support Staff" in [`clarification-session-1.md`](clarification-session-1.md) is a team-written reconstruction (added 13 Sep 2026). The team could not find it in either G8 sheet, so it is not treated as a customer requirement.
+
+**[Implemented — SPM-48, 7 Oct 2026]**
+
+- **Rules:** `shared/preparation.js` holds the values, defaults, notes limit, temporary conditions, read-only reasons, display rule and validation.
+- **Permissions:** `shared/permissions.js` changes its `SECTION_ACCESS` table and applies the conditions to each section in `editableSectionsFor`. `canEdit`, `forbiddenFields` and `editableSections` all follow from that. Forbidden writes keep SPM-42's 403 naming every field, and nothing is written.
+- **Validation:** `PATCH /api/requests/:id` validates the preparation sections only, after authorisation. An invalid status, non-text or over-long notes, or an unknown field returns 400 and writes nothing. Other sections remain unvalidated (SPM-10).
+- **History:** preparation edits go through the same PATCH and `store.update(..., { recordChanges })`, so SPM-28 records one `field_changed` entry per changed field, with the default as the old value on a first save. `shared/changeHistory.js` now hides from the Organiser every section the Organiser role may not view: `internal`, `venuePreparation` and `equipmentPreparation`.
+- **Page:** Venue Staff see a "Venue preparation" card and Technical Support Staff an "Equipment preparation" card. Each has a status select and notes, editable only when the condition holds, and otherwise read-only with "Available once the venue/technical sign-off is approved" or "This event is closed". The reason comes from the API's `preparation` field. The Coordinator sees both cards read-only.
+- **Tests:** `tests/spm-48/`.
+
+**[Known gaps — SPM-48]**
+
+- **No staff assignment outside the seed.** Nothing in the application sets `assignedStaffUids`; only the seed does. Outside seed data, no Venue or Technical Support Staff can see an event, so none can update preparation. This is existing SPM-42 behaviour, not introduced here, and likely belongs to the booking and equipment request stories (SPM-14 / SPM-17 / SPM-56). See §9.
+- **Temporary condition.** Preparation unlocks on SPM-9 sign-off, not on an approved booking or reserved equipment (above).
+
 ### 8. Venue Catalogue
 
 **[Customer-confirmed]** Maintain location, capacity, facilities, accessibility, supported layouts, operating information, and availability-related characteristics. Venue Staff can use catalogue information to identify suitable spaces.
@@ -540,3 +590,8 @@ Before implementing affected functionality, resolve and record:
 8. Notification channels and preferences.
 9. Whether to retain the six-character password minimum as a team security choice.
 10. Whether SPM-42 should be split if all five role surfaces cannot be delivered in Sprint 1.
+11. **Known gap: how staff are assigned to an event. Pending PO decision.**
+    - **Gap:** nothing in the application sets `assignedStaffUids`; only the seed does. Venue and Technical Support Staff therefore see no events, and cannot update preparation (SPM-48), outside seed data. This is existing SPM-42 behaviour, not a regression, and is not fixed by SPM-48.
+    - **Customer answers:** G8 Session 1 (Ange): "Technical Support Staff are auto-assigned by the system, assuming single tech support capability without complex skill matching". G8 Session 1 (Jiaxu): staff assignment tracking "is handled automatically or offline".
+    - **Open:** no story builds staff assignment, and how Venue Staff are assigned is not specified. It likely belongs to the booking and equipment request stories (SPM-14 / SPM-17 / SPM-56).
+12. **SPM-48, pending PO confirmation:** whether staff edit only their preparation/reservation sections (G8 Session 1: Lim Natthida, Jian Yong, Yiap En Rui; SPM-48 as built), or also the Organiser's requested venue/equipment sections. G8 Session 2 (Leyna) says "Venue Staff and Technical Support update their respective venue/equipment sections", the wording SPM-42 was built on (§7, SPM-48).

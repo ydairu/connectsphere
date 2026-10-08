@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CORE,
-  EQUIPMENT,
+  EQUIPMENT_PREPARATION,
   ORGANISER,
   ROLES,
   TECHNICAL_STAFF,
-  VENUE,
+  VENUE_PREPARATION,
   VENUE_STAFF,
   canEdit,
   inScope,
@@ -88,9 +88,13 @@ describe('Seed data — SPM-42 / SPM-24 demonstration coverage', () => {
   })
 
   it('Demonstrable on the seed: venue+technical account edits venue and equipment where venue-only staff cannot', () => {
+    // SPM-48: the staff sections are venue and equipment preparation, editable once sign-off is approved —
+    // A1's confirmed event. B1's planning event is assigned to technical staff only.
+    const confirmed = byId['seed-req-a1-confirmed']
+    expect(canEdit(venueTechnicalStaff, confirmed, VENUE_PREPARATION)).toBe(true)
+    expect(canEdit(venueTechnicalStaff, confirmed, EQUIPMENT_PREPARATION)).toBe(true)
     const planning = byId['seed-req-b1-planning']
-    expect(canEdit(venueTechnicalStaff, planning, VENUE)).toBe(true)
-    expect(canEdit(venueTechnicalStaff, planning, EQUIPMENT)).toBe(true)
+    expect(inScope(venueTechnicalStaff, planning)).toBe(true)
     expect(inScope(venueStaff, planning)).toBe(false)
   })
 

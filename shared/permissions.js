@@ -12,10 +12,21 @@
 // Request shape assumed here (the event-request model does not exist yet — SPM-7):
 //   { id, status, ownerUid, organisationId, organisationName, assignedStaffUids: string[],
 //     assignedCoordinatorUid (SPM-8), core: {...}, venue: {...}, equipment: {...},
-//     registration: { enabled, ... }, internal: {...} }
+//     registration: { enabled, ... }, internal: {...},
+//     venuePreparation: { status, notes }, equipmentPreparation: { status, notes } (SPM-48) }
 // Section data lives under its section key, so a field's section is its top-level key.
 
 import { DRAFT, RETURNED, PLANNING, CONFIRMED, COMPLETED, CANCELLED, REJECTED } from './status.js'
+import {
+  EQUIPMENT_PREPARATION,
+  PREPARATION_CONDITIONS,
+  VENUE_PREPARATION,
+  isPreparationSection,
+  preparationSection,
+  preparationShown,
+} from './preparation.js'
+
+export { EQUIPMENT_PREPARATION, VENUE_PREPARATION } from './preparation.js'
 
 // --- Roles ----------------------------------------------------------------------------------------
 // 'attendee' and 'organiser' match the values already stored in users/{uid}.role.
@@ -36,7 +47,8 @@ export const VENUE = 'venue'
 export const EQUIPMENT = 'equipment'
 export const REGISTRATION = 'registration'
 export const INTERNAL = 'internal'
-export const SECTIONS = Object.freeze([CORE, VENUE, EQUIPMENT, REGISTRATION, INTERNAL])
+// SPM-48: venue and equipment preparation, defined in shared/preparation.js.
+export const SECTIONS = Object.freeze([CORE, VENUE, EQUIPMENT, REGISTRATION, INTERNAL, VENUE_PREPARATION, EQUIPMENT_PREPARATION])
 
 // Role capability — plan, "Role capability — sections".
 const SECTION_ACCESS = Object.freeze({
@@ -45,11 +57,15 @@ const SECTION_ACCESS = Object.freeze({
   // "Coordinators can edit event details" — Clarification 1. "Event Coordinators edit main event
   // details" — Clarification 2. Every section on an event the coordinator may see is the team's SPM-42
   // implementation; which events they may see is record scope, isAssignedCoordinator() (SPM-65).
-  [COORDINATOR]: { view: SECTIONS, edit: SECTIONS },
+  // SPM-48: the Coordinator views both preparation sections but does not edit them.
+  [COORDINATOR]: { view: SECTIONS, edit: [CORE, VENUE, EQUIPMENT, REGISTRATION, INTERNAL] },
   // "Venue staff: venue details only. Technical staff: technical equipment details only."
   // — Clarification 1, User Roles & Access Control. A view restriction, not just edit.
-  [VENUE_STAFF]: { view: [CORE, VENUE], edit: [VENUE] },
-  [TECHNICAL_STAFF]: { view: [CORE, EQUIPMENT], edit: [EQUIPMENT] },
+  // SPM-48 [Team decision, 7 Oct 2026, pending PO confirmation]: staff view the Organiser's requested venue
+  // or equipment but no longer edit it; each edits only its own preparation section, and only while
+  // PREPARATION_CONDITIONS allows (SECTION_CONDITIONS below). Neither sees the other's preparation.
+  [VENUE_STAFF]: { view: [CORE, VENUE, VENUE_PREPARATION], edit: [VENUE_PREPARATION] },
+  [TECHNICAL_STAFF]: { view: [CORE, EQUIPMENT, EQUIPMENT_PREPARATION], edit: [EQUIPMENT_PREPARATION] },
   // Attendee: event information available to them; never internal planning information.
   // — customer-rulings.md, Roles and access
   [ATTENDEE]: { view: [CORE], edit: [] },
@@ -61,6 +77,11 @@ const FINISHED_STATUSES = Object.freeze([COMPLETED, CANCELLED, REJECTED])
 
 // "Venue / Technical staff — planning onwards" — plan, "State gate" — up to, not past, a finished event.
 const STAFF_EDITABLE_STATUSES = Object.freeze([PLANNING, CONFIRMED])
+
+// Record conditions on individual sections, applied after each role's scope and state gate, whoever holds
+// the edit right. SPM-48: a preparation section is editable only while its condition in
+// shared/preparation.js holds (status and the matching sign-off).
+const SECTION_CONDITIONS = PREPARATION_CONDITIONS
 
 // --- Role set -------------------------------------------------------------------------------------
 
@@ -244,7 +265,7 @@ export function editableSectionsFor(user, request) {
   const roles = rolesOf(user).filter(
     (role) => roleInScope(role, user, request) && roleGateOpen(role, user, request),
   )
-  return editableSections(roles)
+  return editableSections(roles).filter((section) => SECTION_CONDITIONS[section]?.(request) ?? true)
 }
 
 /**
@@ -277,7 +298,12 @@ export function projectRequest(user, request) {
 
   const body = { id: request.id, status: request.status }
   for (const section of sections) {
-    if (Object.hasOwn(request, section)) body[section] = request[section]
+    // SPM-48: preparation is shown from Planning onwards, with defaults when nothing is stored yet.
+    if (isPreparationSection(section)) {
+      if (preparationShown(request)) body[section] = preparationSection(request, section)
+    } else if (Object.hasOwn(request, section)) {
+      body[section] = request[section]
+    }
   }
   if (sections.includes(INTERNAL)) {
     for (const [key, value] of Object.entries(request)) {

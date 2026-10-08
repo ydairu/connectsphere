@@ -13,6 +13,7 @@ async function signIn(page, account) {
 }
 
 const A1_PLANNING = 'seed-req-a1-planning'
+const A1_CONFIRMED = 'seed-req-a1-confirmed'
 const A1_SUBMITTED = 'seed-req-a1-submitted'
 const A1_DRAFT = 'seed-req-a1-draft'
 const A2_DRAFT = 'seed-req-a2-draft'
@@ -25,8 +26,11 @@ test.describe('SPM-42 — View and edit information according to my role’s per
     await signIn(page, ROLE_USERS.venueStaff)
     await page.goto(`/requests/${A1_PLANNING}`)
 
-    await expect(page.getByRole('heading', { name: 'Venue' })).toBeVisible()
-    await expect(page.getByLabel('Layout preference')).toBeEditable()
+    await expect(page.getByRole('heading', { name: 'Venue', exact: true })).toBeVisible()
+    // SPM-48: the requested venue is read-only to Venue Staff; their section is venue preparation, which
+    // waits here for the venue sign-off.
+    await expect(page.getByLabel('Layout preference')).toHaveCount(0)
+    await expect(page.getByText('Available once the venue sign-off is approved.')).toBeVisible()
     // Absent from the page, because it is absent from the response — not hidden by the interface.
     await expect(page.getByRole('heading', { name: 'Equipment and technical support' })).toHaveCount(0)
     await expect(page.getByText('projector')).toHaveCount(0)
@@ -47,16 +51,17 @@ test.describe('SPM-42 — View and edit information according to my role’s per
   test('spm42_dual_role_account_edits_venue_and_equipment_on_one_event', async ({ page }) => {
     expect(DUAL_ROLE_STAFF.roles).toEqual([VENUE_STAFF, TECHNICAL_STAFF])
     await signIn(page, DUAL_ROLE_STAFF)
-    await page.goto(`/requests/${A1_PLANNING}`)
+    // SPM-48: the combined roles edit venue and equipment preparation, on the event whose sign-offs are approved.
+    await page.goto(`/requests/${A1_CONFIRMED}`)
 
-    await page.getByLabel('Layout preference').fill('banquet')
-    await page.getByLabel('Equipment required (one per line)').fill('projector\nlectern')
+    await page.getByLabel('Venue preparation status').selectOption('in_progress')
+    await page.getByLabel('Equipment preparation notes').fill('Projector tested')
     await page.getByRole('button', { name: 'Save changes' }).click()
 
     await expect(page.getByRole('alert')).toHaveText('Changes saved.')
     await page.reload()
-    await expect(page.getByLabel('Layout preference')).toHaveValue('banquet')
-    await expect(page.getByLabel('Equipment required (one per line)')).toHaveValue('projector\nlectern')
+    await expect(page.getByLabel('Venue preparation status')).toHaveValue('in_progress')
+    await expect(page.getByLabel('Equipment preparation notes')).toHaveValue('Projector tested')
   })
 
   test('spm42_coordinator_edits_every_section_including_internal_notes', async ({ page }) => {

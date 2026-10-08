@@ -15,7 +15,8 @@
 //     actor: { type: 'user', uid, name, role }, at }
 // `at` is added by the store when it writes the entry.
 
-import { INTERNAL, ROLES, SECTIONS, canEdit, rolesOf } from './permissions.js'
+import { ORGANISER, ROLES, SECTIONS, canEdit, rolesOf, viewableSections } from './permissions.js'
+import { PREPARATION_SECTIONS, preparationSection } from './preparation.js'
 import { isAssignedCoordinator, isOwningOrganiser } from './requestActors.js'
 import { DRAFT } from './status.js'
 
@@ -99,7 +100,13 @@ export function editingRole(user, request, section) {
  */
 export function historyEntriesForEdit(user, before, after) {
   if (before?.status === DRAFT) return []
-  return fieldChanges(before, after).map((change) => ({
+  // SPM-48: a preparation section that was never saved reads as its defaults, so the first edit records
+  // e.g. not_started → in_progress rather than a change from nothing.
+  const withDefaults = (request) => ({
+    ...request,
+    ...Object.fromEntries(PREPARATION_SECTIONS.map((section) => [section, preparationSection(request, section)])),
+  })
+  return fieldChanges(withDefaults(before), withDefaults(after)).map((change) => ({
     type: FIELD_CHANGED,
     ...change,
     actor: {
@@ -122,8 +129,12 @@ export function canViewChangeHistory(user, request) {
   return isAssignedCoordinator(user, request) || isOwningOrganiser(user, request)
 }
 
-function isInternal(entry) {
-  return entry.field.split('.')[0] === INTERNAL
+// The sections whose history an Organiser sees: exactly those the Organiser role may view (SPM-42), so
+// internal planning (SPM-28 AC6) and venue and equipment preparation (SPM-48 AC8) are left out.
+const ORGANISER_VISIBLE_SECTIONS = viewableSections([ORGANISER])
+
+function organiserMaySee(entry) {
+  return ORGANISER_VISIBLE_SECTIONS.includes(entry.field.split('.')[0])
 }
 
 function newestFirst(a, b) {
@@ -137,8 +148,9 @@ function newestFirst(a, b) {
  * never returned (SPM-46: an Organiser does not receive a Coordinator's uid). Null when the user may not
  * view the history at all.
  *
- * The Organiser sees every entry except changes to internal planning (SPM-28 AC6); internal planning is
- * never sent to them (SPM-42), so its history is not either.
+ * The Organiser sees every entry except changes to sections the Organiser role may not view: internal
+ * planning (SPM-28 AC6) and venue and equipment preparation (SPM-48 AC8). Those sections are never sent to
+ * them (SPM-42), so their history is not either.
  */
 export function visibleChangeHistory(user, request, entries) {
   if (!canViewChangeHistory(user, request)) return null
@@ -146,7 +158,7 @@ export function visibleChangeHistory(user, request, entries) {
   const all = isAssignedCoordinator(user, request)
   return entries
     .filter((entry) => entry.type === FIELD_CHANGED && typeof entry.field === 'string')
-    .filter((entry) => all || !isInternal(entry))
+    .filter((entry) => all || organiserMaySee(entry))
     .sort(newestFirst)
     .map(({ id, field, oldValue, newValue, actor, at }) => ({
       id: id ?? null,

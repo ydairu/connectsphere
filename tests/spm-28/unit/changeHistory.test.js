@@ -42,6 +42,9 @@ function request(overrides = {}) {
   }
 }
 
+// SPM-48: staff edit their preparation section only once the matching sign-off is approved.
+const signOffsApproved = { arrangementApprovals: { venue: { decision: 'approved' }, technical: { decision: 'approved' } } }
+
 const withSection = (base, section, fields) => ({ ...base, [section]: { ...base[section], ...fields } })
 
 describe('SPM-28 — field diff', () => {
@@ -130,17 +133,17 @@ describe('SPM-28 — what an edit records', () => {
 
   it.each([
     ['the owner at Returned', owner, RETURNED, 'core', ORGANISER],
-    ['venue staff at Planning', venue, PLANNING, 'venue', VENUE_STAFF],
-    ['technical staff at Confirmed', technical, CONFIRMED, 'equipment', TECHNICAL_STAFF],
+    ['venue staff at Planning', venue, PLANNING, 'venuePreparation', VENUE_STAFF],
+    ['technical staff at Confirmed', technical, CONFIRMED, 'equipmentPreparation', TECHNICAL_STAFF],
     ['the coordinator on internal planning', coordinator, PLANNING, 'internal', COORDINATOR],
   ])('actor role: %s', (_label, user, status, section, role) => {
-    expect(editingRole(user, request({ status }), section)).toBe(role)
+    expect(editingRole(user, request({ status, ...signOffsApproved }), section)).toBe(role)
   })
 
   it('actor role for a multi-role user is the role that permits that section', () => {
     const organiserVenue = { uid: owner.uid, name: 'Both', roles: [ORGANISER, VENUE_STAFF], organisationId: 'ORG-A' }
-    const planning = request({ assignedStaffUids: [owner.uid] })
-    expect(editingRole(organiserVenue, planning, 'venue')).toBe(VENUE_STAFF)
+    const planning = request({ assignedStaffUids: [owner.uid], ...signOffsApproved })
+    expect(editingRole(organiserVenue, planning, 'venuePreparation')).toBe(VENUE_STAFF)
     expect(editingRole(organiserVenue, request({ status: RETURNED }), 'core')).toBe(ORGANISER)
     expect(editingRole(venue, planning, 'core')).toBeNull()
   })
