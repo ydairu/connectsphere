@@ -88,3 +88,19 @@ export function buildPatch(request, form, editableSections = []) {
 export function hasChanges(patch) {
   return Object.keys(patch).length > 0
 }
+
+/**
+ * SPM-10: `form` with the fields named by `paths` ('section.field') put back to their saved values in
+ * `request`; every other field keeps what the user typed. Paths for sections the form does not hold are
+ * ignored.
+ */
+export function withSavedValues(form, request, paths) {
+  const saved = toFormValues(request)
+  const next = { ...form }
+  for (const path of paths) {
+    const [section, name] = path.split('.')
+    if (!next[section] || !saved[section] || !Object.hasOwn(saved[section], name)) continue
+    next[section] = { ...next[section], [name]: saved[section][name] }
+  }
+  return next
+}

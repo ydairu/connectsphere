@@ -12,12 +12,14 @@
 // An entry is one document in the request's `activity` subcollection, in the shape every other activity
 // entry uses (SPM-8, SPM-9, SPM-26):
 //   { type: 'field_changed', field: 'core.title', oldValue, newValue,
-//     actor: { type: 'user', uid, name, role }, at }
+//     actor: { type: 'user', uid, name, role }, at, significant? }
+// `significant: true` is present only on a field shared/significantChanges.js lists as significant (SPM-10).
 // `at` is added by the store when it writes the entry.
 
 import { ORGANISER, ROLES, SECTIONS, canEdit, rolesOf, viewableSections } from './permissions.js'
 import { PREPARATION_SECTIONS, preparationSection } from './preparation.js'
 import { isAssignedCoordinator, isOwningOrganiser } from './requestActors.js'
+import { isSignificantField } from './significantChanges.js'
 import { DRAFT } from './status.js'
 
 export const FIELD_CHANGED = 'field_changed'
@@ -109,6 +111,8 @@ export function historyEntriesForEdit(user, before, after) {
   return fieldChanges(withDefaults(before), withDefaults(after)).map((change) => ({
     type: FIELD_CHANGED,
     ...change,
+    // SPM-10: marked at every status, so the history shows which edits were significant.
+    ...(isSignificantField(change.field) ? { significant: true } : {}),
     actor: {
       type: 'user',
       uid: user.uid,
@@ -144,7 +148,7 @@ function newestFirst(a, b) {
 
 /**
  * The entries this user may see, newest first (one save's entries share a time and are then ordered by
- * field), each as { id, field, oldValue, newValue, actor: { type, name, role }, at } — the actor's uid is
+ * field), each as { id, field, oldValue, newValue, actor: { type, name, role }, at, significant? } — the actor's uid is
  * never returned (SPM-46: an Organiser does not receive a Coordinator's uid). Null when the user may not
  * view the history at all.
  *
@@ -160,12 +164,14 @@ export function visibleChangeHistory(user, request, entries) {
     .filter((entry) => entry.type === FIELD_CHANGED && typeof entry.field === 'string')
     .filter((entry) => all || organiserMaySee(entry))
     .sort(newestFirst)
-    .map(({ id, field, oldValue, newValue, actor, at }) => ({
+    .map(({ id, field, oldValue, newValue, actor, at, significant }) => ({
       id: id ?? null,
       field,
       oldValue: jsonSafe(oldValue),
       newValue: jsonSafe(newValue),
       actor: { type: actor?.type ?? 'user', name: actor?.name ?? null, role: actor?.role ?? null },
       at: at ?? null,
+      // SPM-10: only on significant entries, for every viewer who may see the entry.
+      ...(significant === true ? { significant: true } : {}),
     }))
 }

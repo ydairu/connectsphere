@@ -151,9 +151,15 @@ describe('SPM-5 — Review and approve for Planning (API, in-memory only)', () =
     expect((await act(coordinator, UNDER_REVIEW_ID, APPROVE)).status).toBe(200)
   })
 
-  it('spm5_an_invalid_value_entered_during_review_blocks_approval', async () => {
-    await call('PATCH', `/api/requests/${UNDER_REVIEW_ID}`, coordinator, { core: { expectedAttendees: -5 } })
-    expect((await act(coordinator, UNDER_REVIEW_ID, APPROVE)).json.reason).toBe(INSUFFICIENT_INFORMATION)
+  // SPM-10 AC6 changed this: an invalid value for a significant field is refused when entered (400, nothing
+  // written), so it can no longer reach the record and block approval later.
+  it('spm5_an_invalid_value_entered_during_review_is_refused_and_approval_stays_available', async () => {
+    const before = structuredClone(db.store.get(UNDER_REVIEW_ID))
+    const refused = await call('PATCH', `/api/requests/${UNDER_REVIEW_ID}`, coordinator, { core: { expectedAttendees: -5 } })
+    expect(refused.status).toBe(400)
+    expect(Object.keys(refused.json.errors)).toEqual(['core.expectedAttendees'])
+    expect(db.store.get(UNDER_REVIEW_ID)).toEqual(before)
+    expect((await act(coordinator, UNDER_REVIEW_ID, APPROVE)).status).toBe(200)
   })
 
   // AC: "Given a request assigned to another Coordinator, when an Event Coordinator attempts to approve,

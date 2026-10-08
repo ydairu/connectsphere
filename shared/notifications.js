@@ -15,6 +15,8 @@
 //   cancel / approve cancellation     the owning Organiser, with the reason, and every assigned Venue Staff
 //                                     and Technical Support Staff member (assignedStaffUids)  (SPM-63, SPM-47)
 //                                     and every registered Attendee passed in `attendeeUids`
+//   significant change at Planning /   every assigned Venue Staff and Technical Support Staff member, as
+//   Confirmed                          filtered by role before the save (SPM-10)
 // The user who acted is never notified of their own action.
 
 import { REFUSE_CANCELLATION, REQUEST_CANCELLATION, RESUBMIT_CANCELLATION, RETURN_CANCELLATION } from './requestActions.js'
@@ -27,6 +29,8 @@ export const CANCELLATION_RESUBMITTED_NOTICE = 'cancellation_resubmitted'
 export const CANCELLATION_RETURNED_NOTICE = 'cancellation_returned'
 export const CANCELLATION_REFUSED_NOTICE = 'cancellation_refused'
 export const EVENT_CANCELLED_NOTICE = 'event_cancelled'
+// SPM-10: a significant change reset the sign-off (and, from Confirmed, moved the event back to Planning).
+export const SIGNIFICANT_CHANGE_NOTICE = 'significant_change'
 
 function titleOf(request) {
   const title = request.core?.title
@@ -65,7 +69,11 @@ export function cancellationNotifications(action, request, actor, { reason = nul
     notify(attendeeUids, EVENT_CANCELLED_NOTICE, `“${title}”, which you registered for, has been cancelled.`)
   }
 
-  // One notice per recipient, never to the user who acted, never to a missing uid.
+  return addressed(notices, request, actor, title, at)
+}
+
+// One notice per recipient, never to the user who acted, never to a missing uid.
+function addressed(notices, request, actor, title, at) {
   const seen = new Set()
   return notices
     .filter(({ recipientUid }) => {
@@ -74,4 +82,27 @@ export function cancellationNotifications(action, request, actor, { reason = nul
       return true
     })
     .map((notice) => ({ ...notice, eventRequestId: request.id, eventTitle: title, createdAt: at, readAt: null }))
+}
+
+const STATUS_NAMES = Object.freeze({ planning: 'Planning', confirmed: 'Confirmed' })
+
+/**
+ * SPM-10 — the notices for a significant change saved on `request` (the record before the edit), to
+ * `recipientUids` (assigned Venue and Technical Support Staff, filtered by role by the caller). `fieldLabels`
+ * name the significant fields that changed; `status` is the event's status after the save.
+ */
+export function significantChangeNotifications(request, actor, { recipientUids = [], fieldLabels = [], status, at }) {
+  const title = titleOf(request)
+  const moved = request.status !== status
+  const where = moved ? `It has moved back to ${STATUS_NAMES[status] ?? status}` : `It remains in ${STATUS_NAMES[status] ?? status}`
+  const message = `“${title}” has had a significant change (${fieldLabels.join(', ')}). ${where}, and the venue and technical sign-off must be approved again.`
+  const notices = recipientUids.map((uid) => ({
+    recipientUid: uid,
+    type: SIGNIFICANT_CHANGE_NOTICE,
+    message,
+    reason: null,
+    changedFields: fieldLabels,
+    status,
+  }))
+  return addressed(notices, request, actor, title, at)
 }

@@ -1,5 +1,6 @@
 // In-memory event request store for the API tests. Same contract as firestoreEventRequestStore,
-// including the stale-write check and SPM-28's field history. Not used by the running server.
+// including the stale-write check, SPM-28's field history and SPM-10's consequences. Not used by the running
+// server. Notifications have no collection here; they are kept in memory and read with listNotifications().
 //
 // `history` maps a request id to activity entries already recorded for it (e.g. the seed's
 // SEED_FIELD_HISTORY), each with its `id`.
@@ -10,6 +11,7 @@ import { StaleWriteError } from '../services/eventRequestStore.js'
 export function createMemoryEventRequestStore(requests, { history = {} } = {}) {
   const records = new Map(requests.map((request) => [request.id, { data: structuredClone(request), version: 1 }]))
   const activity = new Map(Object.entries(history).map(([id, entries]) => [id, structuredClone(entries)]))
+  const notifications = []
   let nextEntryId = 1
 
   return {
@@ -29,7 +31,7 @@ export function createMemoryEventRequestStore(requests, { history = {} } = {}) {
     },
 
     // The fields and their history entries are applied together or not at all, as in a transaction.
-    async update(id, patch, { version, recordChanges = () => [] }) {
+    async update(id, patch, { version, recordChanges = () => [], consequences = () => ({}) }) {
       const record = records.get(id)
       if (!record || record.version !== version) throw new StaleWriteError(id)
 
@@ -40,12 +42,26 @@ export function createMemoryEventRequestStore(requests, { history = {} } = {}) {
       }
       const at = new Date().toISOString()
       const entries = recordChanges(before, after).map((entry) => ({ ...entry, id: `memory-activity-${nextEntryId++}`, at }))
+      const effects = consequences(before, after)
+      Object.assign(after, structuredClone(effects.metadata ?? {}))
+      entries.push(...(effects.activity ?? []).map((entry) => ({ ...structuredClone(entry), id: `memory-activity-${nextEntryId++}` })))
 
       after.updatedAt = at
       record.data = after
       record.version += 1
       if (entries.length > 0) activity.set(id, [...(activity.get(id) ?? []), ...entries])
+      notifications.push(...structuredClone(effects.notifications ?? []))
       return { request: structuredClone(record.data), version: record.version }
+    },
+
+    /** Test helper (SPM-10): every activity entry recorded for a request, of every type. */
+    async listActivity(id) {
+      return structuredClone(activity.get(id) ?? [])
+    },
+
+    /** Test helper (SPM-10): the notifications written by updates, in order. */
+    listNotifications() {
+      return structuredClone(notifications)
     },
 
     async listFieldHistory(id) {

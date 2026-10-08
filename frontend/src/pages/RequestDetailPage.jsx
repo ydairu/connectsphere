@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { ORGANISER } from '../../../shared/permissions.js'
-import { DRAFT } from '../../../shared/status.js'
+import { CONFIRMED, DRAFT, PLANNING } from '../../../shared/status.js'
+import { CANCELLATION_REQUEST_OPEN, SIGNIFICANT_FIELDS, significantFieldsIn } from '../../../shared/significantChanges.js'
 import ArrangementsSummary from '../components/ArrangementsSummary.jsx'
 import AssignedCoordinator from '../components/AssignedCoordinator.jsx'
 import ChangeHistory from '../components/ChangeHistory.jsx'
@@ -16,7 +17,8 @@ import StatusPill from '../components/StatusPill.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getRequest, transitionRequest, updateRequest } from '../services/api.js'
 import { statusLabel } from '../utils/statusLabels.js'
-import { buildPatch, hasChanges, toFormValues } from '../utils/requestPatch.js'
+import { fieldLabel } from '../utils/changeHistory.js'
+import { buildPatch, hasChanges, toFormValues, withSavedValues } from '../utils/requestPatch.js'
 import { SECTION_ORDER, optionLabel, preparationReadOnlyText, sectionFields, sectionTitle } from '../utils/requestSections.js'
 
 // SPM-42 — one page for every role. The response carries only the sections the user may view and the
@@ -50,6 +52,13 @@ import { SECTION_ORDER, optionLabel, preparationReadOnlyText, sectionFields, sec
 // equipmentPreparation in the request), editable only while editableSections says so; otherwise it says
 // why (preparation in the response). The assigned Coordinator sees both read-only. The API sends neither to
 // an Organiser or Attendee, so they see nothing new.
+// SPM-10: saving a significant field (shared/significantChanges.js) on a Planning or Confirmed event first
+// asks for confirmation on the page: the sign-offs will reset and a Confirmed event will move back to
+// Planning. The server decides all of it; the page only explains it, then shows the response.
+// A refused save: an invalid value (400) keeps all input and shows each error next to its field; a
+// significant change while a cancellation request is open (409, AC7) puts the significant fields back to
+// their saved values and keeps unsaved ordinary edits; a stale write (409) reloads the latest record.
+// Nothing is saved again automatically.
 
 function ReadOnlyValue({ field, value }) {
   const { type } = field
@@ -64,24 +73,29 @@ function ReadOnlyValue({ field, value }) {
   return <strong>{String(value)}</strong>
 }
 
-function EditableField({ section, field, value, onChange }) {
+function EditableField({ section, field, value, onChange, error }) {
   const id = `${section}-${field.name}`
   const update = (next) => onChange(section, field.name, next)
+  // SPM-10: a server-side validation error for this field, shown beside it (as the draft form's Input does).
+  const errorProps = { 'aria-invalid': Boolean(error), 'aria-describedby': error ? `${id}-error` : undefined }
+  const errorText = error && <span className="field-error" id={`${id}-error`}>{error}</span>
 
   if (field.type === 'boolean') {
-    return (
+    const checkbox = (
       <label className="checkbox-field" htmlFor={id}>
-        <input id={id} type="checkbox" checked={value === true} onChange={(event) => update(event.target.checked)} />
+        <input id={id} type="checkbox" checked={value === true} onChange={(event) => update(event.target.checked)} {...errorProps} />
         {field.label}
       </label>
     )
+    // Unchanged layout unless there is an error to show under it.
+    return error ? <div className="field">{checkbox}{errorText}</div> : checkbox
   }
 
   return (
     <div className="field">
       <label htmlFor={id}>{field.label}</label>
       {field.type === 'select' ? (
-        <select id={id} value={value} onChange={(event) => update(event.target.value)}>
+        <select id={id} value={value} onChange={(event) => update(event.target.value)} {...errorProps}>
           {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       ) : field.type === 'textarea' || field.type === 'list' ? (
@@ -91,6 +105,7 @@ function EditableField({ section, field, value, onChange }) {
           maxLength={field.maxLength}
           value={value}
           onChange={(event) => update(event.target.value)}
+          {...errorProps}
         />
       ) : (
         <input
@@ -98,8 +113,10 @@ function EditableField({ section, field, value, onChange }) {
           type={field.type === 'number' ? 'number' : field.type === 'datetime' ? 'datetime-local' : 'text'}
           value={value}
           onChange={(event) => update(event.target.value)}
+          {...errorProps}
         />
       )}
+      {errorText}
     </div>
   )
 }
@@ -129,6 +146,8 @@ function RequestDetailPage() {
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState(null)
   const [status, setStatus] = useState(null)
+  const [pendingSignificant, setPendingSignificant] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
 
   const applyResponse = useCallback((response) => {
     setRequest(response.request)
@@ -174,6 +193,12 @@ function RequestDetailPage() {
 
   function updateField(section, name, value) {
     setForm((current) => ({ ...current, [section]: { ...current[section], [name]: value } }))
+    // An error stays beside a field until the user changes that field or saves again.
+    setFieldErrors((current) => {
+      if (!current[`${section}.${name}`]) return current
+      const { [`${section}.${name}`]: _cleared, ...rest } = current
+      return rest
+    })
   }
 
   async function handleSave(event) {
@@ -185,26 +210,80 @@ function RequestDetailPage() {
       return
     }
 
+    // SPM-10: a significant change on a Planning or Confirmed event is confirmed on the page first.
+    const significant = significantFieldsIn(patch)
+    if (significant.length > 0 && [PLANNING, CONFIRMED].includes(request.status)) {
+      setStatus(null)
+      setPendingSignificant({ fields: significant, status: request.status })
+      return
+    }
+
+    await save(patch)
+  }
+
+  async function confirmSignificantSave() {
+    setPendingSignificant(null)
+    await save(buildPatch(request, form, editableSections))
+  }
+
+  async function save(patch) {
     setSaving(true)
     setStatus(null)
+    setFieldErrors({})
     try {
       applyResponse(await updateRequest(user, id, patch))
       setHistoryVersion((version) => version + 1)
       setStatus({ type: 'success', message: 'Changes saved.' })
     } catch (error) {
-      // SPM-42 #7: a rejected write names the fields it rejected. Show them rather than a generic error.
-      const rejected = error.details?.forbiddenFields
-      setStatus({
-        type: 'error',
-        message: rejected?.length
-          ? `You are not allowed to change: ${rejected.join(', ')}`
-          : error.status === 409
-            ? 'This request changed while you were editing it. Reload and try again.'
-            : 'We could not save your changes. Please try again.',
-      })
+      await handleRefusedSave(error)
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleRefusedSave(error) {
+    // SPM-42 #7: a rejected write names the fields it rejected. Show them rather than a generic error.
+    const rejected = error.details?.forbiddenFields
+    if (rejected?.length) {
+      setStatus({ type: 'error', message: `You are not allowed to change: ${rejected.join(', ')}` })
+      return
+    }
+
+    // SPM-10 AC7: the significant fields go back to their saved values; unsaved ordinary edits stay.
+    if (error.status === 409 && error.details?.reason === CANCELLATION_REQUEST_OPEN) {
+      setForm((current) => withSavedValues(current, request, SIGNIFICANT_FIELDS))
+      setStatus({
+        type: 'error',
+        message: `${error.details.message ?? ''} Your significant changes were undone. Other edits are still unsaved.`.trim(),
+      })
+      return
+    }
+
+    // SPM-10 AC6: all input is kept; each error is shown beside its field, and summarised above.
+    const invalid = error.status === 400 && error.details?.errors ? error.details.errors : null
+    if (invalid && Object.keys(invalid).length > 0) {
+      setFieldErrors(invalid)
+      setStatus({
+        type: 'error',
+        message: `Please correct: ${Object.entries(invalid).map(([path, problem]) => `${fieldLabel(path)} — ${problem}`).join('; ')}`,
+      })
+      return
+    }
+
+    // Stale write: someone else saved first. Load the latest record into the form.
+    if (error.status === 409) {
+      const message = 'This request changed while you were editing it. The latest version has been loaded; make your changes again.'
+      try {
+        applyResponse(await getRequest(user, id))
+        setHistoryVersion((version) => version + 1)
+        setStatus({ type: 'error', message })
+      } catch {
+        setStatus({ type: 'error', message: 'This request changed while you were editing it. Reload the page and try again.' })
+      }
+      return
+    }
+
+    setStatus({ type: 'error', message: 'We could not save your changes. Please try again.' })
   }
 
   async function handleAction(action, reason) {
@@ -311,6 +390,7 @@ function RequestDetailPage() {
                         field={field}
                         value={form[section]?.[field.name] ?? ''}
                         onChange={updateField}
+                        error={fieldErrors[`${section}.${field.name}`]}
                       />
                     ) : (
                       <div className="profile-row" key={field.name}>
@@ -322,6 +402,24 @@ function RequestDetailPage() {
                 </Card>
               )
             })}
+
+            {pendingSignificant && (
+              <div className="significant-confirmation" role="alertdialog" aria-labelledby="significant-confirmation-title" aria-describedby="significant-confirmation-text">
+                <h2 id="significant-confirmation-title">Confirm significant change</h2>
+                <p id="significant-confirmation-text">
+                  You changed {pendingSignificant.fields.map((path) => fieldLabel(path)).join(', ')}. Saving resets the venue and technical
+                  sign-offs to Awaiting approval
+                  {pendingSignificant.status === CONFIRMED
+                    ? ' and moves the event back to Planning. It cannot be confirmed again until both sign-offs are approved.'
+                    : '. The event cannot be confirmed until both sign-offs are approved again.'}{' '}
+                  Assigned venue and technical staff will be notified.
+                </p>
+                <div className="form-actions">
+                  <Button type="button" onClick={confirmSignificantSave} disabled={saving}>Save and reset sign-offs</Button>
+                  <Button type="button" variant="secondary" onClick={() => setPendingSignificant(null)} disabled={saving}>Keep editing</Button>
+                </div>
+              </div>
+            )}
 
             {canEditAnything ? (
               <div className="form-actions">

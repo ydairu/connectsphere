@@ -22,6 +22,7 @@ import {
   START_REVIEW,
   SUBMIT,
 } from '../../../shared/statusTransitions.js'
+import { SIGNIFICANT_CHANGE } from '../../../shared/significantChanges.js'
 
 // Button wording for the SPM-9 actions in shared/requestActions.js. `confirm` is the question asked
 // before an action that closes the event, hands it back, or records a decision; other actions apply on
@@ -86,10 +87,14 @@ const ACTIONS = {
     label: 'Reject technical arrangement',
     confirm: 'Reject the technical arrangement? The event stays in planning and cannot be confirmed until it is approved.',
   },
+  // SPM-10: not an action anyone can take — the status_changed entry of a significant edit to a Confirmed
+  // event. Labelled so a status history shows it readably; never in availableActions.
+  [SIGNIFICANT_CHANGE]: { label: 'Moved back to Planning (significant change)' },
 }
 
+/** The wording for an action or a status_changed entry's action; an unknown action is shown as it is. */
 export function actionLabel(action) {
-  return ACTIONS[action]?.label ?? action
+  return ACTIONS[action]?.label ?? (typeof action === 'string' && action !== '' ? action : 'Status change')
 }
 
 export function actionConfirmation(action) {

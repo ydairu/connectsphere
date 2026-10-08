@@ -337,6 +337,36 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - `tests/spm-48/e2e/spm48.preparation.spec.js`
     - **Local verification (macOS, 7 Oct 2026):** lint passed; `test:spm48` 96 Vitest + 3 Playwright passed; `test:spm28` 81 Vitest + 3 Playwright passed; 128 Node and 99 frontend tests passed; root Vitest 1004 passed (30 opt-in live tests skipped); Playwright Chromium 63/63 passed; the production build passed with the existing bundle-size warning.
     - **Not verified:** no live API run, emulator, deployed project or manual browser check, the seed was not run against the real project, `firestore.rules` is unchanged, and no backlog status change is claimed.
+23. **SPM-10 edit event information and flag significant changes for re-review (9 Oct 2026, branch `SPM-10`):**
+    - **Built:**
+      - **Field list:** `shared/significantChanges.js`. Significant fields are date/time, duration, attendance, layout preference, the two accessibility fields, the equipment list and the technical support flag. Every other field is ordinary.
+      - **Validation and normalisation:** significant fields are validated on `PATCH /api/requests/:id` after the 403 check (`backend/src/middleware/validateSignificantFields.js`), normalised, and compared by meaning, so `"80"` and `80` are not a change. Date/time, duration, attendance and layout cannot be cleared from Submitted onwards; drafts may still clear them.
+      - **Effects, in the edit's transaction:** history entries are marked `significant: true`. At Planning or Confirmed the recorded sign-off decisions are cleared. At Confirmed the event moves back to Planning, with a `status_changed` entry (`action`/`reason` `significant_change`, the Coordinator, the time and the fields). Assigned users holding a Venue or Technical Support Staff role are notified in-app (`backend/src/services/staffRecipientService.js`).
+      - **Store contract:** a new `consequences` option on `store.update`, in all three stores.
+      - **AC7:** a significant change to a Confirmed event with an open cancellation request is refused with 409; ordinary edits are allowed.
+      - **Request page:** an in-page confirmation before a significant change at Planning or Confirmed, and a "Significant" label in the change history. Refused saves:
+        - **AC7 (409):** significant fields are reset to their saved values and ordinary edits are kept.
+        - **400:** all input is kept, with errors beside each field.
+        - **Stale write (409):** the latest record is reloaded into the form.
+      - **Status label:** "Moved back to Planning (significant change)" in `frontend/src/utils/statusActions.js`.
+    - **Seed:** unchanged. The E2E registers `coordinator3` (A1 confirmed's Coordinator) through the double's `POST /__double__/accounts/:key`, as SPM-48's does.
+    - **Decisions:** the criteria of 8 Oct 2026, the layout rule (free text, no fixed list), the no-clearing rule, the role-filtered notifications and the AC7 block are team decisions (effective-requirements.md §7, SPM-10). AC9 (bookings not released) has nothing to build until SPM-54 / SPM-56 / SPM-62.
+    - **Existing tests changed:**
+      - `tests/spm-5/integration/reviewAndApproveApi.test.js`: `spm5_an_invalid_value_entered_during_review_blocks_approval` is now `…_is_refused_and_approval_stays_available`. AC6 refuses the invalid value when it is entered (400, nothing written).
+      - `tests/spm-27/e2e/spm27.markCompleted.spec.js`: the setup order only. The date moves before the sign-offs are approved, because a date change at Planning is significant and clears them. No assertion changed.
+      - SPM-25 and SPM-64 tests (Organiser edits on Returned requests) were not affected.
+    - **Gaps:**
+      - Ordinary fields are still unvalidated.
+      - No page displays `status_changed` entries yet.
+      - History entries from before SPM-10 carry no significant flag.
+      - With no staff assigned (only the seed assigns staff, effective-requirements.md §9 item 11), nobody is notified.
+    - **Evidence:**
+      - `tests/spm-10/unit/significantChanges.test.js`
+      - `tests/spm-10/integration/significantChangesApi.test.js`
+      - `tests/spm-10/integration/significantChangePage.test.jsx`
+      - `tests/spm-10/e2e/spm10.significantChange.spec.js`
+    - **Local verification (macOS, 9 Oct 2026):** lint passed; `test:spm10` 145 Vitest + 1 Playwright passed; `test:spm27` 23 Vitest + 2 Playwright, `test:spm48` 96 + 3 and `test:spm28` 81 + 3 passed; 128 Node and 99 frontend tests passed; root Vitest 1160 passed (30 opt-in live tests skipped); Playwright Chromium 64/64 passed; the production build passed.
+    - **Not verified:** no live API run, emulator, deployed project or manual browser check; the Firestore store's `consequences` path is exercised only through the in-memory and fakeFirestore stores. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 
