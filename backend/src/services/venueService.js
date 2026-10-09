@@ -1,4 +1,12 @@
 import { buildVenueRecord, hasVenueValidationErrors, normaliseVenueInput } from '../../../shared/venue.js'
+import {
+  AVAILABILITY_STATUS,
+  activeCommitmentsInRange,
+  buildAvailabilityResponse,
+  normaliseAvailabilityCommitment,
+  overlaps,
+  validateAvailabilityRange,
+} from '../../../shared/venueAvailability.js'
 import { VENUE_STAFF } from '../../../shared/permissions.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 
@@ -95,6 +103,55 @@ export async function updateVenue(id, input, venueStaff, db = getAdminDb(), now 
 
     return { id, ...existing, ...update }
   })
+}
+
+export async function listVenueAvailability(venueId, query, db = getAdminDb()) {
+  await getVenue(venueId, db)
+
+  const range = validateAvailabilityRange({ from: query?.from, to: query?.to })
+  if (hasVenueValidationErrors(range.errors)) throw new VenueValidationError(range.errors)
+
+  const snapshot = await db.collection('venueAvailability').where('venueId', '==', venueId).get()
+  const commitments = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+
+  return buildAvailabilityResponse(commitments, range)
+}
+
+export async function createTentativeVenueHold(input, actor, db = getAdminDb()) {
+  const { commitment, errors } = normaliseAvailabilityCommitment({
+    ...input,
+    status: AVAILABILITY_STATUS.TENTATIVE_HOLD,
+  })
+  if (!actor?.uid) errors.createdByUid = 'An authenticated staff member is required.'
+  if (hasVenueValidationErrors(errors)) throw new VenueValidationError(errors)
+
+  const docRef = db.collection('venueAvailability').doc()
+  await db.runTransaction(async (tx) => {
+    const availabilityQuery = db.collection('venueAvailability').where('venueId', '==', commitment.venueId)
+    const snapshot = await tx.get(availabilityQuery)
+    const conflictingHold = activeCommitmentsInRange(
+      snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      { from: new Date(commitment.startsAt), to: new Date(commitment.endsAt) },
+    ).find(
+      (existing) =>
+        existing.status === AVAILABILITY_STATUS.TENTATIVE_HOLD &&
+        existing.id !== docRef.id &&
+        overlaps(existing, commitment),
+    )
+
+    if (conflictingHold) {
+      throw new VenueValidationError({ time: 'This venue already has a tentative hold during that period.' })
+    }
+
+    tx.set(docRef, {
+      ...commitment,
+      createdByUid: actor.uid,
+      createdByName: actor.name ?? actor.email ?? null,
+      createdAt: new Date().toISOString(),
+    })
+  })
+
+  return { id: docRef.id, ...commitment }
 }
 
 function projectVenueCatalogueItem(venue) {
