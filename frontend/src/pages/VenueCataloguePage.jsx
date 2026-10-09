@@ -100,7 +100,10 @@ function VenueCataloguePage() {
                     </dl>
                     <p className="venue-hours">Operating hours: <TextValue>{venue.operatingHours}</TextValue></p>
                   </div>
-                  <Link className="button button-secondary button-small" to={`/venues/${venue.id}`}>View details</Link>
+                  <div className="request-item-actions">
+                    <Link className="button button-secondary button-small" to={`/venues/${venue.id}`}>View details</Link>
+                    <Link className="button button-secondary button-small" to={`/venues/${venue.id}/availability`}>View availability</Link>
+                  </div>
                 </Card>
               </li>
             ))}

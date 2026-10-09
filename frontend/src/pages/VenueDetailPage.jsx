@@ -70,10 +70,17 @@ function VenueDetailPage() {
             </span>
             <h1>{venue?.name || (loading ? 'Loading venue...' : 'Venue details')}</h1>
           </div>
-          {venue && canManageVenue && (
-            <Link className="button button-secondary" to={`/venues/${venue.id}/edit`}>
-              Edit venue
-            </Link>
+          {venue && (
+            <div className="request-item-actions">
+              <Link className="button button-secondary" to={`/venues/${venue.id}/availability`}>
+                View availability
+              </Link>
+              {canManageVenue && (
+                <Link className="button button-secondary" to={`/venues/${venue.id}/edit`}>
+                  Edit venue
+                </Link>
+              )}
+            </div>
           )}
         </div>
 

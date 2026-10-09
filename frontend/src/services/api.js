@@ -80,6 +80,11 @@ export function getVenue(user, id) {
   return authenticatedRequest(user, `/api/venues/${id}`)
 }
 
+export function getVenueAvailability(user, id, { from, to }) {
+  const search = new URLSearchParams({ from, to })
+  return authenticatedRequest(user, `/api/venues/${id}/availability?${search}`)
+}
+
 export function updateVenue(user, id, venue) {
   return authenticatedRequest(user, `/api/venues/${id}`, {
     method: 'PATCH',
