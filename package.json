@@ -26,6 +26,7 @@
     "test:integration": "vitest run tests/spm-1/integration/ tests/spm-2/integration/ tests/spm-3/integration/ tests/spm-4/integration/ tests/spm-6/integration/ tests/spm-7/integration/ tests/spm-29/integration/ tests/spm-49/integration/ tests/lint/",
     "test:e2e": "playwright test",
     "test:spm6": "vitest run tests/spm-6/",
+    "test:spm10": "vitest run tests/spm-10/ && playwright test tests/spm-10",
     "test:spm28": "vitest run tests/spm-28/ && playwright test tests/spm-28",
     "test:spm29": "vitest run tests/spm-29/",
     "test:spm48": "vitest run tests/spm-48/ && playwright test tests/spm-48",

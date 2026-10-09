@@ -6,11 +6,14 @@
 // a write through either route family makes an earlier version stale, as Firestore's update time would.
 //
 // SPM-28: an update and its field_changed entries are written in one fakeFirestore transaction, into the
-// request's `activity` subcollection, as the Firestore store does.
+// request's `activity` subcollection, as the Firestore store does. SPM-10: so are its consequences — the
+// metadata, the activity entries and the notifications (into the double's `notifications` collection, which
+// GET /api/notifications reads).
 
 import { FIELD_CHANGED } from '../../../shared/changeHistory.js'
 import { ACTIVITY_SUBCOLLECTION } from '../../../backend/src/services/coordinatorAssignmentService.js'
 import { StaleWriteError } from '../../../backend/src/services/eventRequestStore.js'
+import { addNotifications } from '../../../backend/src/services/notificationService.js'
 
 export function createFakeFirestoreEventRequestStore(getDb) {
   const records = () => getDb().collectionData('eventRequests')
@@ -30,7 +33,7 @@ export function createFakeFirestoreEventRequestStore(getDb) {
       return data ? { request: toRequest(id, data), version: data } : null
     },
 
-    async update(id, patch, { version, recordChanges = () => [] }) {
+    async update(id, patch, { version, recordChanges = () => [], consequences = () => ({}) }) {
       const db = getDb()
       const ref = db.collection('eventRequests').doc(id)
       await db.runTransaction(async (tx) => {
@@ -46,10 +49,14 @@ export function createFakeFirestoreEventRequestStore(getDb) {
           update[section] = after[section]
         }
         const at = new Date().toISOString()
-        tx.update(ref, { ...update, updatedAt: at })
-        for (const entry of recordChanges(before, after)) {
+        const changes = recordChanges(before, after)
+        const { metadata = {}, activity = [], notifications = [] } = consequences(before, after)
+        tx.update(ref, { ...update, ...metadata, updatedAt: at })
+        for (const entry of changes) {
           tx.set(ref.collection(ACTIVITY_SUBCOLLECTION).doc(), { ...entry, at })
         }
+        for (const entry of activity) tx.set(ref.collection(ACTIVITY_SUBCOLLECTION).doc(), entry)
+        addNotifications(tx, db, notifications)
       })
       const next = records().get(id)
       return { request: toRequest(id, next), version: next }

@@ -3,8 +3,10 @@
 
 import { COORDINATOR, rolesOf } from '../../../shared/permissions.js'
 import { historyEntriesForEdit } from '../../../shared/changeHistory.js'
+import { SIGNIFICANT_CHANGE, significantChangeEffects } from '../../../shared/significantChanges.js'
 import { presentRequest } from '../middleware/authorise.js'
 import { StaleWriteError } from '../services/eventRequestStore.js'
+import { STATUS_CHANGED, userActor } from '../services/statusHistory.js'
 
 function newestFirst(a, b) {
   return (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0)
@@ -12,8 +14,10 @@ function newestFirst(a, b) {
 
 // loadCoordinatorName (SPM-46) comes from services/assignedCoordinatorService.js and reads users/{uid} only
 // for an Organiser who may see the assigned Coordinator. loadOwnerNames (SPM-64 follow-up) comes from
-// services/requestOwnerService.js and reads only the owners an Organiser may see named.
-export function createRequestController(store, loadCoordinatorName, loadOwnerNames = async () => new Map()) {
+// services/requestOwnerService.js and reads only the owners an Organiser may see named. loadStaffRecipients
+// (SPM-10) comes from services/staffRecipientService.js and reads the assigned staff's roles only when a
+// significant change could notify them.
+export function createRequestController(store, loadCoordinatorName, loadOwnerNames = async () => new Map(), loadStaffRecipients = async () => []) {
   return {
     async loadAll(req, _res, next) {
       // SPM-65: a coordinator-only user is served by a query on assignedCoordinatorUid, using the uid from
@@ -64,10 +68,21 @@ export function createRequestController(store, loadCoordinatorName, loadOwnerNam
 
     async update(req, res) {
       try {
+        const staffRecipientUids = await loadStaffRecipients(req.user, req.eventRequest, req.body)
+        const at = new Date().toISOString()
         // SPM-28: one field_changed entry per changed field, written in the same transaction as the edit.
+        // SPM-10: in the same transaction, a significant change at Planning/Confirmed clears the sign-off,
+        // moves a Confirmed event back to Planning (with its status_changed entry) and notifies the staff.
         const { request } = await store.update(req.params.id, req.body, {
           version: req.eventRequestVersion,
           recordChanges: (before, after) => historyEntriesForEdit(req.user, before, after),
+          consequences: (before, after) => {
+            const { metadata, statusChange, notifications } = significantChangeEffects(req.user, before, after, { at, staffRecipientUids })
+            const activity = statusChange
+              ? [{ type: STATUS_CHANGED, action: SIGNIFICANT_CHANGE, ...statusChange, actor: userActor(req.user), at, reason: SIGNIFICANT_CHANGE }]
+              : []
+            return { metadata, activity, notifications }
+          },
         })
         const coordinatorName = await loadCoordinatorName(req.user, request)
         const ownerNames = await loadOwnerNames(req.user, [request])

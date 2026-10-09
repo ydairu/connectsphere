@@ -425,6 +425,7 @@ Both the SPM-64 summary and SPM-9's "Arrangements and cancellation" card use thi
 **[Known gaps — SPM-28]**
 
 - **Unvalidated values.** `PATCH /api/requests/:id` still does not validate or normalise field values (AGENTS.md §6, known gap), so history records whatever was stored; for example, `"80"` replacing `80` is recorded as a change. This is the same validation gap SPM-10 needs closed before it can compare old and new values reliably to detect significant changes. Closing it will make history entries consistent too.
+  - **Update (9 Oct 2026, SPM-10):** closed for the significant fields only. They are now validated, normalised and compared by meaning, so `"80"` replacing `80` is no longer a change (§7, SPM-10). Ordinary fields are still unvalidated.
 - **Live API runs add entries.** Live API runs add entries to the real seeded events. `backend/scripts/seed.js --write` removes them: only `field_changed` entries under seeded requests that are not part of the seeded history.
 - **Ordering within one save.** One save's entries share a timestamp and are ordered by field.
 
@@ -475,6 +476,85 @@ Both the SPM-64 summary and SPM-9's "Arrangements and cancellation" card use thi
 
 - **No staff assignment outside the seed.** Nothing in the application sets `assignedStaffUids`; only the seed does. Outside seed data, no Venue or Technical Support Staff can see an event, so none can update preparation. This is existing SPM-42 behaviour, not introduced here, and likely belongs to the booking and equipment request stories (SPM-14 / SPM-17 / SPM-56). See §9.
 - **Temporary condition.** Preparation unlocks on SPM-9 sign-off, not on an approved booking or reserved equipment (above).
+
+#### SPM-10 — Edit Event Information and Flag Significant Changes for Re-review
+
+**[Customer-confirmed]**
+
+- §7 above: significant date/time, duration, attendance, venue/layout or equipment changes trigger formal re-review and may alter Planning/confirmation status; routine edits are normal.
+- Team record of G8 Session 1 ([`clarification-session-1.md`](clarification-session-1.md), line 54): "Significant changes include expected attendance, duration, venue requirements or layout, and date/time. These trigger re-review."
+- Team record of G8 Session 2 ([`clarification-session-2.md`](clarification-session-2.md), §5):
+  - examples include date, duration, expected attendance, venue and equipment requirements;
+  - "Review/Planning resumes to reassess feasibility";
+  - routine contact or descriptive edits need not trigger re-review;
+  - "The Coordinator reviews whether a change is significant and whether it affects confirmation or planning status."
+- These are the team's records of the answers, not verbatim G8 wording.
+- G8 Session 2 (Leyna), on routine vs significant edits, quoted exactly: "Yes, correct. Routine edits (e.g., contact info, descriptive text) are normal updates. Significant changes affecting date, duration, expected attendance (pax), venue, or equipment requirements, require formal re-review and may affect confirmation/planning status. (Subject to review by Co-ordinator)". The G8 sheets are not stored in the repository; this quote was supplied by the team from the sheet.
+
+**[Team interpretation, 8 Oct 2026 — the S2 "(Subject to review by Co-ordinator)" reading]**
+
+- **The source:** G8 Session 2 (Leyna, above) ends with "(Subject to review by Co-ordinator)", which places the significance judgement with the Coordinator.
+- **How SPM-10 reads it:**
+  - **Fixed list:** significance is decided by a fixed field list, not case by case.
+  - **The Coordinator's review:** the assigned Coordinator is the one making the significant edit, and they see an in-page confirmation of its effect before saving. That confirmation is their review of the change's effect on planning and confirmation status.
+- **Out of scope:** the "formal change request" path for Organisers is Event Change Requests (§19, SPM-20) and SPM-40.
+
+**[Team decision, 8 Oct 2026] SPM-10 criteria (final):**
+
+- **Field classification** (`SIGNIFICANT_FIELDS` in `shared/significantChanges.js`). Every other field is ordinary.
+
+  | Section | Significant | Ordinary |
+  |---|---|---|
+  | `core` | `preferredDateTime`, `durationHours`, `expectedAttendees` | `title`, `purpose`, `description` |
+  | `venue` | `layoutPreference` (the request's venue and layout preference; there is no separate venue field), `accessibilityRequired`, `accessibilityNeeds` | — |
+  | `equipment` | `requirements`, `technicalSupportNeeded` | — |
+  | `registration`, `internal` | — | all fields |
+  | `venuePreparation`, `equipmentPreparation` (SPM-48) | — | all fields (staff-only, and not event information) |
+
+- **Accessibility (team interpretation):** the customer lists "venue requirements"; the team counts the accessibility flag and needs as venue requirements.
+- **Effects by status:**
+  - **Submitted, Under Review or Returned:** a significant edit is applied, and its change history entry is marked significant. Nothing else changes.
+  - **Planning:** the recorded venue and technical sign-off decisions (approved or rejected) are cleared back to Awaiting approval.
+  - **Confirmed:** the decisions are cleared and the event moves back to Planning. It cannot be confirmed again until both sign-offs are re-approved (the SPM-9 Confirm guard).
+  - **"Not required"** is derived from the equipment fields, so clearing does not affect it.
+  - **Both sign-offs:** both are cleared whichever field changed. Choosing per field is deferred.
+- **Ordinary edits** are applied with no other effect at Submitted, Under Review, Planning or Confirmed.
+- **Validation (significant fields only):**
+  - attendance is a positive whole number; duration is a positive number; the date/time is valid;
+  - layout is non-empty free text of at most 2,000 characters, with no fixed list;
+  - accessibility needs is text of at most 2,000 characters;
+  - the equipment list is an array of text; the two flags are true or false.
+  - Invalid input returns 400 naming each field, and nothing is written.
+  - Values are normalised (numbers, ISO date/time, trimmed lists) and compared by meaning, so `"80"` and `80`, or the same time in another format, are not a change.
+- **Required fields:** date/time, duration, attendance and layout cannot be cleared from Submitted onwards (Returned included); this returns 400 "Required". A draft may still clear them (SPM-4/SPM-7), and keeps the draft format rules.
+- **Status history:** Confirmed → Planning is recorded as a `status_changed` entry with `action` and `reason` both `significant_change`, the Coordinator as actor, the time, and the changed field paths. It is an effect of the edit, not an SPM-9 action: it is not in `TRANSITIONS` or `availableActions`.
+- **Notifications:** at Planning or Confirmed, the users in `assignedStaffUids` who hold the Venue Staff or Technical Support Staff role are notified in-app (type `significant_change`). The notice has the event title, the changed fields and the new status. The actor is never notified; there is no email.
+- **Bookings (AC9):** existing venue and equipment bookings are not released by a significant change. Nothing to build until SPM-54 and SPM-56/SPM-62 exist.
+- **Preparation (SPM-48):** the sections keep their status and notes, and become read-only again through SPM-48's temporary condition once the sign-offs are cleared.
+
+**[Team decision, 8 Oct 2026 — SPM-10 AC7] A significant change is refused while a Confirmed event has an open cancellation request.**
+
+- **Rule:** an open request is pending or returned. The refusal is 409 with an explanation, and ordinary edits are still allowed.
+- **Rationale:** the team may set operational boundaries with a documented rationale, and no customer cancellation boundary exists (team record of G8 Session 2, [`clarification-session-2.md`](clarification-session-2.md) lines 51 and 116). An Organiser's cancellation request can be approved, returned, refused or resubmitted only while the event is Confirmed (`shared/cancellationRequests.js`, `APPROVE_CANCELLATION`). Moving the event back to Planning would leave the request undecidable, so the Coordinator decides the cancellation request first.
+
+**[Implemented — SPM-10, 9 Oct 2026]**
+
+- **Rules:** `shared/significantChanges.js`.
+- **Route:** `PATCH /api/requests/:id`. The order is the permission check (403), then `validatePreparation` (400), then `validateSignificantFields` (400), then the AC7 check (409). There is no new write path.
+- **One transaction:** `store.update(..., { recordChanges, consequences })` writes the fields, the `field_changed` entries (marked `significant: true`), the cleared sign-offs, the status change and its `status_changed` entry, and the notifications. A failure writes none of them.
+- **Change history:** shows a "Significant" label on significant entries, for the Coordinator and the Organiser. The Organiser still never sees internal or preparation entries.
+- **Request page:** a significant change on a Planning or Confirmed event first shows an in-page confirmation; ordinary edits save as before. A refused save is handled by its cause, and nothing is saved again automatically:
+  - **AC7 (409):** the significant fields go back to their saved values and unsaved ordinary edits stay. The server's message is shown with "Your significant changes were undone. Other edits are still unsaved."
+  - **Invalid value (400):** all input is kept, and each error is shown beside its field.
+  - **Stale write (409):** the latest saved record is loaded into the form.
+- **Tests:** `tests/spm-10/`.
+
+**[Known gaps — SPM-10]**
+
+- **Ordinary fields are still unvalidated** (AGENTS.md §6).
+- **No status history display:** the `status_changed` entries, including `significant_change`, are recorded but not shown on any page yet. The action has a readable label ready (`frontend/src/utils/statusActions.js`).
+- **Older history entries:** entries recorded before SPM-10, including the seeded ones, carry no significant flag.
+- **Staff assignment (§9 item 11):** with no staff assigned, nobody is notified. This is not an error.
 
 ### 8. Venue Catalogue
 

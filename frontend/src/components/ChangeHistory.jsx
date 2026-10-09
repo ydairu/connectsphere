@@ -8,7 +8,8 @@ import LoadingSpinner from './LoadingSpinner.jsx'
 // SPM-28 — the event's field change history, newest first, as GET /api/requests/:id/history returns it for
 // this user. Rendered only when the API says canViewChangeHistory; the API also refuses everyone else, and
 // leaves out internal planning changes for the Organiser. `refreshKey` changes after a save, so a new
-// entry appears without reloading the page.
+// entry appears without reloading the page. SPM-10: an entry the API marks significant carries a
+// "Significant" label, for every viewer who receives it.
 function ChangeHistory({ user, requestId, refreshKey }) {
   const [entries, setEntries] = useState(null)
   const [error, setError] = useState(null)
@@ -44,6 +45,7 @@ function ChangeHistory({ user, requestId, refreshKey }) {
               <span>{formatHistoryTime(entry.at)}</span>
               <div>
                 <strong>{fieldLabel(entry.field)}</strong>
+                {entry.significant === true && <span className="significant-badge">Significant</span>}
                 <p style={{ margin: '6px 0 0' }}>
                   <span className="value-empty">{formatHistoryValue(entry.field, entry.oldValue)}</span>
                   {' → '}
