@@ -85,6 +85,26 @@ export function getVenueAvailability(user, id, { from, to }) {
   return authenticatedRequest(user, `/api/venues/${id}/availability?${search}`)
 }
 
+export function createMaintenanceBlock(user, venueId, block) {
+  return authenticatedRequest(user, `/api/venues/${venueId}/maintenance-blocks`, {
+    method: 'POST',
+    body: JSON.stringify(block),
+  })
+}
+
+export function updateMaintenanceBlock(user, venueId, blockId, block) {
+  return authenticatedRequest(user, `/api/venues/${venueId}/maintenance-blocks/${blockId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(block),
+  })
+}
+
+export function removeMaintenanceBlock(user, venueId, blockId) {
+  return authenticatedRequest(user, `/api/venues/${venueId}/maintenance-blocks/${blockId}`, {
+    method: 'DELETE',
+  })
+}
+
 export function updateVenue(user, id, venue) {
   return authenticatedRequest(user, `/api/venues/${id}`, {
     method: 'PATCH',
