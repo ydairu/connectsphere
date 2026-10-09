@@ -36,9 +36,9 @@ export function createVenueController(getDb) {
         return sendVenueError(error, res, next)
       }
     },
-    async listVenues(_req, res, next) {
+    async listVenues(req, res, next) {
       try {
-        const venues = await listVenues(getDb())
+        const venues = await listVenues(req.query, getDb())
         return res.json({ venues })
       } catch (error) {
         return sendVenueError(error, res, next)

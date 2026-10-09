@@ -56,11 +56,22 @@ export async function createVenue(input, venueStaff, db = getAdminDb()) {
   return { id: docRef.id, ...venue }
 }
 
-export async function listVenues(db = getAdminDb()) {
+export async function listVenues(query = {}, db = getAdminDb()) {
   const snapshot = await db.collection('venues').get()
-  return snapshot.docs
+  const venues = snapshot.docs
     .map((doc) => projectVenueCatalogueItem({ id: doc.id, ...doc.data() }))
     .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
+
+  if (!query?.availableFrom && !query?.availableTo) return venues
+
+  const range = validateAvailabilityRange({ from: query?.availableFrom, to: query?.availableTo })
+  if (hasVenueValidationErrors(range.errors)) throw new VenueValidationError(range.errors)
+
+  const availabilitySnapshot = await db.collection('venueAvailability').get()
+  const commitments = availabilitySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  const unavailableVenueIds = new Set(activeCommitmentsInRange(commitments, range).map((commitment) => commitment.venueId))
+
+  return venues.filter((venue) => !unavailableVenueIds.has(venue.id))
 }
 
 export async function getVenue(id, db = getAdminDb()) {

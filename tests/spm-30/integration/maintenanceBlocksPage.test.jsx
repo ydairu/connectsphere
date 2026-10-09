@@ -77,6 +77,24 @@ function showAvailabilityPage({ roles = [VENUE_STAFF] } = {}) {
   return userEvent.setup()
 }
 
+function showCataloguePage({ roles = [COORDINATOR] } = {}) {
+  render(
+    <AuthContext.Provider
+      value={{
+        user: { uid: 'user-1', getIdToken: vi.fn().mockResolvedValue('token') },
+        userProfile: { name: 'User One' },
+        roles,
+        loading: false,
+      }}
+    >
+      <MemoryRouter initialEntries={['/venues']}>
+        <App />
+      </MemoryRouter>
+    </AuthContext.Provider>,
+  )
+  return userEvent.setup()
+}
+
 describe('SPM-30 — maintenance block frontend', () => {
   it('spm30_frontend_allows_venue_staff_to_create_a_maintenance_block', async () => {
     listVenues.mockResolvedValue({ venues })
@@ -145,5 +163,25 @@ describe('SPM-30 — maintenance block frontend', () => {
     expect(screen.queryByRole('heading', { name: 'Block venue period' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Amend' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
+  })
+
+  it('spm30_frontend_lets_coordinators_search_for_venues_available_in_a_period', async () => {
+    listVenues.mockResolvedValueOnce({ venues }).mockResolvedValueOnce({ venues: [] })
+    const user = showCataloguePage({ roles: [COORDINATOR] })
+
+    expect(await screen.findByRole('heading', { name: 'Available venues' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Atrium Hall' })).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Available from'), { target: { value: '2026-10-10T10:15' } })
+    fireEvent.change(screen.getByLabelText('Available to'), { target: { value: '2026-10-10T10:45' } })
+    await user.click(screen.getByRole('button', { name: 'Search available venues' }))
+
+    await waitFor(() => {
+      expect(listVenues).toHaveBeenLastCalledWith(expect.objectContaining({ uid: 'user-1' }), {
+        availableFrom: new Date('2026-10-10T10:15').toISOString(),
+        availableTo: new Date('2026-10-10T10:45').toISOString(),
+      })
+    })
+    expect(await screen.findByRole('heading', { name: 'No venues available' })).toBeTruthy()
   })
 })

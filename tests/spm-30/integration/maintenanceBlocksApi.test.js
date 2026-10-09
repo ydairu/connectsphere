@@ -121,6 +121,11 @@ async function getAvailability(from = '2026-10-10T08:00:00.000Z', to = '2026-10-
   return requestJson(`/api/venues/venue-a/availability?${search}`, { uid: COORDINATOR_USER.uid })
 }
 
+async function searchAvailableVenuesAsCoordinator(from, to) {
+  const search = new URLSearchParams({ availableFrom: from, availableTo: to })
+  return requestJson(`/api/venues?${search}`, { uid: COORDINATOR_USER.uid })
+}
+
 describe('SPM-30 — maintenance block API (integration)', () => {
   it('spm30_api_allows_venue_staff_to_create_a_maintenance_block', async () => {
     const response = await requestJson('/api/venues/venue-a/maintenance-blocks', {
@@ -204,6 +209,22 @@ describe('SPM-30 — maintenance block API (integration)', () => {
         reason: 'maintenance',
       }),
     )
+  })
+
+  it('spm30_api_excludes_maintenance_blocked_venues_from_availability_search', async () => {
+    const duringBlock = await searchAvailableVenuesAsCoordinator(
+      '2026-10-10T10:15:00.000Z',
+      '2026-10-10T10:45:00.000Z',
+    )
+    const afterBlock = await searchAvailableVenuesAsCoordinator(
+      '2026-10-10T11:00:00.000Z',
+      '2026-10-10T12:00:00.000Z',
+    )
+
+    expect(duringBlock.status).toBe(200)
+    expect(duringBlock.json.venues).toEqual([])
+    expect(afterBlock.status).toBe(200)
+    expect(afterBlock.json.venues.map((venue) => venue.id)).toEqual(['venue-a'])
   })
 
   it('spm30_api_allows_venue_staff_to_amend_a_maintenance_block', async () => {
