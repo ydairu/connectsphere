@@ -2,6 +2,7 @@ import {
   createVenue,
   getVenue,
   listVenues,
+  listVenueAvailability,
   updateVenue,
   VenueNotFoundError,
   VenueValidationError,
@@ -40,6 +41,14 @@ export function createVenueController(getDb) {
       try {
         const venue = await getVenue(req.params.id, getDb())
         return res.json({ venue })
+      } catch (error) {
+        return sendVenueError(error, res, next)
+      }
+    },
+    async listVenueAvailability(req, res, next) {
+      try {
+        const availability = await listVenueAvailability(req.params.id, req.query, getDb())
+        return res.json({ availability })
       } catch (error) {
         return sendVenueError(error, res, next)
       }

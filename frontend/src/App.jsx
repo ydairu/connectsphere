@@ -13,6 +13,7 @@ import RequestDetailPage from './pages/RequestDetailPage.jsx'
 import RequestsPage from './pages/RequestsPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 import VenueCataloguePage from './pages/VenueCataloguePage.jsx'
+import VenueAvailabilityPage from './pages/VenueAvailabilityPage.jsx'
 import VenueDetailPage from './pages/VenueDetailPage.jsx'
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
       {/* SPM-49 catalogue viewing belongs to Event Coordinators and Venue Staff; creation remains Venue Staff-only. */}
       <Route element={<ProtectedRoute allowedRoles={[COORDINATOR, VENUE_STAFF]} />}>
         <Route path="/venues" element={<VenueCataloguePage />} />
+        <Route path="/venues/:id/availability" element={<VenueAvailabilityPage />} />
         <Route path="/venues/:id" element={<VenueDetailPage />} />
       </Route>
       <Route element={<ProtectedRoute allowedRoles={[VENUE_STAFF]} />}>

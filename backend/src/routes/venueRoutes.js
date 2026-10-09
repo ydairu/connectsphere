@@ -10,6 +10,7 @@ export function createVenueRoutes({ authenticate, getDb }) {
   router.post('/', authenticate, requireRole(VENUE_STAFF), controller.createVenue)
   router.get('/', authenticate, requireRole(COORDINATOR, VENUE_STAFF), controller.listVenues)
   router.patch('/:id', authenticate, requireRole(VENUE_STAFF), controller.updateVenue)
+  router.get('/:id/availability', authenticate, requireRole(COORDINATOR, VENUE_STAFF), controller.listVenueAvailability)
   router.get('/:id', authenticate, requireRole(COORDINATOR, VENUE_STAFF), controller.getVenue)
 
   return router
