@@ -1,8 +1,12 @@
 import {
+  createMaintenanceBlock,
   createVenue,
   getVenue,
   listVenues,
   listVenueAvailability,
+  removeMaintenanceBlock,
+  updateMaintenanceBlock,
+  VenueAvailabilityBlockNotFoundError,
   updateVenue,
   VenueNotFoundError,
   VenueValidationError,
@@ -14,6 +18,9 @@ export function sendVenueError(error, res, next) {
   }
   if (error instanceof VenueNotFoundError) {
     return res.status(404).json({ message: 'Venue not found' })
+  }
+  if (error instanceof VenueAvailabilityBlockNotFoundError) {
+    return res.status(404).json({ message: 'Maintenance block not found' })
   }
   return next(error)
 }
@@ -29,9 +36,9 @@ export function createVenueController(getDb) {
         return sendVenueError(error, res, next)
       }
     },
-    async listVenues(_req, res, next) {
+    async listVenues(req, res, next) {
       try {
-        const venues = await listVenues(getDb())
+        const venues = await listVenues(req.query, getDb())
         return res.json({ venues })
       } catch (error) {
         return sendVenueError(error, res, next)
@@ -49,6 +56,30 @@ export function createVenueController(getDb) {
       try {
         const availability = await listVenueAvailability(req.params.id, req.query, getDb())
         return res.json({ availability })
+      } catch (error) {
+        return sendVenueError(error, res, next)
+      }
+    },
+    async createMaintenanceBlock(req, res, next) {
+      try {
+        const block = await createMaintenanceBlock(req.params.id, req.body, req.user, getDb())
+        return res.status(201).json({ block })
+      } catch (error) {
+        return sendVenueError(error, res, next)
+      }
+    },
+    async updateMaintenanceBlock(req, res, next) {
+      try {
+        const block = await updateMaintenanceBlock(req.params.id, req.params.blockId, req.body, req.user, getDb())
+        return res.json({ block })
+      } catch (error) {
+        return sendVenueError(error, res, next)
+      }
+    },
+    async removeMaintenanceBlock(req, res, next) {
+      try {
+        const block = await removeMaintenanceBlock(req.params.id, req.params.blockId, req.user, getDb())
+        return res.json({ block })
       } catch (error) {
         return sendVenueError(error, res, next)
       }

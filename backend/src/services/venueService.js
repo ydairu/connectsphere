@@ -4,6 +4,7 @@ import {
   activeCommitmentsInRange,
   buildAvailabilityResponse,
   normaliseAvailabilityCommitment,
+  normaliseMaintenanceBlockInput,
   overlaps,
   validateAvailabilityRange,
 } from '../../../shared/venueAvailability.js'
@@ -39,6 +40,14 @@ export class VenueNotFoundError extends Error {
   }
 }
 
+export class VenueAvailabilityBlockNotFoundError extends Error {
+  constructor(id) {
+    super(`Maintenance block ${id} was not found.`)
+    this.name = 'VenueAvailabilityBlockNotFoundError'
+    this.id = id
+  }
+}
+
 export async function createVenue(input, venueStaff, db = getAdminDb()) {
   const { venue, errors } = buildVenueRecord(input, venueStaff)
   if (hasVenueValidationErrors(errors)) throw new VenueValidationError(errors)
@@ -47,11 +56,22 @@ export async function createVenue(input, venueStaff, db = getAdminDb()) {
   return { id: docRef.id, ...venue }
 }
 
-export async function listVenues(db = getAdminDb()) {
+export async function listVenues(query = {}, db = getAdminDb()) {
   const snapshot = await db.collection('venues').get()
-  return snapshot.docs
+  const venues = snapshot.docs
     .map((doc) => projectVenueCatalogueItem({ id: doc.id, ...doc.data() }))
     .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
+
+  if (!query?.availableFrom && !query?.availableTo) return venues
+
+  const range = validateAvailabilityRange({ from: query?.availableFrom, to: query?.availableTo })
+  if (hasVenueValidationErrors(range.errors)) throw new VenueValidationError(range.errors)
+
+  const availabilitySnapshot = await db.collection('venueAvailability').get()
+  const commitments = availabilitySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  const unavailableVenueIds = new Set(activeCommitmentsInRange(commitments, range).map((commitment) => commitment.venueId))
+
+  return venues.filter((venue) => !unavailableVenueIds.has(venue.id))
 }
 
 export async function getVenue(id, db = getAdminDb()) {
@@ -152,6 +172,92 @@ export async function createTentativeVenueHold(input, actor, db = getAdminDb()) 
   })
 
   return { id: docRef.id, ...commitment }
+}
+
+export async function createMaintenanceBlock(venueId, input, venueStaff, db = getAdminDb(), now = new Date()) {
+  await getVenue(venueId, db)
+
+  const { block, errors } = normaliseMaintenanceBlockInput({ ...input, venueId })
+  if (!venueStaff?.uid) errors.createdByUid = 'An authenticated Venue Staff member is required.'
+  if (hasVenueValidationErrors(errors)) throw new VenueValidationError(errors)
+
+  const record = {
+    ...block,
+    lifecycleStatus: 'active',
+    createdByUid: venueStaff.uid,
+    createdByName: venueStaff.name ?? venueStaff.email ?? null,
+    createdAt: now.toISOString(),
+    updatedByUid: venueStaff.uid,
+    updatedByName: venueStaff.name ?? venueStaff.email ?? null,
+    updatedAt: now.toISOString(),
+  }
+  const docRef = await db.collection('venueAvailability').add(record)
+  return { id: docRef.id, ...record }
+}
+
+export async function updateMaintenanceBlock(venueId, blockId, input, venueStaff, db = getAdminDb(), now = new Date()) {
+  await getVenue(venueId, db)
+
+  const docRef = db.collection('venueAvailability').doc(blockId)
+  return db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(docRef)
+    if (!snapshot.exists) throw new VenueAvailabilityBlockNotFoundError(blockId)
+
+    const existing = snapshot.data()
+    if (existing.venueId !== venueId || existing.status !== AVAILABILITY_STATUS.MAINTENANCE_BLOCK) {
+      throw new VenueAvailabilityBlockNotFoundError(blockId)
+    }
+
+    const { block, errors } = normaliseMaintenanceBlockInput({ ...input, venueId })
+    if (!venueStaff?.uid) errors.updatedByUid = 'An authenticated Venue Staff member is required.'
+    if (hasVenueValidationErrors(errors)) throw new VenueValidationError(errors)
+
+    const update = {
+      startsAt: block.startsAt,
+      endsAt: block.endsAt,
+      reason: block.reason,
+      title: block.title,
+      lifecycleStatus: 'active',
+      updatedByUid: venueStaff.uid,
+      updatedByName: venueStaff.name ?? venueStaff.email ?? null,
+      updatedAt: now.toISOString(),
+    }
+
+    tx.update(docRef, update)
+    return { id: blockId, ...existing, ...update }
+  })
+}
+
+export async function removeMaintenanceBlock(venueId, blockId, venueStaff, db = getAdminDb(), now = new Date()) {
+  await getVenue(venueId, db)
+
+  const docRef = db.collection('venueAvailability').doc(blockId)
+  return db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(docRef)
+    if (!snapshot.exists) throw new VenueAvailabilityBlockNotFoundError(blockId)
+
+    const existing = snapshot.data()
+    if (existing.venueId !== venueId || existing.status !== AVAILABILITY_STATUS.MAINTENANCE_BLOCK) {
+      throw new VenueAvailabilityBlockNotFoundError(blockId)
+    }
+
+    if (!venueStaff?.uid) {
+      throw new VenueValidationError({ removedByUid: 'An authenticated Venue Staff member is required.' })
+    }
+
+    const update = {
+      lifecycleStatus: 'removed',
+      removedByUid: venueStaff.uid,
+      removedByName: venueStaff.name ?? venueStaff.email ?? null,
+      removedAt: now.toISOString(),
+      updatedByUid: venueStaff.uid,
+      updatedByName: venueStaff.name ?? venueStaff.email ?? null,
+      updatedAt: now.toISOString(),
+    }
+
+    tx.update(docRef, update)
+    return { id: blockId, ...existing, ...update }
+  })
 }
 
 function projectVenueCatalogueItem(venue) {

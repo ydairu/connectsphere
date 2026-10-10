@@ -11,6 +11,14 @@ export const ACTIVE_COMMITMENT_STATUSES = Object.freeze([
   AVAILABILITY_STATUS.MAINTENANCE_BLOCK,
 ])
 
+export const MAINTENANCE_BLOCK_REASONS = Object.freeze([
+  'maintenance',
+  'renovation',
+  'safety',
+  'internal_activity',
+  'other',
+])
+
 const REMOVED_STATUSES = new Set(['cancelled', 'removed'])
 
 export function validateAvailabilityRange({ from, to }) {
@@ -49,6 +57,27 @@ export function normaliseAvailabilityCommitment(input) {
   }
 }
 
+export function normaliseMaintenanceBlockInput(input) {
+  const reason = typeof input?.reason === 'string' ? input.reason.trim() : ''
+  const { commitment, errors } = normaliseAvailabilityCommitment({
+    ...input,
+    status: AVAILABILITY_STATUS.MAINTENANCE_BLOCK,
+  })
+
+  if (!MAINTENANCE_BLOCK_REASONS.includes(reason)) {
+    errors.reason = 'Reason must be maintenance, renovation, safety, internal_activity, or other.'
+  }
+
+  return {
+    block: {
+      ...commitment,
+      reason,
+      title: commitment.title || maintenanceBlockTitle(reason),
+    },
+    errors,
+  }
+}
+
 export function overlaps(left, right) {
   const leftStart = Date.parse(left.startsAt)
   const leftEnd = Date.parse(left.endsAt)
@@ -78,6 +107,7 @@ export function buildAvailabilityResponse(commitments, range) {
       startsAt,
       endsAt,
       title: commitment.title || null,
+      reason: commitment.reason ?? null,
       eventRequestId: commitment.eventRequestId ?? null,
     }
   })
@@ -89,6 +119,11 @@ export function buildAvailabilityResponse(commitments, range) {
     },
     slots: fillAvailableSlots(busySlots, range),
   }
+}
+
+function maintenanceBlockTitle(reason) {
+  if (reason === 'internal_activity') return 'Internal activity'
+  return reason ? reason[0].toUpperCase() + reason.slice(1) : ''
 }
 
 function parseIsoDate(value) {

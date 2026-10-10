@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { VENUE_STAFF } from '../../../shared/permissions.js'
 import { AVAILABILITY_STATUS } from '../../../shared/venueAvailability.js'
 import Card from '../components/Card.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
-import { getVenueAvailability, listVenues } from '../services/api.js'
+import {
+  createMaintenanceBlock,
+  getVenueAvailability,
+  listVenues,
+  removeMaintenanceBlock,
+  updateMaintenanceBlock,
+} from '../services/api.js'
 
 const STATUS_LABELS = {
   [AVAILABILITY_STATUS.AVAILABLE]: 'Available',
@@ -13,6 +20,14 @@ const STATUS_LABELS = {
   [AVAILABILITY_STATUS.TENTATIVE_HOLD]: 'Tentative hold',
   [AVAILABILITY_STATUS.MAINTENANCE_BLOCK]: 'Maintenance block',
 }
+
+const MAINTENANCE_REASONS = [
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'renovation', label: 'Renovation' },
+  { value: 'safety', label: 'Safety' },
+  { value: 'internal_activity', label: 'Internal activity' },
+  { value: 'other', label: 'Other' },
+]
 
 function localDateTimeValue(date) {
   const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
@@ -27,6 +42,15 @@ function defaultRange() {
   return {
     from: localDateTimeValue(start),
     to: localDateTimeValue(end),
+  }
+}
+
+function defaultBlockForm() {
+  const range = defaultRange()
+  return {
+    startsAt: range.from,
+    endsAt: range.to,
+    reason: 'maintenance',
   }
 }
 
@@ -60,15 +84,26 @@ function slotClassName(status) {
 function VenueAvailabilityPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, roles = [] } = useAuth()
   const [venues, setVenues] = useState([])
   const [range, setRange] = useState(defaultRange)
+  const [blockForm, setBlockForm] = useState(defaultBlockForm)
+  const [editingBlockId, setEditingBlockId] = useState(null)
   const [availability, setAvailability] = useState(null)
   const [loadingVenues, setLoadingVenues] = useState(true)
   const [loadingAvailability, setLoadingAvailability] = useState(true)
+  const [savingBlock, setSavingBlock] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [error, setError] = useState(null)
+  const [blockError, setBlockError] = useState(null)
+  const [blockMessage, setBlockMessage] = useState(null)
 
   const selectedVenue = useMemo(() => venues.find((venue) => venue.id === id), [id, venues])
+  const canManageMaintenanceBlocks = roles.includes(VENUE_STAFF)
+  const maintenanceSlots = useMemo(
+    () => availability?.slots.filter((slot) => slot.status === AVAILABILITY_STATUS.MAINTENANCE_BLOCK && slot.id) ?? [],
+    [availability],
+  )
 
   useEffect(() => {
     let active = true
@@ -124,7 +159,7 @@ function VenueAvailabilityPage() {
     return () => {
       active = false
     }
-  }, [id, range.from, range.to, user])
+  }, [id, range.from, range.to, refreshKey, user])
 
   function updateRange(field, value) {
     setRange((current) => ({ ...current, [field]: value }))
@@ -132,6 +167,82 @@ function VenueAvailabilityPage() {
 
   function shiftRange(direction) {
     setRange((current) => moveRange(current, direction))
+  }
+
+  function updateBlockForm(field, value) {
+    setBlockForm((current) => ({ ...current, [field]: value }))
+  }
+
+  function startEditingBlock(slot) {
+    setEditingBlockId(slot.id)
+    setBlockForm({
+      startsAt: localDateTimeValue(new Date(slot.startsAt)),
+      endsAt: localDateTimeValue(new Date(slot.endsAt)),
+      reason: slot.reason || 'maintenance',
+    })
+    setBlockError(null)
+    setBlockMessage(null)
+  }
+
+  function resetBlockForm() {
+    setEditingBlockId(null)
+    setBlockForm(defaultBlockForm())
+    setBlockError(null)
+  }
+
+  async function saveMaintenanceBlock(event) {
+    event.preventDefault()
+    if (!id) return
+
+    setSavingBlock(true)
+    setBlockError(null)
+    setBlockMessage(null)
+
+    const payload = {
+      startsAt: toApiDateTime(blockForm.startsAt),
+      endsAt: toApiDateTime(blockForm.endsAt),
+      reason: blockForm.reason,
+    }
+
+    try {
+      if (editingBlockId) {
+        await updateMaintenanceBlock(user, id, editingBlockId, payload)
+        setBlockMessage('Maintenance block updated.')
+      } else {
+        await createMaintenanceBlock(user, id, payload)
+        setBlockMessage('Maintenance block created.')
+      }
+      setEditingBlockId(null)
+      setRefreshKey((current) => current + 1)
+    } catch (saveError) {
+      if (saveError.status === 400) setBlockError('Check the start date, end date, and reason.')
+      else if (saveError.status === 403) setBlockError('Only Venue Staff can manage maintenance blocks.')
+      else if (saveError.status === 404) setBlockError('This venue or maintenance block no longer exists.')
+      else setBlockError('We could not save the maintenance block. Please try again.')
+    } finally {
+      setSavingBlock(false)
+    }
+  }
+
+  async function removeBlock(blockId) {
+    if (!id) return
+
+    setSavingBlock(true)
+    setBlockError(null)
+    setBlockMessage(null)
+
+    try {
+      await removeMaintenanceBlock(user, id, blockId)
+      if (editingBlockId === blockId) setEditingBlockId(null)
+      setBlockMessage('Maintenance block removed.')
+      setRefreshKey((current) => current + 1)
+    } catch (removeError) {
+      if (removeError.status === 403) setBlockError('Only Venue Staff can manage maintenance blocks.')
+      else if (removeError.status === 404) setBlockError('This maintenance block no longer exists.')
+      else setBlockError('We could not remove the maintenance block. Please try again.')
+    } finally {
+      setSavingBlock(false)
+    }
   }
 
   return (
@@ -194,6 +305,66 @@ function VenueAvailabilityPage() {
 
         {(loadingVenues || loadingAvailability) && !error && <Card><LoadingSpinner label="Loading availability" /></Card>}
 
+        {canManageMaintenanceBlocks && !loadingVenues && !error && (
+          <Card className="request-form-section maintenance-block-panel">
+            <div className="section-heading">
+              <div>
+                <h2>{editingBlockId ? 'Amend maintenance block' : 'Block venue period'}</h2>
+                <p className="request-meta">Mark this venue unavailable for maintenance, renovation, safety issues, or internal use.</p>
+              </div>
+            </div>
+            {blockError && <div className="alert alert-error" role="alert">{blockError}</div>}
+            {blockMessage && <div className="alert alert-success" role="status">{blockMessage}</div>}
+            <form className="venue-form" onSubmit={saveMaintenanceBlock}>
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="blockStartsAt">Start date</label>
+                  <input
+                    id="blockStartsAt"
+                    type="datetime-local"
+                    value={blockForm.startsAt}
+                    onChange={(event) => updateBlockForm('startsAt', event.target.value)}
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="blockEndsAt">End date</label>
+                  <input
+                    id="blockEndsAt"
+                    type="datetime-local"
+                    value={blockForm.endsAt}
+                    onChange={(event) => updateBlockForm('endsAt', event.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="blockReason">Reason</label>
+                <select
+                  id="blockReason"
+                  value={blockForm.reason}
+                  onChange={(event) => updateBlockForm('reason', event.target.value)}
+                  required
+                >
+                  {MAINTENANCE_REASONS.map((reason) => (
+                    <option key={reason.value} value={reason.value}>{reason.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-actions">
+                <button className="button button-primary" type="submit" disabled={savingBlock || !id}>
+                  {savingBlock ? 'Saving...' : editingBlockId ? 'Save changes' : 'Create maintenance block'}
+                </button>
+                {editingBlockId && (
+                  <button className="button button-secondary" type="button" onClick={resetBlockForm} disabled={savingBlock}>
+                    Cancel edit
+                  </button>
+                )}
+              </div>
+            </form>
+          </Card>
+        )}
+
         {!loadingVenues && !loadingAvailability && !error && availability && (
           <Card className="request-form-section availability-calendar">
             <div className="section-heading">
@@ -211,13 +382,27 @@ function VenueAvailabilityPage() {
             </div>
             <ol className="availability-slot-list" aria-label="Availability slots">
               {availability.slots.map((slot) => (
-                <li key={`${slot.status}-${slot.startsAt}-${slot.endsAt}`} className={slotClassName(slot.status)}>
+                <li key={`${slot.id ?? slot.status}-${slot.startsAt}-${slot.endsAt}`} className={slotClassName(slot.status)}>
                   <strong>{STATUS_LABELS[slot.status] ?? slot.status}</strong>
                   <span>{toDisplayTime(slot.startsAt)} to {toDisplayTime(slot.endsAt)}</span>
                   {slot.title && <span>{slot.title}</span>}
+                  {slot.reason && <span>Reason: {MAINTENANCE_REASONS.find((reason) => reason.value === slot.reason)?.label ?? slot.reason}</span>}
+                  {canManageMaintenanceBlocks && slot.status === AVAILABILITY_STATUS.MAINTENANCE_BLOCK && slot.id && (
+                    <span className="maintenance-block-actions">
+                      <button className="button button-secondary button-small" type="button" onClick={() => startEditingBlock(slot)}>
+                        Amend
+                      </button>
+                      <button className="button button-secondary button-small" type="button" onClick={() => removeBlock(slot.id)} disabled={savingBlock}>
+                        Remove
+                      </button>
+                    </span>
+                  )}
                 </li>
               ))}
             </ol>
+            {canManageMaintenanceBlocks && maintenanceSlots.length === 0 && (
+              <p className="request-meta">No maintenance blocks are visible in this selected period.</p>
+            )}
           </Card>
         )}
       </main>

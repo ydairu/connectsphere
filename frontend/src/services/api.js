@@ -85,6 +85,26 @@ export function getVenueAvailability(user, id, { from, to }) {
   return authenticatedRequest(user, `/api/venues/${id}/availability?${search}`)
 }
 
+export function createMaintenanceBlock(user, venueId, block) {
+  return authenticatedRequest(user, `/api/venues/${venueId}/maintenance-blocks`, {
+    method: 'POST',
+    body: JSON.stringify(block),
+  })
+}
+
+export function updateMaintenanceBlock(user, venueId, blockId, block) {
+  return authenticatedRequest(user, `/api/venues/${venueId}/maintenance-blocks/${blockId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(block),
+  })
+}
+
+export function removeMaintenanceBlock(user, venueId, blockId) {
+  return authenticatedRequest(user, `/api/venues/${venueId}/maintenance-blocks/${blockId}`, {
+    method: 'DELETE',
+  })
+}
+
 export function updateVenue(user, id, venue) {
   return authenticatedRequest(user, `/api/venues/${id}`, {
     method: 'PATCH',
@@ -92,8 +112,11 @@ export function updateVenue(user, id, venue) {
   })
 }
 
-export function listVenues(user) {
-  return authenticatedRequest(user, '/api/venues')
+export function listVenues(user, filters = {}) {
+  const search = new URLSearchParams()
+  if (filters.availableFrom) search.set('availableFrom', filters.availableFrom)
+  if (filters.availableTo) search.set('availableTo', filters.availableTo)
+  return authenticatedRequest(user, `/api/venues${search.size > 0 ? `?${search}` : ''}`)
 }
 
 // SPM-42 list route: returns only the requests in the caller's scope, each reduced to the sections

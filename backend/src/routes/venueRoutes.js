@@ -10,6 +10,9 @@ export function createVenueRoutes({ authenticate, getDb }) {
   router.post('/', authenticate, requireRole(VENUE_STAFF), controller.createVenue)
   router.get('/', authenticate, requireRole(COORDINATOR, VENUE_STAFF), controller.listVenues)
   router.patch('/:id', authenticate, requireRole(VENUE_STAFF), controller.updateVenue)
+  router.post('/:id/maintenance-blocks', authenticate, requireRole(VENUE_STAFF), controller.createMaintenanceBlock)
+  router.patch('/:id/maintenance-blocks/:blockId', authenticate, requireRole(VENUE_STAFF), controller.updateMaintenanceBlock)
+  router.delete('/:id/maintenance-blocks/:blockId', authenticate, requireRole(VENUE_STAFF), controller.removeMaintenanceBlock)
   router.get('/:id/availability', authenticate, requireRole(COORDINATOR, VENUE_STAFF), controller.listVenueAvailability)
   router.get('/:id', authenticate, requireRole(COORDINATOR, VENUE_STAFF), controller.getVenue)
 
