@@ -19,7 +19,7 @@ export const MAINTENANCE_BLOCK_REASONS = Object.freeze([
   'other',
 ])
 
-const REMOVED_STATUSES = new Set(['cancelled', 'removed'])
+export const REMOVED_STATUSES = new Set(['cancelled', 'removed'])
 
 export function validateAvailabilityRange({ from, to }) {
   const errors = {}

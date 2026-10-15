@@ -485,6 +485,17 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 >
 > **[Customer gap — C6 subparts unanswered]** G8!B6 asked three things that C6 never addresses: (a) who is notified when a setup/turnaround change creates a conflict (Venue Staff, Coordinator, or both); (b) who resolves the conflict; (c) whether the affected event reverts to Planning or keeps its status with a warning flag. No fallback is invented.
 
+> **Lock point chosen by the backlog — SPM-72 AC5 (Product Backlog workbook), pending PO confirmation.** SPM-72 adopts G8!C6's freeze moment: setup and turnaround cannot be changed while the venue has a confirmed booking (fields read-only, server refuses). G8!C4's "once set" reading is not adopted. The tension above is kept as the historical record.
+
+**[Team decision, 15 Oct 2026 — SPM-72, pending PO confirmation]** Where SPM-72's acceptance criteria leave room:
+
+- **"Has a confirmed booking"** means a `confirmed_booking` entry in `venueAvailability` that is not cancelled or removed and has not ended. Past bookings, tentative holds and maintenance blocks do not lock the times.
+- **A refused change gets 409** naming each locked field, as SPM-10 refuses state-based edits. Other venue details can still be saved while the times are locked.
+- **Times left out of an edit keep their saved values**; on creation they default to 0. A blank value is refused rather than read as 0.
+- **Creation history** is the venue record itself (its values, `createdByUid`, `createdAt`, as SPM-6 records). Later changes are `venue_field_changed` entries, as SPM-29 records.
+
+**[Implemented — SPM-72, 15 Oct 2026 — historical record]** Validation in `shared/venue.js`; `venueBufferMinutes`, `occupiedPeriod` and `hasConfirmedBooking` in `shared/venueOccupancy.js`; `GET /api/venues/:id` adds `setupMinutes`, `turnaroundMinutes` (0 when not stored) and `bufferTimesLocked`. `occupiedPeriod` is not yet applied to availability, search or conflict checks (SPM-73, SPM-75, SPM-16). A change made while the venue has only tentative holds can make those holds' occupied periods overlap; nothing flags this yet (the C6 sub-parts above remain open).
+
 ### 4.9 Venue Availability Calendar
 
 **[Customer-confirmed]** Show bookings, tentative holds, and maintenance/unavailable periods. Turnaround may be zero.

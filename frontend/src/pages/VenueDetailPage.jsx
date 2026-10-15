@@ -17,6 +17,11 @@ function TextValue({ children }) {
   return <strong>{children}</strong>
 }
 
+function formatMinutes(minutes) {
+  const value = minutes ?? 0
+  return value === 1 ? '1 minute' : `${value} minutes`
+}
+
 function DetailRow({ label, children }) {
   return (
     <div className="profile-row">
@@ -98,6 +103,11 @@ function VenueDetailPage() {
             <DetailRow label="Accessibility features"><ListValue items={venue.accessibilityFeatures} /></DetailRow>
             <DetailRow label="Supported room layouts"><ListValue items={venue.supportedLayouts} /></DetailRow>
             <DetailRow label="Operating hours"><TextValue>{venue.operatingHours}</TextValue></DetailRow>
+            <DetailRow label="Setup time"><TextValue>{formatMinutes(venue.setupMinutes)}</TextValue></DetailRow>
+            <DetailRow label="Turnaround time"><TextValue>{formatMinutes(venue.turnaroundMinutes)}</TextValue></DetailRow>
+            {canManageVenue && venue.bufferTimesLocked && (
+              <p className="request-meta">Setup and turnaround times are locked while this venue has a confirmed booking.</p>
+            )}
             {canManageVenue && <DetailRow label="Added by"><TextValue>{venue.createdByName || venue.createdByUid}</TextValue></DetailRow>}
           </Card>
         )}

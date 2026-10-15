@@ -19,6 +19,19 @@ function positiveIntegerRequired(value) {
   return { value: number }
 }
 
+// SPM-72: setup and turnaround are whole minutes, 0 or more, with no maximum (CL3 row 28). Left out,
+// they default to 0; a value that was sent must be valid, so a blank field is not read as 0.
+function bufferMinutes(value) {
+  if (value === undefined) return { value: 0 }
+  if (typeof value === 'string' && value.trim() === '') return { error: 'Required. Enter 0 if none is needed.' }
+
+  const number = typeof value === 'string' ? Number(value.trim()) : value
+  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 0) {
+    return { error: 'Must be a whole number of minutes, 0 or more.' }
+  }
+  return { value: number }
+}
+
 function requiredStringList(value) {
   if (value === undefined || value === null || value === '') return { error: 'Required.' }
 
@@ -60,6 +73,8 @@ export function normaliseVenueInput(input = {}) {
     accessibilityFeatures: collect(errors, 'accessibilityFeatures', requiredStringList(input.accessibilityFeatures)),
     supportedLayouts: collect(errors, 'supportedLayouts', requiredStringList(input.supportedLayouts)),
     operatingHours: collect(errors, 'operatingHours', requiredText(input.operatingHours)),
+    setupMinutes: collect(errors, 'setupMinutes', bufferMinutes(input.setupMinutes)),
+    turnaroundMinutes: collect(errors, 'turnaroundMinutes', bufferMinutes(input.turnaroundMinutes)),
   }
 
   return { venue, errors }

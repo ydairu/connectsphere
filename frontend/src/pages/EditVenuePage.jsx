@@ -16,10 +16,19 @@ const editableFields = {
   accessibilityFeatures: '',
   supportedLayouts: '',
   operatingHours: '',
+  setupMinutes: '',
+  turnaroundMinutes: '',
 }
 
 function listToText(value) {
   return Array.isArray(value) ? value.join('\n') : ''
+}
+
+function savedBufferMinutes(venue) {
+  return {
+    setupMinutes: String(venue.setupMinutes ?? 0),
+    turnaroundMinutes: String(venue.turnaroundMinutes ?? 0),
+  }
 }
 
 function toForm(venue) {
@@ -30,11 +39,14 @@ function toForm(venue) {
     accessibilityFeatures: listToText(venue.accessibilityFeatures),
     supportedLayouts: listToText(venue.supportedLayouts),
     operatingHours: venue.operatingHours ?? '',
+    ...savedBufferMinutes(venue),
   }
 }
 
-function toPayload(form) {
-  return {
+// SPM-72 AC5: while a confirmed booking locks setup and turnaround, they are not sent, so the
+// server keeps the saved values.
+function toPayload(form, { bufferTimesLocked }) {
+  const payload = {
     location: form.location,
     maximumCapacity: form.maximumCapacity,
     facilities: form.facilities,
@@ -42,6 +54,8 @@ function toPayload(form) {
     supportedLayouts: form.supportedLayouts,
     operatingHours: form.operatingHours,
   }
+  if (bufferTimesLocked) return payload
+  return { ...payload, setupMinutes: form.setupMinutes, turnaroundMinutes: form.turnaroundMinutes }
 }
 
 function TextArea({ id, label, hint, error, ...props }) {
@@ -106,7 +120,7 @@ function EditVenuePage() {
     if (!venue) return
 
     setStatus({ type: null, message: '' })
-    const payload = toPayload(form)
+    const payload = toPayload(form, { bufferTimesLocked: Boolean(venue.bufferTimesLocked) })
     const { errors: validationErrors } = normaliseVenueInput({ ...payload, name: venue.name })
 
     if (Object.keys(validationErrors).length > 0) {
@@ -123,6 +137,17 @@ function EditVenuePage() {
     } catch (error) {
       const apiErrors = error.details?.errors
       if (apiErrors) setErrors(apiErrors)
+      if (error.status === 409) {
+        // A booking was confirmed after the page loaded: lock the times at their saved values.
+        setVenue((current) => ({ ...current, bufferTimesLocked: true }))
+        setForm((current) => ({ ...current, ...savedBufferMinutes(venue) }))
+        setStatus({
+          type: 'error',
+          message:
+            'This venue now has a confirmed booking, so its setup and turnaround times are locked. Nothing was saved. Save again to keep your other changes.',
+        })
+        return
+      }
       setStatus({
         type: 'error',
         message: apiErrors
@@ -234,6 +259,43 @@ function EditVenuePage() {
                   error={errors.operatingHours}
                   required
                 />
+              </section>
+
+              <section className="request-form-section">
+                <h2>Setup and turnaround</h2>
+                <p className="request-meta" id="venue-buffer-note">
+                  {venue.bufferTimesLocked
+                    ? 'Setup and turnaround times cannot be changed while this venue has a confirmed booking.'
+                    : 'Minutes the venue is occupied before each event to prepare the room and after it to reset the room. Enter 0 if none is needed.'}
+                </p>
+                <div className="field-row">
+                  <Input
+                    id="venue-setup-minutes"
+                    name="setupMinutes"
+                    label="Setup time (minutes)"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.setupMinutes}
+                    onChange={updateField}
+                    error={errors.setupMinutes}
+                    readOnly={Boolean(venue.bufferTimesLocked)}
+                    required
+                  />
+                  <Input
+                    id="venue-turnaround-minutes"
+                    name="turnaroundMinutes"
+                    label="Turnaround time (minutes)"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.turnaroundMinutes}
+                    onChange={updateField}
+                    error={errors.turnaroundMinutes}
+                    readOnly={Boolean(venue.bufferTimesLocked)}
+                    required
+                  />
+                </div>
               </section>
 
               <div className="form-actions">

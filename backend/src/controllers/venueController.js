@@ -1,13 +1,14 @@
 import {
   createMaintenanceBlock,
   createVenue,
-  getVenue,
+  getVenueDetails,
   listVenues,
   listVenueAvailability,
   removeMaintenanceBlock,
   updateMaintenanceBlock,
   VenueAvailabilityBlockNotFoundError,
   updateVenue,
+  VenueBufferTimesLockedError,
   VenueNotFoundError,
   VenueValidationError,
 } from '../services/venueService.js'
@@ -15,6 +16,9 @@ import {
 export function sendVenueError(error, res, next) {
   if (error instanceof VenueValidationError) {
     return res.status(400).json({ message: 'Validation failed', errors: error.errors })
+  }
+  if (error instanceof VenueBufferTimesLockedError) {
+    return res.status(409).json({ message: 'Setup and turnaround times are locked by a confirmed booking', errors: error.errors })
   }
   if (error instanceof VenueNotFoundError) {
     return res.status(404).json({ message: 'Venue not found' })
@@ -46,7 +50,7 @@ export function createVenueController(getDb) {
     },
     async getVenue(req, res, next) {
       try {
-        const venue = await getVenue(req.params.id, getDb())
+        const venue = await getVenueDetails(req.params.id, getDb())
         return res.json({ venue })
       } catch (error) {
         return sendVenueError(error, res, next)

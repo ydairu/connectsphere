@@ -22,8 +22,8 @@
     "test:spm3": "vitest run tests/spm-3/",
     "test:spm4": "vitest run tests/spm-4/",
     "test:spm7": "vitest run tests/spm-7/",
-    "test:unit": "vitest run tests/spm-1/unit/ tests/spm-2/unit/ tests/spm-3/unit/ tests/spm-6/unit/ tests/spm-7/unit/ tests/spm-12/unit/",
-    "test:integration": "vitest run tests/spm-1/integration/ tests/spm-2/integration/ tests/spm-3/integration/ tests/spm-4/integration/ tests/spm-6/integration/ tests/spm-7/integration/ tests/spm-11/integration/ tests/spm-12/integration/ tests/spm-29/integration/ tests/spm-30/integration/ tests/spm-49/integration/ tests/lint/",
+    "test:unit": "vitest run tests/spm-1/unit/ tests/spm-2/unit/ tests/spm-3/unit/ tests/spm-6/unit/ tests/spm-7/unit/ tests/spm-12/unit/ tests/spm-72/unit/",
+    "test:integration": "vitest run tests/spm-1/integration/ tests/spm-2/integration/ tests/spm-3/integration/ tests/spm-4/integration/ tests/spm-6/integration/ tests/spm-7/integration/ tests/spm-11/integration/ tests/spm-12/integration/ tests/spm-29/integration/ tests/spm-30/integration/ tests/spm-49/integration/ tests/spm-72/integration/ tests/lint/",
     "test:e2e": "playwright test",
     "test:spm6": "vitest run tests/spm-6/",
     "test:spm10": "vitest run tests/spm-10/ && playwright test tests/spm-10",
@@ -39,6 +39,7 @@
     "test:spm45": "vitest run tests/spm-45/ && playwright test tests/spm-45",
     "test:spm27": "vitest run tests/spm-27/ && playwright test tests/spm-27",
     "test:spm49": "vitest run tests/spm-49/",
+    "test:spm72": "vitest run tests/spm-72/",
     "test:coverage": "vitest run --coverage",
     "install:all": "npm install",
     "test:api:live": "vitest run tests/spm-42/integration/requestApi.live.test.js tests/spm-24/integration/draftListApi.live.test.js"
