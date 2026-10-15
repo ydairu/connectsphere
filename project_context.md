@@ -440,6 +440,29 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - The venue, its hold and its lock were deleted afterwards. A follow-up read-only query found none left.
     - **Not verified:** emulator, manual browser check, production build (no frontend change). `firestore.rules` is unchanged, and no backlog status change is claimed.
 
+27. **SPM-37 exclude unavailable equipment from the available quantity (15 Oct 2026, branch `feature/spm-37`):**
+    - **Built:**
+      - The first equipment inventory. Equipment types live in `equipmentTypes`; their units live in `equipmentUnits`, each with `equipmentTypeId`, an asset tag that is unique within its type, and a status: Available, Damaged, Under Repair or Unavailable.
+      - Only Available units count as available. The other three statuses are excluded for every period, because a status has no dates.
+      - Each status change is recorded in `equipmentUnits/{id}/activity` with the previous status, new status, optional note, actor and time.
+      - `/api/equipment` lists every type's total, available and unavailable counts for an optional period, and serves one type with its units. Technical Support Staff add types and units and change unit status; Event Coordinators view only.
+      - Pages: `/equipment` and `/equipment/:id`, and an "Equipment" navbar link for both roles.
+      - Rules are in `shared/equipment.js` and the service is `backend/src/services/equipmentService.js`. `createApp` takes `getEquipmentDb`, and the E2E double passes its in-memory database to it.
+    - **Team decisions (15 Oct 2026, pending PO confirmation):** the individual-unit model; Coordinator read-only access; new units start Available. See effective-requirements.md §4.16.
+    - **Blocked — AC5** (a reserved unit becomes Damaged, Under Repair or Unavailable: shortfall flag, other reservations kept, Technical Support Staff and Coordinator notified). No equipment reservations exist (SPM-38), so there is nothing to flag. SPM-37 is not Done until AC5 is built once reservations exist, or the PO agrees to defer it.
+    - **Gaps:**
+      - Reservations are not subtracted from the available count, so the count is usable stock and the period is validated but does not change it (SPM-18, SPM-38).
+      - Organisers' equipment needs are still free text and are not linked to equipment types.
+      - Unit activity history is written but not displayed.
+      - Nothing is seeded, and there is no rename or delete for types or units.
+    - **Evidence:**
+      - `tests/spm-37/unit/equipmentAvailability.test.js`
+      - `tests/spm-37/integration/equipmentApi.test.js`
+      - `tests/spm-37/integration/equipmentPage.test.jsx`
+      - `tests/spm-37/e2e/spm37.equipmentAvailability.spec.js`
+    - **Local verification (Windows, 15 Oct 2026):** lint passed; 128 Node and 99 frontend tests passed; root Vitest 1322 passed (31 opt-in live tests skipped); the production build passed with the existing bundle-size warning; Playwright Chromium passed all 66 tests.
+    - **Not verified:** these are in-memory doubles only. No live Firebase, emulator or manual browser check was run. `firestore.rules` is unchanged: its default deny already blocks the browser from the new collections, and the API uses the Admin SDK. No backlog status change is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.

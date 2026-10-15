@@ -164,6 +164,8 @@ export function createDouble() {
     authenticate,
     eventRequestStore: createFakeFirestoreEventRequestStore(() => state.db),
     getEventRequestDb: () => state.db,
+    // SPM-37: equipment types and units start empty after every reset.
+    getEquipmentDb: () => state.db,
   })
 
   reset()

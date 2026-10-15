@@ -590,6 +590,24 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Customer-confirmed]** Check requested type/quantity for the event time. Equipment modelling by quantity/type versus individual asset ID is a team choice.
 
+**[Team decision, 15 Oct 2026 — SPM-37, pending PO confirmation]** Equipment is modelled as **individual units**. Each equipment type has units, and each unit has its own asset tag (unique within its type) and status. The customer left the model to the team (CL1 §6). CL3 row 34 ("availability by quantity + condition") is consistent with it, but that cell is truncated.
+
+**[Implemented — SPM-37, 15 Oct 2026]** (`shared/equipment.js`, `backend/src/services/equipmentService.js`, `/api/equipment`):
+
+- unit statuses are Available, Damaged, Under Repair and Unavailable; only Available units count towards the available quantity, and the other three are excluded for every period, because a status is not tied to dates (SPM-37 AC1–AC4);
+- a unit marked Available again is counted again; each status change is recorded in the unit's activity history with the previous and new status, optional note, actor and time;
+- Technical Support Staff add equipment types and units and change unit status (briefing: Technical Support Staff manage equipment).
+
+**[Team decisions, 15 Oct 2026 — SPM-37, pending PO confirmation]**
+
+- Event Coordinators may view equipment availability read-only, because initial feasibility considers equipment availability (CL1 §3). They cannot change it.
+- A new unit starts Available.
+- An availability check may name a period, which is validated. Until reservations exist the counts do not depend on it.
+
+**[Blocked — SPM-37 AC5]** When a reserved unit becomes Damaged, Under Repair or Unavailable, the event is flagged with an equipment shortfall and the Technical Support Staff and Coordinator are notified, without cancelling the event or its other reservations. This cannot be built until equipment reservations exist (§4.17, SPM-38). CL1 §8 supports the direction: "Unexpected venue or equipment failures notify staff; replacement arrangements are resolved manually."
+
+**[Known gaps — SPM-37]** Reservations are not subtracted, so the count is usable stock rather than stock free for the period (SPM-18, SPM-38). Organisers' equipment needs remain free text, not linked to equipment types (§4.15). Unit activity history is not displayed.
+
 ### 4.17 Equipment Reservation
 
 **[Customer-confirmed]** Fulfilment is all-or-nothing. Conflicts or breakdowns are flagged for manual resolution; automatic substitutes are not required. Transit/setup buffers may be zero.

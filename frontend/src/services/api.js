@@ -125,6 +125,39 @@ export function listVenues(user, filters = {}) {
   return authenticatedRequest(user, `/api/venues${search.size > 0 ? `?${search}` : ''}`)
 }
 
+// SPM-37: every equipment type with its total, available and unavailable unit counts, for an optional period.
+export function listEquipment(user, { from, to } = {}) {
+  const search = new URLSearchParams()
+  if (from) search.set('from', from)
+  if (to) search.set('to', to)
+  return authenticatedRequest(user, `/api/equipment${search.size > 0 ? `?${search}` : ''}`)
+}
+
+export function createEquipmentType(user, equipmentType) {
+  return authenticatedRequest(user, '/api/equipment', {
+    method: 'POST',
+    body: JSON.stringify(equipmentType),
+  })
+}
+
+export function getEquipmentType(user, id) {
+  return authenticatedRequest(user, `/api/equipment/${id}`)
+}
+
+export function addEquipmentUnit(user, equipmentTypeId, unit) {
+  return authenticatedRequest(user, `/api/equipment/${equipmentTypeId}/units`, {
+    method: 'POST',
+    body: JSON.stringify(unit),
+  })
+}
+
+export function updateEquipmentUnitStatus(user, equipmentTypeId, unitId, { status, note }) {
+  return authenticatedRequest(user, `/api/equipment/${equipmentTypeId}/units/${unitId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, note }),
+  })
+}
+
 // SPM-42 list route: returns only the requests in the caller's scope, each reduced to the sections
 // their roles may view. Drafts come back only to their owner, which is what SPM-24's page relies on.
 export function listRequests(user) {
