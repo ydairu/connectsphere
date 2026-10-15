@@ -182,6 +182,7 @@ describe('SPM-30 — maintenance block frontend', () => {
         availableTo: new Date('2026-10-10T10:45').toISOString(),
       })
     })
-    expect(await screen.findByRole('heading', { name: 'No venues available' })).toBeTruthy()
+    // SPM-12 AC4 renamed the empty search result to a no-matching-venues message.
+    expect(await screen.findByRole('heading', { name: 'No matching venues' })).toBeTruthy()
   })
 })

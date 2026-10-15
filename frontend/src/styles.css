@@ -173,6 +173,17 @@ a { color: inherit; }
 .venue-summary-grid dd { margin: 4px 0 0; overflow-wrap: anywhere; line-height: 1.45; }
 .venue-hours { margin: 0; color: var(--muted); line-height: 1.5; }
 .availability-controls .field-row { margin-top: 16px; }
+.venue-search-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.filter-group { min-width: 0; margin: 0 0 20px; padding: 0; border: 0; }
+.filter-group legend { padding: 0; font-size: 14px; font-weight: 600; }
+.filter-group > .request-meta { margin: 4px 0 12px; line-height: 1.45; }
+.filter-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.filter-options .checkbox-field { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+.venue-search-actions { gap: 12px; flex-wrap: wrap; }
+.search-summary { display: grid; gap: 10px; margin-bottom: 18px; }
+.applied-filters { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0; padding: 0; }
+.search-summary .applied-filters { justify-content: flex-start; }
+.applied-filters li { padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: #f4f7f5; color: var(--ink); font-size: 13px; }
 .availability-range-actions { display: flex; align-items: end; justify-content: flex-end; gap: 12px; padding-bottom: 20px; flex-wrap: wrap; }
 .availability-calendar .section-heading { align-items: flex-start; }
 .availability-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
@@ -197,6 +208,7 @@ a { color: inherit; }
   .venue-card { flex-direction: column; }
   .venue-card .button { width: 100%; }
   .venue-summary-grid { grid-template-columns: 1fr; }
+  .venue-search-grid, .filter-options { grid-template-columns: 1fr; }
   .availability-range-actions, .availability-slot { align-items: stretch; flex-direction: column; }
   .availability-slot strong { min-width: 0; }
 }
