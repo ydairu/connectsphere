@@ -405,6 +405,40 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - `tests/spm-72/integration/venueBufferTimesPage.test.jsx`
     - **Local verification (macOS, Node 24.1.0, 15 Oct 2026, on top of SPM-12's merge `2e92be8`):** lint passed; `test:spm72` 28 and `test:spm12` 31 Vitest passed; 128 Node and 99 frontend tests passed; root Vitest 1240 passed (30 opt-in live tests skipped); Playwright Chromium 64/64 passed; the production build passed with the existing bundle-size warning. Before the merge, one Playwright run alongside the root Vitest suite timed out once in an SPM-2 registration spec, which then passed on its own.
     - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
+26. **SPM-16 booking conflict detection (15 Oct 2026, branch `feature/SPM-16-conflict-detection`):**
+    - **Built (service level only, no route):**
+      - **Rule:** `findVenueConflict` in `shared/venueConflicts.js`. Bookings and holds are compared on occupied periods (`occupiedPeriod`, with the venue's current times on both sides). Maintenance blocks are compared on their own period. Overlap uses `overlaps()`, so a later setup may start exactly when an earlier turnaround ends, and one second of overlap conflicts. Filtering reuses `activeCommitmentsInRange`. Each venue is checked on its own.
+      - **Expiry:** `TENTATIVE_HOLD_DURATION_MS` (7 days), `tentativeHoldExpiresAt` and `isExpiredHold` in `shared/venueAvailability.js`. Expired holds do not block a new request. Holds without `holdExpiresAt` still block. The calendar and search are unchanged.
+      - **Enforcement:** `createTentativeVenueHold(input, actor, db, now)` checks the venue exists. It then reads the venue, the lock `systemLocks/venueBooking-{venueId}` and the venue's `venueAvailability` in one transaction. A conflict throws `VenueConflictError` and writes nothing. Otherwise the transaction writes the hold (`lifecycleStatus: 'active'`, `holdExpiresAt`) and the lock. `sendVenueError` maps the error to 409 with the type and occupied period only.
+      - **Seed:** `SEED_VENUES` (hall with setup 30 and turnaround 45; room with 0/0) and `SEED_VENUE_AVAILABILITY` at the hall:
+        - A1 Confirmed's booking at that event's own date and time.
+        - An active hold for B1 Planning at its own date and time. Its expiry is 30 June 2027 (23:59:59 SGT), so it stays active for demonstrations.
+        - **Existing seed changed:** `seed-req-b1-planning`'s `preferredDateTime` moved from 20 Nov to 27 Nov 2026 (09:00 SGT). Every non-draft seeded event was on 20 Nov 09:00, so B1's hold at its own time would have clashed with A1's seeded booking at the same hall.
+        - An expired hold linked to no event.
+    - **Decisions:** team decisions of 15 Oct 2026, pending PO confirmation (effective-requirements.md §4.14).
+    - **Existing test changed:** `tests/spm-11/integration/venueAvailabilityApi.test.js` now expects `VenueConflictError` instead of the earlier 400 message for an overlapping hold.
+    - **Gaps:**
+      - No route or UI creates holds or bookings (SPM-14, SPM-54).
+      - SPM-14 must release an event's own hold before re-holding the same venue with new times.
+      - SPM-54 needs an `excludeId` option when re-checking on approval.
+      - Clashes after a setup or turnaround change are not flagged.
+      - Maintenance blocks do not take the venue lock.
+      - The seed has only been dry-run, not written to the project.
+    - **Evidence:**
+      - `tests/spm-16/unit/venueConflicts.test.js`
+      - `tests/spm-16/unit/seedVenues.test.js`
+      - `tests/spm-16/integration/tentativeHoldConflicts.test.js` (in-memory double; sequential requests, lock reads and writes)
+      - `tests/spm-16/integration/tentativeHoldConcurrency.live.test.js` (opt-in, real project)
+    - **Local verification (macOS, 15 Oct 2026):**
+      - Lint passed.
+      - `test:spm16`: 42 passed, 1 live test skipped. `test:spm11`: 10 passed. `test:unit`: 144 passed. `test:integration`: 280 passed, 1 skipped.
+      - 128 Node and 99 frontend tests passed. Root Vitest: 1282 passed, 31 opt-in live tests skipped.
+      - Playwright Chromium: 64/64 passed.
+      - Seed dry run against `connectsphere-6546c`: 5 venue documents to create, no blockers, nothing written.
+    - **Live verification (real Firebase project `connectsphere-6546c`, run once):**
+      - Five simultaneous overlapping holds on a throwaway venue: 1 created, 4 refused with `VenueConflictError`, 1 hold stored.
+      - The venue, its hold and its lock were deleted afterwards. A follow-up read-only query found none left.
+    - **Not verified:** emulator, manual browser check, production build (no frontend change). `firestore.rules` is unchanged, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

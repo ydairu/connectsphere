@@ -5,9 +5,10 @@ import {
   buildAvailabilityResponse,
   normaliseAvailabilityCommitment,
   normaliseMaintenanceBlockInput,
-  overlaps,
+  tentativeHoldExpiresAt,
   validateAvailabilityRange,
 } from '../../../shared/venueAvailability.js'
+import { findVenueConflict } from '../../../shared/venueConflicts.js'
 import { buildVenueFilterOptions, normaliseVenueSearchQuery, venueMatchesFilters } from '../../../shared/venueSearch.js'
 import { hasConfirmedBooking, venueBufferMinutes } from '../../../shared/venueOccupancy.js'
 import { VENUE_STAFF } from '../../../shared/permissions.js'
@@ -54,6 +55,31 @@ export class VenueBufferTimesLockedError extends Error {
     super('Venue setup and turnaround times are locked by a confirmed booking.')
     this.name = 'VenueBufferTimesLockedError'
     this.errors = errors
+  }
+}
+
+const CONFLICT_LABELS = {
+  [AVAILABILITY_STATUS.CONFIRMED_BOOKING]: 'a confirmed booking',
+  [AVAILABILITY_STATUS.TENTATIVE_HOLD]: 'a tentative hold',
+  [AVAILABILITY_STATUS.MAINTENANCE_BLOCK]: 'a maintenance block',
+}
+
+// SPM-16: the proposed period overlaps an existing commitment at the venue. `conflict` names its type and
+// period only, never its event or title, so a caller cannot learn about another organisation's event.
+export class VenueConflictError extends Error {
+  constructor(conflict) {
+    super('The venue is not available for that period.')
+    this.name = 'VenueConflictError'
+    this.conflict = {
+      status: conflict.status,
+      startsAt: conflict.startsAt,
+      endsAt: conflict.endsAt,
+      occupiedStartsAt: conflict.occupiedStartsAt,
+      occupiedEndsAt: conflict.occupiedEndsAt,
+    }
+    this.errors = {
+      time: `This venue has ${CONFLICT_LABELS[conflict.status]} occupying it from ${conflict.occupiedStartsAt} to ${conflict.occupiedEndsAt}.`,
+    }
   }
 }
 
@@ -192,7 +218,17 @@ export async function listVenueAvailability(venueId, query, db = getAdminDb()) {
   return buildAvailabilityResponse(commitments, range)
 }
 
-export async function createTentativeVenueHold(input, actor, db = getAdminDb()) {
+// SPM-16: one lock document per venue. Every hold or booking for the venue reads and writes it in its
+// transaction, so overlapping requests are serialised (as SPM-8's systemLocks/coordinatorAssignment) and
+// the later one sees the earlier one's commitment: first come, first served.
+export function venueBookingLockPath(venueId) {
+  return ['systemLocks', `venueBooking-${venueId}`]
+}
+
+// SPM-16: places a tentative hold unless its occupied period conflicts with an active booking, unexpired
+// hold or maintenance block at the venue; a conflict throws VenueConflictError and writes nothing. No
+// route calls this yet — SPM-14 (booking request) is expected to.
+export async function createTentativeVenueHold(input, actor, db = getAdminDb(), now = new Date()) {
   const { commitment, errors } = normaliseAvailabilityCommitment({
     ...input,
     status: AVAILABILITY_STATUS.TENTATIVE_HOLD,
@@ -200,33 +236,40 @@ export async function createTentativeVenueHold(input, actor, db = getAdminDb()) 
   if (!actor?.uid) errors.createdByUid = 'An authenticated staff member is required.'
   if (hasVenueValidationErrors(errors)) throw new VenueValidationError(errors)
 
+  const venueRef = db.collection('venues').doc(commitment.venueId)
+  const [lockCollection, lockId] = venueBookingLockPath(commitment.venueId)
+  const lockRef = db.collection(lockCollection).doc(lockId)
   const docRef = db.collection('venueAvailability').doc()
+  const at = now.toISOString()
+  const record = {
+    ...commitment,
+    lifecycleStatus: 'active',
+    holdExpiresAt: tentativeHoldExpiresAt(now),
+    createdByUid: actor.uid,
+    createdByName: actor.name ?? actor.email ?? null,
+    createdAt: at,
+  }
+
   await db.runTransaction(async (tx) => {
-    const availabilityQuery = db.collection('venueAvailability').where('venueId', '==', commitment.venueId)
-    const snapshot = await tx.get(availabilityQuery)
-    const conflictingHold = activeCommitmentsInRange(
-      snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      { from: new Date(commitment.startsAt), to: new Date(commitment.endsAt) },
-    ).find(
-      (existing) =>
-        existing.status === AVAILABILITY_STATUS.TENTATIVE_HOLD &&
-        existing.id !== docRef.id &&
-        overlaps(existing, commitment),
-    )
+    // The venue is read here, so a setup or turnaround change made meanwhile also retries this check.
+    const venueSnapshot = await tx.get(venueRef)
+    if (!venueSnapshot.exists) throw new VenueNotFoundError(commitment.venueId)
+    await tx.get(lockRef)
+    const availability = await tx.get(db.collection('venueAvailability').where('venueId', '==', commitment.venueId))
 
-    if (conflictingHold) {
-      throw new VenueValidationError({ time: 'This venue already has a tentative hold during that period.' })
-    }
-
-    tx.set(docRef, {
-      ...commitment,
-      createdByUid: actor.uid,
-      createdByName: actor.name ?? actor.email ?? null,
-      createdAt: new Date().toISOString(),
+    const conflict = findVenueConflict({
+      candidate: commitment,
+      venue: venueSnapshot.data(),
+      commitments: availability.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      now,
     })
+    if (conflict) throw new VenueConflictError(conflict)
+
+    tx.set(docRef, record)
+    tx.set(lockRef, { venueId: commitment.venueId, lastCommitmentId: docRef.id, updatedAt: at })
   })
 
-  return { id: docRef.id, ...commitment }
+  return { id: docRef.id, ...record }
 }
 
 export async function createMaintenanceBlock(venueId, input, venueStaff, db = getAdminDb(), now = new Date()) {
