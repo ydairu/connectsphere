@@ -38,8 +38,8 @@ export function createVenueController(getDb) {
     },
     async listVenues(req, res, next) {
       try {
-        const venues = await listVenues(req.query, getDb())
-        return res.json({ venues })
+        const { venues, filterOptions } = await listVenues(req.query, getDb())
+        return res.json({ venues, filterOptions })
       } catch (error) {
         return sendVenueError(error, res, next)
       }

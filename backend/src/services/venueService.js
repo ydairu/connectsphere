@@ -8,6 +8,7 @@ import {
   overlaps,
   validateAvailabilityRange,
 } from '../../../shared/venueAvailability.js'
+import { buildVenueFilterOptions, normaliseVenueSearchQuery, venueMatchesFilters } from '../../../shared/venueSearch.js'
 import { VENUE_STAFF } from '../../../shared/permissions.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 
@@ -56,22 +57,31 @@ export async function createVenue(input, venueStaff, db = getAdminDb()) {
   return { id: docRef.id, ...venue }
 }
 
+// SPM-12: every search filter is optional and a venue must meet all of those applied. The filter
+// options always describe the whole catalogue, whatever the search.
 export async function listVenues(query = {}, db = getAdminDb()) {
   const snapshot = await db.collection('venues').get()
-  const venues = snapshot.docs
+  const catalogue = snapshot.docs
     .map((doc) => projectVenueCatalogueItem({ id: doc.id, ...doc.data() }))
     .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
+  const filterOptions = buildVenueFilterOptions(catalogue)
 
-  if (!query?.availableFrom && !query?.availableTo) return venues
+  const { filters, errors } = normaliseVenueSearchQuery(query)
+  const range =
+    query?.availableFrom || query?.availableTo
+      ? validateAvailabilityRange({ from: query?.availableFrom, to: query?.availableTo })
+      : null
+  if (range) Object.assign(errors, range.errors)
+  if (hasVenueValidationErrors(errors)) throw new VenueValidationError(errors)
 
-  const range = validateAvailabilityRange({ from: query?.availableFrom, to: query?.availableTo })
-  if (hasVenueValidationErrors(range.errors)) throw new VenueValidationError(range.errors)
+  const venues = catalogue.filter((venue) => venueMatchesFilters(venue, filters))
+  if (!range || venues.length === 0) return { venues, filterOptions }
 
   const availabilitySnapshot = await db.collection('venueAvailability').get()
   const commitments = availabilitySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
   const unavailableVenueIds = new Set(activeCommitmentsInRange(commitments, range).map((commitment) => commitment.venueId))
 
-  return venues.filter((venue) => !unavailableVenueIds.has(venue.id))
+  return { venues: venues.filter((venue) => !unavailableVenueIds.has(venue.id)), filterOptions }
 }
 
 export async function getVenue(id, db = getAdminDb()) {

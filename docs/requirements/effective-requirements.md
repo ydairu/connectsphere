@@ -507,6 +507,18 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Team decision pending]** If no exact match exists, either return no results or show partial matches with clear suitability warnings.
 
+> **Resolved by the backlog — SPM-12 AC4 (Product Backlog workbook).** The customer left this choice to the team (CL2 §6). SPM-12's acceptance criteria choose **no results, with a clear no-matching-venues message**; partial matches are not shown. The item above is kept as the historical record.
+
+**[Team decision, 15 Oct 2026 — SPM-12, pending PO confirmation]** How the SPM-12 filters behave where the acceptance criteria leave room:
+
+- **Filter values come from the catalogue.** AC9 states this for facilities. It is applied to location, layout and accessibility as well, so the Coordinator picks only values a venue actually records.
+- **Matching** is exact, ignoring letter case and extra spaces. Location matches the whole recorded location, not part of it.
+- **Multi-value filters require every value.** Accessibility (yes/no per requirement, AC6) and facilities (AC10) return only venues recording all the selected values.
+- **Every filter is optional,** including date/time, which needs both a start and an end when used.
+- **Venue Staff** can use the same filters, because `GET /api/venues` already admitted them (SPM-49). No access rule changed.
+
+**[Implemented — SPM-12, 15 Oct 2026 — historical record]** Rules in `shared/venueSearch.js`; `GET /api/venues` takes `attendance`, `location`, `layout`, and repeated `facility` and `accessibility` parameters beside the existing `availableFrom`/`availableTo`, and returns `filterOptions` built from the whole catalogue. Not covered: operating hours (free text; a Session 1 suitability factor, §4.11), setup/turnaround buffers (Change #1, SPM-75) and hold expiry (Change #4, SPM-78). Until SPM-78, every tentative hold makes a venue unavailable for the period.
+
 ### 4.11 Venue Suitability Checking
 
 **[Customer-confirmed]** Evaluate attendance versus capacity, date/time availability, layout, accessibility, and required facilities. Capacity overflow is blocking. Numeric accessibility scoring is not required; tags/booleans are acceptable.
@@ -656,7 +668,7 @@ Before implementing affected functionality, resolve and record:
 4. Exact multi-role storage and permission evaluation model. *(open team choice)*
 5. ~~Coordinator assignment algorithm.~~ The SPM-8 algorithm itself was PO-confirmed 20 Sep 2026; **its on-submit auto-trigger (and the empty-pool = server error rule) is superseded by Change #5** (§4.5, §10). Open sub-question: whether the Lead reuses the algorithm on manual assignment.
 6. Missing venue-facility block/warning policy. *(open)*
-7. Venue partial-match behaviour. *(open)*
+7. ~~Venue partial-match behaviour.~~ **Resolved by SPM-12 AC4: no results, with a clear no-matching-venues message** (§4.10).
 8. Notification channels and preferences. *(open)*
 9. Whether to retain the six-character password minimum as a team security choice. *(open)*
 10. SPM-42 split for five role surfaces in Sprint 1. This is a **historical Sprint 1 scope question**, not a cap on the now-seven total roles (§2.1); it does not limit the two new internal roles' permission surfaces.

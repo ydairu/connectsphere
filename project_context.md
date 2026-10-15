@@ -367,6 +367,24 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - `tests/spm-10/e2e/spm10.significantChange.spec.js`
     - **Local verification (macOS, 9 Oct 2026):** lint passed; `test:spm10` 145 Vitest + 1 Playwright passed; `test:spm27` 23 Vitest + 2 Playwright, `test:spm48` 96 + 3 and `test:spm28` 81 + 3 passed; 128 Node and 99 frontend tests passed; root Vitest 1160 passed (30 opt-in live tests skipped); Playwright Chromium 64/64 passed; the production build passed.
     - **Not verified:** no live API run, emulator, deployed project or manual browser check; the Firestore store's `consequences` path is exercised only through the in-memory and fakeFirestore stores. `firestore.rules` is unchanged, and no backlog status change is claimed.
+24. **SPM-12 search and filter venues by event requirements (15 Oct 2026, branch `spm-12`):**
+    - **Built:**
+      - **Rules:** `shared/venueSearch.js` parses the filters, matches venues and builds the filter options.
+      - **API:** `GET /api/venues` takes `attendance`, `location`, `layout`, and repeated `facility` and `accessibility` parameters beside SPM-30's `availableFrom`/`availableTo`. A venue is returned only when it meets every filter applied. The response adds `filterOptions`: the distinct locations, layouts, facilities and accessibility features recorded in the whole catalogue. Invalid values get 400 with field errors. Route access is unchanged (Coordinators and Venue Staff).
+      - **Page:** the venue catalogue's search card is now "Search by event requirements": date/time, expected attendance, location and layout dropdowns, and accessibility and facility checkboxes. Every filter is optional. A search lists the applied filters and the number of matches; no match shows "No matching venues" with a Clear filters button.
+    - **Decisions:** AC4 resolves the partial-match question as no results with a clear message. Catalogue-sourced options for every filter, exact case-insensitive matching and optional filters are team decisions of 15 Oct 2026, pending PO confirmation (effective-requirements.md §4.10).
+    - **Existing test changed:** `tests/spm-30/integration/maintenanceBlocksPage.test.jsx` now expects the "No matching venues" heading instead of "No venues available" (AC4).
+    - **Gaps:**
+      - Setup/turnaround buffers (SPM-75) and hold expiry (SPM-78) are not applied; every tentative hold makes a venue unavailable.
+      - Operating hours are not checked; they are free text (a Session 1 suitability factor, for SPM-13).
+      - Accessibility features and facilities are free text, so near-duplicates ("Mic system" / "Microphone system") appear as separate options.
+      - No seeded venues and no E2E test: the E2E double does not give the venue routes its in-memory database.
+    - **Evidence:**
+      - `tests/spm-12/unit/venueSearch.test.js`
+      - `tests/spm-12/integration/venueSearchApi.test.js`
+      - `tests/spm-12/integration/venueSearchPage.test.jsx`
+    - **Local verification (macOS, Node 24.1.0, 15 Oct 2026):** lint passed; `test:spm12` 31 Vitest passed; 128 Node and 99 frontend tests passed; root Vitest 1212 passed (30 opt-in live tests skipped); Playwright Chromium 64/64 passed; the production build passed with the existing bundle-size warning.
+    - **Not verified:** these use in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

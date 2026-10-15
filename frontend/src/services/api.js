@@ -112,10 +112,16 @@ export function updateVenue(user, id, venue) {
   })
 }
 
+// SPM-12: facility and accessibility repeat once per value; a venue must have every one of them.
 export function listVenues(user, filters = {}) {
   const search = new URLSearchParams()
   if (filters.availableFrom) search.set('availableFrom', filters.availableFrom)
   if (filters.availableTo) search.set('availableTo', filters.availableTo)
+  if (filters.attendance) search.set('attendance', String(filters.attendance))
+  if (filters.location) search.set('location', filters.location)
+  if (filters.layout) search.set('layout', filters.layout)
+  for (const facility of filters.facilities ?? []) search.append('facility', facility)
+  for (const feature of filters.accessibility ?? []) search.append('accessibility', feature)
   return authenticatedRequest(user, `/api/venues${search.size > 0 ? `?${search}` : ''}`)
 }
 
