@@ -41,6 +41,7 @@
     "test:spm49": "vitest run tests/spm-49/",
     "test:spm72": "vitest run tests/spm-72/",
     "test:spm16": "vitest run tests/spm-16/",
+    "test:spm37": "vitest run tests/spm-37/ && playwright test tests/spm-37",
     "test:coverage": "vitest run --coverage",
     "install:all": "npm install",
     "test:api:live": "vitest run tests/spm-42/integration/requestApi.live.test.js tests/spm-24/integration/draftListApi.live.test.js tests/spm-16/integration/tentativeHoldConcurrency.live.test.js"

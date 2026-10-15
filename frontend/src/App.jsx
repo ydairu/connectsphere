@@ -1,9 +1,11 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { COORDINATOR, ORGANISER, VENUE_STAFF } from '../../shared/permissions.js'
+import { COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../shared/permissions.js'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import CreateEventRequestPage from './pages/CreateEventRequestPage.jsx'
 import CreateVenuePage from './pages/CreateVenuePage.jsx'
 import DraftRequestsPage from './pages/DraftRequestsPage.jsx'
+import EquipmentDetailPage from './pages/EquipmentDetailPage.jsx'
+import EquipmentPage from './pages/EquipmentPage.jsx'
 import EditVenuePage from './pages/EditVenuePage.jsx'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
@@ -45,6 +47,11 @@ function App() {
       <Route element={<ProtectedRoute allowedRoles={[VENUE_STAFF]} />}>
         <Route path="/venues/new" element={<CreateVenuePage />} />
         <Route path="/venues/:id/edit" element={<EditVenuePage />} />
+      </Route>
+      {/* SPM-37: Technical Support Staff manage equipment; Event Coordinators view its availability. */}
+      <Route element={<ProtectedRoute allowedRoles={[COORDINATOR, TECHNICAL_STAFF]} />}>
+        <Route path="/equipment" element={<EquipmentPage />} />
+        <Route path="/equipment/:id" element={<EquipmentDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

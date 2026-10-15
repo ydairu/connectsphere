@@ -2,6 +2,7 @@ import cors from 'cors'
 import express from 'express'
 import { env } from './config/env.js'
 import { getAdminDb } from './config/firebaseAdmin.js'
+import { createEquipmentRoutes } from './routes/equipmentRoutes.js'
 import { createEventRequestRoutes } from './routes/eventRequestRoutes.js'
 import { authenticate as firebaseAuthenticate } from './middleware/authenticate.js'
 import healthRoutes from './routes/healthRoutes.js'
@@ -22,6 +23,7 @@ export function createApp({
   getEventRequestDb = getAdminDb,
   getUserDb = getEventRequestDb,
   getVenueDb = getAdminDb,
+  getEquipmentDb = getAdminDb,
   getNotificationDb = getEventRequestDb,
 } = {}) {
   const app = express()
@@ -35,6 +37,7 @@ export function createApp({
   })
 
   app.use('/api/health', healthRoutes)
+  app.use('/api/equipment', createEquipmentRoutes({ authenticate, getDb: getEquipmentDb }))
   app.use('/api/event-requests', createEventRequestRoutes({ authenticate, getDb: getEventRequestDb, getUserDb }))
   app.use('/api/notifications', createNotificationRoutes({ authenticate, getDb: getNotificationDb }))
   app.use('/api/profile', profileRoutes)

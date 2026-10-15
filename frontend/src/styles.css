@@ -224,6 +224,12 @@ a { color: inherit; }
 .status-completed { color: #35414a; background: #eaeef1; }
 .status-cancelled, .status-rejected { color: #8c2f39; background: #fbeaec; }
 
+/* SPM-37 equipment unit statuses */
+.equipment-status-available { color: #1f6b4f; background: #e6f5ee; }
+.equipment-status-damaged { color: #8c2f39; background: #fbeaec; }
+.equipment-status-under_repair { color: #7b4d12; background: #fbf1df; }
+.equipment-status-unavailable { color: #35414a; background: #eaeef1; }
+
 /* SPM-42 request detail */
 .request-item-actions { display: flex; align-items: center; gap: 12px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
