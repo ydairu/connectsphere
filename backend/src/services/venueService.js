@@ -9,6 +9,7 @@ import {
   validateAvailabilityRange,
 } from '../../../shared/venueAvailability.js'
 import { buildVenueFilterOptions, normaliseVenueSearchQuery, venueMatchesFilters } from '../../../shared/venueSearch.js'
+import { hasConfirmedBooking, venueBufferMinutes } from '../../../shared/venueOccupancy.js'
 import { VENUE_STAFF } from '../../../shared/permissions.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 
@@ -23,7 +24,14 @@ const CATALOGUE_FIELDS = [
   'supportedLayouts',
   'operatingHours',
 ]
-const EDITABLE_FIELDS = CATALOGUE_FIELDS.filter((field) => field !== 'name')
+// SPM-72: setup and turnaround are edited and recorded like the catalogue fields, but are not part of
+// the catalogue list.
+const BUFFER_FIELDS = ['setupMinutes', 'turnaroundMinutes']
+const EDITABLE_FIELDS = [...CATALOGUE_FIELDS.filter((field) => field !== 'name'), ...BUFFER_FIELDS]
+const BUFFER_LOCKED_MESSAGES = {
+  setupMinutes: 'Setup time cannot be changed while this venue has a confirmed booking.',
+  turnaroundMinutes: 'Turnaround time cannot be changed while this venue has a confirmed booking.',
+}
 
 export class VenueValidationError extends Error {
   constructor(errors) {
@@ -38,6 +46,14 @@ export class VenueNotFoundError extends Error {
     super(`Venue ${id} was not found.`)
     this.name = 'VenueNotFoundError'
     this.id = id
+  }
+}
+
+export class VenueBufferTimesLockedError extends Error {
+  constructor(errors) {
+    super('Venue setup and turnaround times are locked by a confirmed booking.')
+    this.name = 'VenueBufferTimesLockedError'
+    this.errors = errors
   }
 }
 
@@ -90,6 +106,16 @@ export async function getVenue(id, db = getAdminDb()) {
   return { id: snapshot.id, ...snapshot.data() }
 }
 
+// The venue as the detail and edit pages show it: setup and turnaround default to 0, and
+// bufferTimesLocked tells the edit page that a confirmed booking prevents changing them (SPM-72 AC5).
+export async function getVenueDetails(id, db = getAdminDb(), now = new Date()) {
+  const venue = await getVenue(id, db)
+  const snapshot = await db.collection('venueAvailability').where('venueId', '==', id).get()
+  const commitments = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+
+  return { ...venue, ...venueBufferMinutes(venue), bufferTimesLocked: hasConfirmedBooking(commitments, now) }
+}
+
 export async function updateVenue(id, input, venueStaff, db = getAdminDb(), now = new Date()) {
   const docRef = db.collection('venues').doc(id)
   const at = now.toISOString()
@@ -99,9 +125,24 @@ export async function updateVenue(id, input, venueStaff, db = getAdminDb(), now 
     if (!snapshot.exists) throw new VenueNotFoundError(id)
 
     const existing = snapshot.data()
-    const { venue, errors } = normaliseVenueInput({ ...input, name: existing.name })
+    const savedBufferMinutes = venueBufferMinutes(existing)
+    // Setup and turnaround left out of the request keep their saved values, so an edit that does not
+    // send them cannot reset them to 0.
+    const { venue, errors } = normaliseVenueInput({ ...savedBufferMinutes, ...input, name: existing.name })
     if (!venueStaff?.uid) errors.updatedByUid = 'An authenticated Venue Staff member is required.'
     if (hasVenueValidationErrors(errors)) throw new VenueValidationError(errors)
+
+    // SPM-72 AC5: checked inside the transaction, so a booking confirmed during the edit still blocks it.
+    const changedBufferFields = BUFFER_FIELDS.filter((field) => venue[field] !== savedBufferMinutes[field])
+    if (changedBufferFields.length > 0) {
+      const availability = await tx.get(db.collection('venueAvailability').where('venueId', '==', id))
+      const commitments = availability.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      if (hasConfirmedBooking(commitments, now)) {
+        throw new VenueBufferTimesLockedError(
+          Object.fromEntries(changedBufferFields.map((field) => [field, BUFFER_LOCKED_MESSAGES[field]])),
+        )
+      }
+    }
 
     const update = {
       location: venue.location,
@@ -110,11 +151,15 @@ export async function updateVenue(id, input, venueStaff, db = getAdminDb(), now 
       accessibilityFeatures: venue.accessibilityFeatures,
       supportedLayouts: venue.supportedLayouts,
       operatingHours: venue.operatingHours,
+      setupMinutes: venue.setupMinutes,
+      turnaroundMinutes: venue.turnaroundMinutes,
       updatedByUid: venueStaff.uid,
       updatedByName: venueStaff.name ?? venueStaff.email ?? null,
       updatedAt: at,
     }
-    const changedFields = venueFieldChanges(existing, update)
+    // Compared with the defaulted times, so a venue created before SPM-72 does not record a change
+    // from nothing to 0.
+    const changedFields = venueFieldChanges({ ...existing, ...savedBufferMinutes }, update)
 
     tx.update(docRef, update)
     for (const change of changedFields) {

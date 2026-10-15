@@ -61,6 +61,7 @@ a { color: inherit; }
 .field textarea { resize: vertical; line-height: 1.5; }
 .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(25, 92, 67, 0.12); }
 .field input[aria-invalid='true'], .field textarea[aria-invalid='true'] { border-color: #b83a3a; }
+.field input[readonly] { background: #f4f6f5; color: var(--muted); cursor: not-allowed; }
 .field-error { color: #a52d2d; font-size: 13px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .alert { padding: 12px 14px; margin-bottom: 20px; border-radius: 9px; background: #fff1f1; color: #922c2c; font-size: 14px; }

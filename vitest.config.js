@@ -65,6 +65,7 @@ export default defineConfig({
         'shared/permissions.js',
         'shared/venue.js',
         'shared/venueSearch.js',
+        'shared/venueOccupancy.js',
       ],
       exclude: ['**/*.test.*', '**/*.cases.js', '**/*.live.js', 'backend/src/testing/**'],
     },

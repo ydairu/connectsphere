@@ -385,6 +385,26 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - `tests/spm-12/integration/venueSearchPage.test.jsx`
     - **Local verification (macOS, Node 24.1.0, 15 Oct 2026):** lint passed; `test:spm12` 31 Vitest passed; 128 Node and 99 frontend tests passed; root Vitest 1212 passed (30 opt-in live tests skipped); Playwright Chromium 64/64 passed; the production build passed with the existing bundle-size warning.
     - **Not verified:** these use in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
+25. **SPM-72 configure venue setup and turnaround time (15 Oct 2026, branch `spm-72`):**
+    - **Built:**
+      - **Fields:** each venue has `setupMinutes` and `turnaroundMinutes`, whole minutes, 0 or more, no maximum. Venues created before SPM-72 read as 0; nothing is migrated. Validation is in `normaliseVenueInput` (`shared/venue.js`): a negative, fractional, non-numeric or blank value gets 400 naming the field.
+      - **Occupied period:** `shared/venueOccupancy.js` has `occupiedPeriod` (10:00–12:00 with 30/45 minutes gives 09:30–12:45), `venueBufferMinutes` and `hasConfirmedBooking`. Nothing applies `occupiedPeriod` yet; SPM-16, SPM-73 and SPM-75 are expected to import it.
+      - **Lock (AC5):** while the venue has a confirmed booking that has not ended, `PATCH /api/venues/:id` refuses changed times with 409 naming each field, checked inside the edit's transaction. Other details still save. `GET /api/venues/:id` adds `bufferTimesLocked`, and the edit page then shows the times read-only with a note.
+      - **History (AC7):** changes are recorded as SPM-29 `venue_field_changed` entries (old value, new value, who, when). An older venue's first edit records no change from nothing to 0. On creation, the venue record holds the values and who created it when.
+      - **Pages:** add and edit pages have "Setup time (minutes)" and "Turnaround time (minutes)", starting at 0 on the add page. The venue detail page shows both.
+    - **Decisions:** AC5 adopts CL3 row 6's lock point (confirmed booking) over row 4's ("once set"). The meaning of "has a confirmed booking", the 409, keeping times that an edit leaves out, and creation history are team decisions of 15 Oct 2026, pending PO confirmation (effective-requirements.md §4.8).
+    - **Gaps:**
+      - Nothing creates confirmed bookings yet (SPM-54), so AC5 is tested only with seeded `venueAvailability` entries. It assumes SPM-54 stores bookings there with status `confirmed_booking`.
+      - A change while the venue has only tentative holds can make their occupied periods overlap; nothing flags it (effective-requirements.md §4.8, C6 sub-parts).
+      - Venue history is recorded but not displayed.
+      - No E2E test: the E2E double does not give the venue routes its in-memory database.
+    - **Shared file changed:** `REMOVED_STATUSES` in `shared/venueAvailability.js` is now exported.
+    - **Evidence:**
+      - `tests/spm-72/unit/venueBufferTimes.test.js`
+      - `tests/spm-72/integration/venueBufferTimesApi.test.js`
+      - `tests/spm-72/integration/venueBufferTimesPage.test.jsx`
+    - **Local verification (macOS, Node 24.1.0, 15 Oct 2026, on top of SPM-12's merge `2e92be8`):** lint passed; `test:spm72` 28 and `test:spm12` 31 Vitest passed; 128 Node and 99 frontend tests passed; root Vitest 1240 passed (30 opt-in live tests skipped); Playwright Chromium 64/64 passed; the production build passed with the existing bundle-size warning. Before the merge, one Playwright run alongside the root Vitest suite timed out once in an SPM-2 registration spec, which then passed on its own.
+    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

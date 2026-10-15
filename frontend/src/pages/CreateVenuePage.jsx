@@ -16,6 +16,8 @@ const initialForm = {
   accessibilityFeatures: '',
   supportedLayouts: '',
   operatingHours: '',
+  setupMinutes: '0',
+  turnaroundMinutes: '0',
 }
 
 function toPayload(form) {
@@ -27,6 +29,8 @@ function toPayload(form) {
     accessibilityFeatures: form.accessibilityFeatures,
     supportedLayouts: form.supportedLayouts,
     operatingHours: form.operatingHours,
+    setupMinutes: form.setupMinutes,
+    turnaroundMinutes: form.turnaroundMinutes,
   }
 }
 
@@ -197,6 +201,40 @@ function CreateVenuePage() {
                 placeholder="Monday-Friday 09:00-18:00"
                 required
               />
+            </section>
+
+            <section className="request-form-section">
+              <h2>Setup and turnaround</h2>
+              <p className="request-meta">
+                Minutes the venue is occupied before each event to prepare the room and after it to reset the room. Enter 0 if
+                none is needed.
+              </p>
+              <div className="field-row">
+                <Input
+                  id="venue-setup-minutes"
+                  name="setupMinutes"
+                  label="Setup time (minutes)"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.setupMinutes}
+                  onChange={updateField}
+                  error={errors.setupMinutes}
+                  required
+                />
+                <Input
+                  id="venue-turnaround-minutes"
+                  name="turnaroundMinutes"
+                  label="Turnaround time (minutes)"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.turnaroundMinutes}
+                  onChange={updateField}
+                  error={errors.turnaroundMinutes}
+                  required
+                />
+              </div>
             </section>
 
             <div className="form-actions">
