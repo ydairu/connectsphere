@@ -565,6 +565,23 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 > **Week 7 effect (Change #1).** Overlap is measured on the **effective occupancy interval** (advertised start − setup, advertised end + turnaround). "Any overlap, even one second" therefore applies to these expanded intervals.
 
+**[Team decision, 15 Oct 2026 — SPM-16, pending PO confirmation]** Where SPM-16's acceptance criteria leave room:
+
+- **Both sides use the venue's current times.** A proposed booking or hold is compared on its occupied period with each existing booking's and hold's occupied period, both calculated with the venue's current setup and turnaround.
+- **Maintenance blocks are not buffered.** The proposed occupied period is compared with the block's own start and end.
+- **No exemption for the same event.** A hold that overlaps the same event's own hold at the same venue conflicts like any other.
+- **Hold expiry.** A new tentative hold gets `holdExpiresAt`, 7 days after it is created (`TENTATIVE_HOLD_DURATION_MS` in `shared/venueAvailability.js`, for SPM-78 to change). A hold whose `holdExpiresAt` has been reached does not block. A hold saved without `holdExpiresAt` still blocks.
+- **A refused request gets 409.** The response names the conflicting entry's type and occupied period only, never its event, title or ID, so a caller cannot learn about another organisation's event.
+- **First come, first served** is enforced by a lock document per venue (`systemLocks/venueBooking-{venueId}`), read and written in the same transaction as the hold, as SPM-8 does.
+
+**[Implemented — SPM-16, 15 Oct 2026 — historical record]** The rule is `findVenueConflict` in `shared/venueConflicts.js`. It is enforced in `createTentativeVenueHold` (`backend/src/services/venueService.js`). No route calls this function yet; it is service-level enforcement for SPM-14 to call. Known limits:
+
+- **SPM-14 must release an event's existing hold before re-holding the same venue with new times,** because an overlap with the same event's own hold conflicts.
+- **SPM-54 needs an `excludeId` option** so that the check, when re-run on approval, ignores the hold being approved. It is not added yet.
+- **Clashes between existing holds after a setup or turnaround change are not flagged** (§4.8, C6 sub-parts). Venue Staff approval (SPM-54/SPM-81) is expected to re-run the check.
+- **Maintenance blocks do not take the venue lock** (SPM-30 never refuses them, Change #2). A block created at the same moment as a hold may not be seen by that hold's check.
+- **Expiry applies only to conflict checks.** The calendar and search still treat every hold as blocking until SPM-78.
+
 ### 4.15 Equipment Request Management
 
 **[Customer-confirmed]** Organisers record preliminary equipment needs. Coordinators and Technical Support Staff review/refine them. Technical staff approve or reject according to requested staff/equipment availability.

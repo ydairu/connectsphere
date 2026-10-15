@@ -30,10 +30,14 @@ import {
   UNDER_REVIEW,
 } from '../../shared/status.js'
 import { ARRANGEMENT_APPROVED, TECHNICAL_ARRANGEMENT, VENUE_ARRANGEMENT } from '../../shared/arrangementDecisions.js'
+import { buildVenueRecord } from '../../shared/venue.js'
+import { AVAILABILITY_STATUS } from '../../shared/venueAvailability.js'
 
 export const SEED_TAG = 'spm42-spm24-sprint1'
 export const SEED_ID_PREFIX = 'seed-'
 export const EVENT_REQUESTS_COLLECTION = 'eventRequests'
+export const VENUES_COLLECTION = 'venues'
+export const VENUE_AVAILABILITY_COLLECTION = 'venueAvailability'
 
 // `.test` is reserved (RFC 6761) and never resolves, so no seeded address can reach a real inbox.
 const EMAIL_DOMAIN = 'seed.connectsphere.test'
@@ -80,14 +84,14 @@ const { coordinator, coordinator2, coordinator3, venueStaff, technicalStaff, ven
 // `coordinator` is set on every non-draft request: a submitted event is always assigned exactly one
 // Coordinator (Clarification 1, Coordinator and Staff Assignment). Drafts carry no assignment field.
 // `approvals` is SPM-9's arrangementApprovals record metadata, set only where a request needs it.
-function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, approvals, createdAt }) {
+function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', createdAt }) {
   const core = draft
     ? { title, purpose: null, description: null, preferredDateTime: null, durationHours: null, expectedAttendees: null, ...draftCore }
     : {
         title,
         purpose: `Seeded ${status} request for permission demonstrations`,
         description: 'Seed data — safe to delete by seedTag.',
-        preferredDateTime: '2026-11-20T09:00:00+08:00',
+        preferredDateTime,
         durationHours: 4,
         expectedAttendees: 80,
       }
@@ -144,9 +148,10 @@ export const SEED_REQUESTS = Object.freeze([
   eventRequest({ slug: 'a2-submitted', coordinator: coordinator2, status: SUBMITTED, owner: organiserA2, title: 'A2 submitted (A1 can view, cannot edit)', createdAt: '2026-09-10T11:00:00+08:00' }),
 
   // Organisation B — invisible to organisation A. Assigned to technical staff only, so venue-only
-  // staff cannot see it while the venue+technical account can.
+  // staff cannot see it while the venue+technical account can. SPM-16: a week after the other events, so
+  // its tentative hold on the seeded hall (SEED_VENUE_AVAILABILITY) does not clash with A1's booking.
   eventRequest({ slug: 'b1-draft', status: DRAFT, owner: organiserB1, title: 'B1 draft (private to B1)', draft: true, createdAt: '2026-09-11T10:00:00+08:00' }),
-  eventRequest({ slug: 'b1-planning', coordinator: coordinator2, status: PLANNING, owner: organiserB1, title: 'B1 planning (technical staff only)', assigned: [technicalStaff, venueTechnicalStaff], createdAt: '2026-09-11T11:00:00+08:00' }),
+  eventRequest({ slug: 'b1-planning', coordinator: coordinator2, status: PLANNING, owner: organiserB1, title: 'B1 planning (technical staff only)', assigned: [technicalStaff, venueTechnicalStaff], preferredDateTime: '2026-11-27T09:00:00+08:00', createdAt: '2026-09-11T11:00:00+08:00' }),
 ])
 
 // SPM-28 — field change history on A1's planning event, so the Change history panel can be checked on the
@@ -168,3 +173,92 @@ export const SEED_FIELD_HISTORY = Object.freeze({
     historyEntry('a1-planning-3', 'internal.planningNotes', '', planningRequest.internal.planningNotes, coordinator, 'coordinator', '2026-09-14T10:00:00.000Z'),
   ]),
 })
+
+// SPM-16 / SPM-72 — venues and venueAvailability entries for demonstrating conflict detection. The hall
+// has setup and turnaround times and holds one of each kind of entry; the room has neither and nothing
+// booked, for the back-to-back and multi-venue cases. Built with buildVenueRecord so they pass the same
+// validation as a venue created in the app. The hall's booking has not ended, so its setup and turnaround
+// are locked (SPM-72 AC5).
+const VENUE_CREATED_AT = new Date('2026-09-20T09:00:00+08:00')
+
+function seedVenue(slug, input) {
+  const { venue, errors } = buildVenueRecord(input, venueStaff, VENUE_CREATED_AT)
+  if (Object.keys(errors).length > 0) throw new Error(`Seed venue ${slug} is invalid: ${JSON.stringify(errors)}`)
+  return { id: `${SEED_ID_PREFIX}venue-${slug}`, ...venue }
+}
+
+export const SEED_VENUES = Object.freeze([
+  seedVenue('hall', {
+    name: 'Seed Hall (setup 30, turnaround 45)',
+    location: 'Level 1, Main Campus',
+    maximumCapacity: 200,
+    facilities: ['Projector', 'Wireless microphone'],
+    accessibilityFeatures: ['Wheelchair access'],
+    supportedLayouts: ['Theatre', 'Banquet'],
+    operatingHours: 'Daily 08:00-22:00',
+    setupMinutes: 30,
+    turnaroundMinutes: 45,
+  }),
+  seedVenue('room', {
+    name: 'Seed Breakout Room (no setup or turnaround)',
+    location: 'Level 2, Main Campus',
+    maximumCapacity: 40,
+    facilities: ['Whiteboard'],
+    accessibilityFeatures: ['Wheelchair access'],
+    supportedLayouts: ['Classroom'],
+    operatingHours: 'Daily 08:00-22:00',
+    setupMinutes: 0,
+    turnaroundMinutes: 0,
+  }),
+])
+
+const HOUR_MS = 60 * 60 * 1000
+const hall = SEED_VENUES[0]
+
+// A seeded event's own period, from its preferredDateTime and durationHours.
+export function seedEventPeriod(slug) {
+  const { core } = SEED_REQUESTS.find((request) => request.id === `${SEED_ID_PREFIX}req-${slug}`)
+  const startsAt = new Date(core.preferredDateTime)
+  return { startsAt: startsAt.toISOString(), endsAt: new Date(startsAt.getTime() + core.durationHours * HOUR_MS).toISOString() }
+}
+
+function availability(slug, fields) {
+  return { id: `${SEED_ID_PREFIX}availability-${slug}`, venueId: hall.id, lifecycleStatus: 'active', ...fields }
+}
+
+export const SEED_VENUE_AVAILABILITY = Object.freeze([
+  // A1's Confirmed event, at its own date and time (09:00-13:00 SGT, 20 Nov): occupies 08:30-13:45.
+  availability('a1-confirmed-booking', {
+    status: AVAILABILITY_STATUS.CONFIRMED_BOOKING,
+    eventRequestId: `${SEED_ID_PREFIX}req-a1-confirmed`,
+    ...seedEventPeriod('a1-confirmed'),
+    title: 'A1 confirmed (registration open)',
+    createdByUid: coordinator3.uid,
+    createdByName: coordinator3.name,
+    createdAt: '2026-09-06T12:00:00.000Z',
+  }),
+  // B1's Planning event, at its own date and time (09:00-13:00 SGT, 27 Nov). The expiry is set far ahead
+  // so the hold stays active for demonstrations.
+  availability('b1-planning-hold', {
+    status: AVAILABILITY_STATUS.TENTATIVE_HOLD,
+    eventRequestId: `${SEED_ID_PREFIX}req-b1-planning`,
+    ...seedEventPeriod('b1-planning'),
+    title: 'B1 planning (tentative hold)',
+    holdExpiresAt: '2027-06-30T15:59:59.000Z',
+    createdByUid: coordinator2.uid,
+    createdByName: coordinator2.name,
+    createdAt: '2026-09-12T02:00:00.000Z',
+  }),
+  // Expired, and linked to no event: 14:00-17:00 SGT on 4 Dec would be blocked if it were still active.
+  availability('expired-hold', {
+    status: AVAILABILITY_STATUS.TENTATIVE_HOLD,
+    eventRequestId: null,
+    startsAt: '2026-12-04T06:00:00.000Z',
+    endsAt: '2026-12-04T09:00:00.000Z',
+    title: 'Expired hold (no event)',
+    holdExpiresAt: '2026-10-01T10:00:00.000Z',
+    createdByUid: coordinator.uid,
+    createdByName: coordinator.name,
+    createdAt: '2026-09-24T02:00:00.000Z',
+  }),
+])

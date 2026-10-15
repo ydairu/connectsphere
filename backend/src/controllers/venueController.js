@@ -9,6 +9,7 @@ import {
   VenueAvailabilityBlockNotFoundError,
   updateVenue,
   VenueBufferTimesLockedError,
+  VenueConflictError,
   VenueNotFoundError,
   VenueValidationError,
 } from '../services/venueService.js'
@@ -19,6 +20,9 @@ export function sendVenueError(error, res, next) {
   }
   if (error instanceof VenueBufferTimesLockedError) {
     return res.status(409).json({ message: 'Setup and turnaround times are locked by a confirmed booking', errors: error.errors })
+  }
+  if (error instanceof VenueConflictError) {
+    return res.status(409).json({ message: 'The venue is not available for that period', errors: error.errors, conflict: error.conflict })
   }
   if (error instanceof VenueNotFoundError) {
     return res.status(404).json({ message: 'Venue not found' })

@@ -235,7 +235,14 @@ describe('SPM-11 — venue availability API (integration)', () => {
         db,
       ),
     ).rejects.toMatchObject({
-      errors: { time: 'This venue already has a tentative hold during that period.' },
+      // SPM-16 replaced the earlier 400 message with VenueConflictError, which names the conflict's type
+      // and occupied period.
+      name: 'VenueConflictError',
+      conflict: {
+        status: AVAILABILITY_STATUS.TENTATIVE_HOLD,
+        occupiedStartsAt: '2026-10-08T09:00:00.000Z',
+        occupiedEndsAt: '2026-10-08T10:00:00.000Z',
+      },
     })
   })
 })

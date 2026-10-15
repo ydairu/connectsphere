@@ -21,6 +21,9 @@
 // ALL of these hold: the run has --write; its parent is a seeded request ID; its type is field_changed; and
 // it is not one of the SEED_FIELD_HISTORY entries. No other activity type and nothing outside the seeded
 // requests is ever deleted.
+//
+// SPM-16: it also writes SEED_VENUES and SEED_VENUE_AVAILABILITY (a venue with setup and turnaround times
+// holding a confirmed booking, an active tentative hold and an expired one), with the same tag checks.
 
 import { parseArgs } from 'node:util'
 import { Timestamp } from 'firebase-admin/firestore'
@@ -29,7 +32,17 @@ import { env } from '../src/config/env.js'
 import { getAdminAuth, getAdminDb } from '../src/config/firebaseAdmin.js'
 import { FIELD_CHANGED } from '../../shared/changeHistory.js'
 import { ACTIVITY_SUBCOLLECTION } from '../src/services/coordinatorAssignmentService.js'
-import { EVENT_REQUESTS_COLLECTION, SEED_ACCOUNTS, SEED_FIELD_HISTORY, SEED_REQUESTS, SEED_TAG } from './seedData.js'
+import {
+  EVENT_REQUESTS_COLLECTION,
+  SEED_ACCOUNTS,
+  SEED_FIELD_HISTORY,
+  SEED_REQUESTS,
+  SEED_TAG,
+  SEED_VENUE_AVAILABILITY,
+  SEED_VENUES,
+  VENUE_AVAILABILITY_COLLECTION,
+  VENUES_COLLECTION,
+} from './seedData.js'
 import { removableFieldHistory } from './seedHistory.js'
 import { banner, resolveWriteMode } from './writeGuard.js'
 
@@ -93,7 +106,19 @@ async function preflight(auth, db) {
     if (refs.length > 0) strays.push({ request, refs })
   }
 
-  return { accounts, requests, history, strays, blockers }
+  // SPM-16: venues and their venueAvailability entries.
+  const venueDocuments = []
+  for (const [collection, documents] of [[VENUES_COLLECTION, SEED_VENUES], [VENUE_AVAILABILITY_COLLECTION, SEED_VENUE_AVAILABILITY]]) {
+    for (const document of documents) {
+      const snapshot = await db.collection(collection).doc(document.id).get()
+      if (snapshot.exists && snapshot.get('seedTag') !== SEED_TAG) {
+        blockers.push(`${collection}/${document.id} exists and is not tagged ${SEED_TAG}`)
+      }
+      venueDocuments.push({ collection, document, docAction: snapshot.exists ? 'overwrite' : 'create' })
+    }
+  }
+
+  return { accounts, requests, history, strays, venueDocuments, blockers }
 }
 
 function profileDocument(account) {
@@ -104,6 +129,11 @@ function profileDocument(account) {
 function historyDocument(entry) {
   const { id: _id, at, ...fields } = entry
   return { ...fields, seedTag: SEED_TAG, at: Timestamp.fromDate(new Date(at)) }
+}
+
+function venueDocument(document) {
+  const { id: _id, ...fields } = document
+  return { ...fields, seedTag: SEED_TAG }
 }
 
 function requestDocument(request) {
@@ -137,7 +167,7 @@ async function main() {
 
   const auth = getAdminAuth()
   const db = getAdminDb()
-  const { accounts, requests, history, strays, blockers } = await preflight(auth, db)
+  const { accounts, requests, history, strays, venueDocuments, blockers } = await preflight(auth, db)
 
   console.log(`\nAccounts (${accounts.length}):`)
   for (const { account, authAction, docAction } of accounts) {
@@ -156,6 +186,14 @@ async function main() {
   console.log(`Stray ${FIELD_CHANGED} entries under seeded requests${mode.write ? ' (to remove)' : ' (--write would remove)'}:`)
   if (strays.length === 0) console.log('  none')
   for (const { request, refs } of strays) console.log(`  ${request.id}: ${refs.length}`)
+
+  console.log(`\nVenues and availability (${venueDocuments.length}):`)
+  for (const { collection, document, docAction } of venueDocuments) {
+    const detail = document.status
+      ? `${document.status.padEnd(18)} ${document.startsAt} to ${document.endsAt}${document.holdExpiresAt ? `  expires ${document.holdExpiresAt}` : ''}  event=${document.eventRequestId ?? 'none'}`
+      : `setup ${document.setupMinutes} min, turnaround ${document.turnaroundMinutes} min`
+    console.log(`  ${docAction.padEnd(9)} ${collection}/${document.id}  ${detail}`)
+  }
 
   if (blockers.length > 0) {
     console.error('\nRefusing to continue — these are not this seed\'s to overwrite:')
@@ -182,6 +220,7 @@ async function main() {
   for (const { request, entry } of history) {
     batch.set(db.collection(EVENT_REQUESTS_COLLECTION).doc(request.id).collection(ACTIVITY_SUBCOLLECTION).doc(entry.id), historyDocument(entry))
   }
+  for (const { collection, document } of venueDocuments) batch.set(db.collection(collection).doc(document.id), venueDocument(document))
   await batch.commit()
 
   // Removal in batches of at most 500 writes, Firestore's limit. Re-checked with the real --write flag
@@ -199,7 +238,7 @@ async function main() {
     removed.push(`${request.id}: ${refs.length}`)
   }
 
-  console.log(`\nWrote ${accounts.length} Auth users, ${accounts.length} users documents, ${requests.length} ${EVENT_REQUESTS_COLLECTION} documents and ${history.length} field history entries to ${env.firebaseProjectId}.`)
+  console.log(`\nWrote ${accounts.length} Auth users, ${accounts.length} users documents, ${requests.length} ${EVENT_REQUESTS_COLLECTION} documents, ${history.length} field history entries and ${venueDocuments.length} venue and availability documents to ${env.firebaseProjectId}.`)
   console.log(`Removed stray ${FIELD_CHANGED} entries: ${removed.length === 0 ? 'none' : removed.join(', ')}`)
 }
 
