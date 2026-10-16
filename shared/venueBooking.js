@@ -1,5 +1,6 @@
 import { COORDINATOR, VENUE_STAFF, isAssignedCoordinator, rolesOf } from './permissions.js'
 import { PLANNING } from './status.js'
+import { chooseStaff } from './staffAssignment.js'
 import { validateAvailabilityRange } from './venueAvailability.js'
 
 export const BOOKING_PENDING = 'pending'
@@ -52,12 +53,9 @@ export function capacityWarning(attendance, capacity) {
     ? `Expected attendance (${attendance}) exceeds venue capacity (${capacity}). Venue Staff must review this request.` : null
 }
 
-// Least pending work, then cycle through stable UID order after the previous assignee.
+// Least pending work, then cycle through stable UID order after the previous assignee. The rule is
+// chooseStaff (shared/staffAssignment.js), shared with SPM-17's Technical Support Staff assignment.
 export function chooseVenueStaff(users, bookings, lastUid) {
-  const eligible = users.filter((user) => rolesOf(user).includes(VENUE_STAFF)).sort((a, b) => a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0)
-  if (!eligible.length) return null
-  const counts = new Map(eligible.map((user) => [user.uid, bookings.filter((b) => b.status === BOOKING_PENDING && b.assignedVenueStaffUid === user.uid).length]))
-  const minimum = Math.min(...counts.values())
-  const tied = eligible.filter((user) => counts.get(user.uid) === minimum)
-  return tied.find((user) => user.uid > (lastUid ?? '')) ?? tied[0]
+  const pendingAssignees = bookings.filter((b) => b.status === BOOKING_PENDING).map((b) => b.assignedVenueStaffUid)
+  return chooseStaff(users, VENUE_STAFF, pendingAssignees, lastUid)
 }

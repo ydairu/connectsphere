@@ -68,6 +68,7 @@ import { EventRequestForbiddenError, EventRequestNotFoundError, submitDraftEvent
 import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
 import { prepareVenueHoldRelease } from './venueBookingService.js'
+import { prepareEquipmentRequestClose } from './equipmentRequestService.js'
 
 export const REASON_REQUIRED = 'reason_required'
 export const REASON_INVALID = 'reason_invalid'
@@ -209,10 +210,15 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       refuse(decision)
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }
-      // Read release data before status/history writes; only actual terminal actions release holds.
-      const releaseHolds = [REJECT, CANCEL, APPROVE_CANCELLATION].includes(action)
-        ? await prepareVenueHoldRelease(tx, db, id, user, now) : null
+      // Read release data before status/history writes; only actual terminal actions release holds (SPM-14)
+      // and close Pending Review equipment requests (SPM-17). Both read first, then both write, because a
+      // transaction may not read after it has written.
+      const terminal = [REJECT, CANCEL, APPROVE_CANCELLATION].includes(action)
+      const releaseHolds = terminal ? await prepareVenueHoldRelease(tx, db, id, user, now) : null
+      const closeEquipmentRequests = terminal
+        ? await prepareEquipmentRequestClose(tx, db, id, user, now, action === REJECT ? 'event_rejected' : 'event_cancelled') : null
       if (releaseHolds) releaseHolds()
+      if (closeEquipmentRequests) closeEquipmentRequests()
       // SPM-25: the clarification message is kept as record metadata for the Organiser, and every earlier
       // one is kept with it, so a second return does not overwrite the first.
       if (action === RETURN_FOR_CLARIFICATION) {

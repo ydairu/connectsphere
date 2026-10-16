@@ -9,6 +9,13 @@ export function submitVenueBooking(user, eventId, input) {
 export function getVenueBookingQueue(user) {
   return authenticatedRequest(user, '/api/venues/booking-requests')
 }
+// SPM-17: the event's equipment requests, and submitting a new one.
+export function listEquipmentRequests(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/equipment-requests`)
+}
+export function submitEquipmentRequest(user, eventId, input) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/equipment-requests`, { method: 'POST', body: JSON.stringify(input) })
+}
 
 export class ApiRequestError extends Error {
   constructor(message, { status, details } = {}) {

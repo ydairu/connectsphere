@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { createVenueBookingController } from '../controllers/venueBookingController.js'
+import { createEquipmentRequestController } from '../controllers/equipmentRequestController.js'
 import { createRequestController } from '../controllers/requestController.js'
 import { authoriseHistory, authoriseList, authoriseRead, authoriseWrite, sendHistory } from '../middleware/authorise.js'
 import { createCoordinatorNameLoader } from '../services/assignedCoordinatorService.js'
@@ -26,6 +27,11 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   const bookings = createVenueBookingController(getEventRequestDb)
   router.get('/:id/venue-bookings', authenticate, bookings.list)
   router.post('/:id/venue-bookings', authenticate, bookings.submit)
+  // SPM-17: the event's equipment requests. Who may read and submit is decided in the service
+  // (shared/equipmentRequest.js), as SPM-14's booking routes do.
+  const equipmentRequests = createEquipmentRequestController(getEventRequestDb)
+  router.get('/:id/equipment-requests', authenticate, equipmentRequests.list)
+  router.post('/:id/equipment-requests', authenticate, equipmentRequests.submit)
 
   router.get('/', authenticate, controller.loadAll, controller.loadOwnerNames, authoriseList, controller.sendList)
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead, controller.sendOne)
