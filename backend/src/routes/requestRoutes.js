@@ -5,6 +5,7 @@ import { authoriseHistory, authoriseList, authoriseRead, authoriseWrite, sendHis
 import { createCoordinatorNameLoader } from '../services/assignedCoordinatorService.js'
 import { createOwnerNameLoader } from '../services/requestOwnerService.js'
 import { validatePreparation } from '../middleware/validatePreparation.js'
+import { validateVenueRequirements } from '../middleware/validateVenueRequirements.js'
 import { refuseSignificantChangeWhileCancellationOpen, validateSignificantFields } from '../middleware/validateSignificantFields.js'
 import { createStaffRecipientLoader } from '../services/staffRecipientService.js'
 
@@ -28,15 +29,16 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
 
   router.get('/', authenticate, controller.loadAll, controller.loadOwnerNames, authoriseList, controller.sendList)
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead, controller.sendOne)
-  // SPM-48, SPM-10: values are validated after authorisation, so a forbidden field is a 403, not a 400. Then
-  // SPM-10 AC7: a significant change while a cancellation request is open is a 409. Nothing is written
-  // before controller.update.
+  // SPM-48, SPM-13, SPM-10: values are validated after authorisation, so a forbidden field is a 403, not a
+  // 400. Then SPM-10 AC7: a significant change while a cancellation request is open is a 409. Nothing is
+  // written before controller.update.
   router.patch(
     '/:id',
     authenticate,
     controller.loadOne,
     authoriseWrite,
     validatePreparation,
+    validateVenueRequirements,
     validateSignificantFields,
     refuseSignificantChangeWhileCancellationOpen,
     controller.update,

@@ -14,6 +14,7 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import StatusActions from '../components/StatusActions.jsx'
 import StatusPill from '../components/StatusPill.jsx'
+import VenueSuitability from '../components/VenueSuitability.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getRequest, transitionRequest, updateRequest } from '../services/api.js'
 import { statusLabel } from '../utils/statusLabels.js'
@@ -132,6 +133,7 @@ function RequestDetailPage() {
   const [cancellationRequest, setCancellationRequest] = useState(null)
   const [clarificationRequests, setClarificationRequests] = useState(null)
   const [canReassign, setCanReassign] = useState(false)
+  const [canCheckSuitability, setCanCheckSuitability] = useState(false)
   const [assignedCoordinator, setAssignedCoordinator] = useState(null)
   const [cancellation, setCancellation] = useState(null)
   const [rejection, setRejection] = useState(null)
@@ -157,6 +159,7 @@ function RequestDetailPage() {
     setCancellationRequest(response.cancellationRequest ?? null)
     setClarificationRequests(response.clarificationRequests ?? null)
     setCanReassign(response.canReassignCoordinator === true)
+    setCanCheckSuitability(response.canCheckVenueSuitability === true)
     setAssignedCoordinator(response.assignedCoordinator ?? null)
     setCancellation(response.cancellation ?? null)
     setRejection(response.rejection ?? null)
@@ -370,6 +373,18 @@ function RequestDetailPage() {
                 requestId={id}
                 busy={acting || saving}
                 onReassigned={(name) => navigate('/requests', { replace: true, state: { notice: `Event reassigned to ${name}.` } })}
+              />
+            )}
+
+            {canCheckSuitability && (
+              <VenueSuitability
+                user={user}
+                request={request}
+                busy={acting || saving}
+                onRequirementsSaved={(response) => {
+                  applyResponse(response)
+                  setHistoryVersion((version) => version + 1)
+                }}
               />
             )}
 

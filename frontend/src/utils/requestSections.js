@@ -47,6 +47,10 @@ export const SECTION_FIELDS = Object.freeze({
       { name: 'layoutPreference', label: 'Layout preference', type: 'text' },
       { name: 'accessibilityRequired', label: 'Accessibility required', type: 'boolean' },
       { name: 'accessibilityNeeds', label: 'Accessibility needs', type: 'textarea' },
+      // SPM-13: chosen by the assigned Coordinator from catalogue values in the Venue suitability card, not
+      // in this section's form. Defined here so the change history can name them.
+      { name: 'requiredFacilities', label: 'Required facilities', type: 'list', pageEditor: false },
+      { name: 'requiredAccessibilityFeatures', label: 'Required accessibility features', type: 'list', pageEditor: false },
     ],
   },
   [EQUIPMENT]: {
@@ -101,6 +105,7 @@ export function sectionTitle(section) {
   return SECTION_FIELDS[section]?.title ?? section
 }
 
+/** The fields the request page's section form shows and edits. */
 export function sectionFields(section) {
-  return SECTION_FIELDS[section]?.fields ?? []
+  return (SECTION_FIELDS[section]?.fields ?? []).filter((field) => field.pageEditor !== false)
 }

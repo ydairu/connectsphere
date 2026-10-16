@@ -12,6 +12,7 @@ import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.
 import { canViewChangeHistory, visibleChangeHistory } from '../../../shared/changeHistory.js'
 import { requestOwnerFields } from '../../../shared/requestOwner.js'
 import { preparationEditing } from '../../../shared/preparationAccess.js'
+import { canCheckVenueSuitability } from '../../../shared/venueSuitability.js'
 import {
   allAvailableActions,
   arrangementsSummary,
@@ -75,6 +76,7 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
     completion: completionNotice(user, request),
     canViewChangeHistory: canViewChangeHistory(user, request),
     preparation: preparationEditing(user, request),
+    canCheckVenueSuitability: canCheckVenueSuitability(user, request),
     ...requestOwnerFields(user, request, ownerNames),
   }
 }
