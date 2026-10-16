@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { createVenueBookingController } from '../controllers/venueBookingController.js'
 import { createRequestController } from '../controllers/requestController.js'
 import { authoriseHistory, authoriseList, authoriseRead, authoriseWrite, sendHistory } from '../middleware/authorise.js'
 import { createCoordinatorNameLoader } from '../services/assignedCoordinatorService.js'
@@ -13,7 +14,7 @@ import { createStaffRecipientLoader } from '../services/staffRecipientService.js
 // Route split by status (AGENTS.md §6, team decision of 20 Sep 2026): drafts are
 // created and edited through /api/event-requests, which validates field values; everything after
 // submission goes through these routes, which evaluate role, record scope and the status gate.
-export function createRequestRoutes({ authenticate, store, getUserDb }) {
+export function createRequestRoutes({ authenticate, store, getUserDb, getEventRequestDb }) {
   const controller = createRequestController(
     store,
     createCoordinatorNameLoader(getUserDb),
@@ -21,6 +22,9 @@ export function createRequestRoutes({ authenticate, store, getUserDb }) {
     createStaffRecipientLoader(getUserDb),
   )
   const router = Router()
+  const bookings = createVenueBookingController(getEventRequestDb)
+  router.get('/:id/venue-bookings', authenticate, bookings.list)
+  router.post('/:id/venue-bookings', authenticate, bookings.submit)
 
   router.get('/', authenticate, controller.loadAll, controller.loadOwnerNames, authoriseList, controller.sendList)
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead, controller.sendOne)

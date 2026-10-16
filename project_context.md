@@ -463,6 +463,14 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
     - **Local verification (Windows, 15 Oct 2026):** lint passed; 128 Node and 99 frontend tests passed; root Vitest 1322 passed (31 opt-in live tests skipped); the production build passed with the existing bundle-size warning; Playwright Chromium passed all 66 tests.
     - **Not verified:** these are in-memory doubles only. No live Firebase, emulator or manual browser check was run. `firestore.rules` is unchanged: its default deny already blocks the browser from the new collections, and the API uses the Admin SDK. No backlog status change is claimed.
 
+## SPM-14 venue booking increment — 16 October 2026
+
+- Assigned Coordinators can submit venue booking requests at Planning through `/api/requests/:id/venue-bookings`. The browser form is linked from event details. Assigned Venue Staff read their pending queue at `/venues/booking-requests`.
+- Team choice authorised for this increment: least pending requests, round robin on ties; retain the assignee on replacement. The booking, assignment, hold and activity entry save atomically. Capacity overflow warns but permits a pending request for review, not approval.
+- Replacement secures the new hold and releases the exact old one together. Event rejection, direct cancellation and approved cancellation release tentative holds in the status transaction; cancellation requests alone do not. Confirmed bookings are preserved.
+- Verification and gaps: `docs/evidence/spm-14-traceability.md`. The user manual checklist is `docs/testing/spm-14-manual-testing.md`. Local unit/integration suites, production build, targeted browser tests and isolated Firestore emulator checks passed. Manual acceptance and SPM-54 rejection-flow integration remain outstanding.
+- No live project or production seed was used; rules were neither edited nor deployed. The workbook/Sprint record is absent, and no operational status or Sprint assignment was changed. Existing calendar/search expiry and maintenance concurrency gaps remain.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.

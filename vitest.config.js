@@ -33,6 +33,14 @@ export default defineConfig({
       reporter: ['text', 'html', 'json-summary'],
       // Application-owned authentication, registration and authorisation code only — never Firebase.
       include: [
+        'shared/venueBooking.js',
+        'shared/venueAvailability.js',
+        'shared/venueConflicts.js',
+        'backend/src/services/venueBookingService.js',
+        'backend/src/controllers/venueBookingController.js',
+        'backend/src/services/statusTransitionService.js',
+        'backend/src/routes/requestRoutes.js',
+        'frontend/src/pages/VenueBookingsPage.jsx',
         'frontend/src/context/**',
         'frontend/src/hooks/useAuth.js',
         'frontend/src/components/ProtectedRoute.jsx',

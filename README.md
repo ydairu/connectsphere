@@ -1,5 +1,7 @@
 # ConnectSphere
 
+Venue booking requests (SPM-14): assigned Coordinators open **Venue booking requests** from an event in Planning; Venue Staff use **Venue bookings** in navigation. Requests create tentative holds, not confirmed bookings. See [manual testing](docs/testing/spm-14-manual-testing.md), [implementation and API notes](docs/plans/spm-14-venue-booking.md), and [test evidence and remaining gaps](docs/evidence/spm-14-traceability.md).
+
 ConnectSphere is a full-stack event management foundation. It currently provides account registration, login, persistent sessions, Firestore-backed multi-role profiles, a protected profile page, and an authenticated Express API.
 
 Event requests are created through the API and stored in Firestore. The five-role permission model lives in `shared/permissions.js` and is enforced by the API, and Firestore security rules keep the browser out of the `eventRequests` collection. Organisers can create and directly reopen their own unsubmitted drafts for editing; the dedicated drafts list and request-submission flow are not built yet.

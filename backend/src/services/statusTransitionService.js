@@ -67,6 +67,7 @@ import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError, submitDraftEventRequest } from './eventRequestService.js'
 import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
+import { prepareVenueHoldRelease } from './venueBookingService.js'
 
 export const REASON_REQUIRED = 'reason_required'
 export const REASON_INVALID = 'reason_invalid'
@@ -208,6 +209,10 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       refuse(decision)
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }
+      // Read release data before status/history writes; only actual terminal actions release holds.
+      const releaseHolds = [REJECT, CANCEL, APPROVE_CANCELLATION].includes(action)
+        ? await prepareVenueHoldRelease(tx, db, id, user, now) : null
+      if (releaseHolds) releaseHolds()
       // SPM-25: the clarification message is kept as record metadata for the Organiser, and every earlier
       // one is kept with it, so a second return does not overwrite the first.
       if (action === RETURN_FOR_CLARIFICATION) {

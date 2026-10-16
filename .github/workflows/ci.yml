@@ -3,6 +3,7 @@ name: CI
 # Runs the full automated suite on every push and on pull requests into main.
 # Nothing here needs Firebase credentials: unit/integration tests mock Firebase and the E2E suite
 # runs against the in-memory Firebase double. The opt-in live harness (test:api:live) never runs here.
+# SPM-14 also exercises actual transactions against a local, credential-free Firestore emulator.
 on:
   push:
   pull_request:
@@ -41,6 +42,24 @@ jobs:
 
       - name: Frontend production build
         run: npm run build
+
+      - name: Java for local Firestore concurrency checks
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Booking transactions against Firestore emulator
+        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-bookings --config firebase.spm14.json "npm run test:spm14:emulator"
+
+      - name: Upload booking emulator results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: booking-emulator-results
+          path: test-results/spm14-emulator.json
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Resolve Playwright version
         id: playwright

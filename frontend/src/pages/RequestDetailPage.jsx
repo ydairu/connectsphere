@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { ORGANISER } from '../../../shared/permissions.js'
+import { COORDINATOR, ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
 import { CONFIRMED, DRAFT, PLANNING } from '../../../shared/status.js'
 import { CANCELLATION_REQUEST_OPEN, SIGNIFICANT_FIELDS, significantFieldsIn } from '../../../shared/significantChanges.js'
 import ArrangementsSummary from '../components/ArrangementsSummary.jsx'
@@ -346,6 +346,7 @@ function RequestDetailPage() {
             )}
 
             <AssignedCoordinator coordinator={assignedCoordinator} />
+            {(roles?.includes(COORDINATOR) || roles?.includes(VENUE_STAFF)) && <p><Link to={`/requests/${id}/venue-bookings`}>Venue booking requests</Link></p>}
 
             {roles?.includes(ORGANISER) && <ArrangementsSummary request={request} arrangements={arrangements} />}
 

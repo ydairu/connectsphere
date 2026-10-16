@@ -225,6 +225,21 @@ export function venueBookingLockPath(venueId) {
   return ['systemLocks', `venueBooking-${venueId}`]
 }
 
+// Read-only transaction phase shared by SPM-14 and the standalone SPM-16 hold service.
+// Only a caller that has verified a replacement's association may pass excludeId.
+export async function checkVenueHoldInTransaction(tx, db, commitment, now, excludeId = null) {
+  const venueSnapshot = await tx.get(db.collection('venues').doc(commitment.venueId))
+  if (!venueSnapshot.exists) throw new VenueNotFoundError(commitment.venueId)
+  const [collection, id] = venueBookingLockPath(commitment.venueId)
+  const lockRef = db.collection(collection).doc(id)
+  await tx.get(lockRef)
+  const availability = await tx.get(db.collection('venueAvailability').where('venueId', '==', commitment.venueId))
+  const conflict = findVenueConflict({ candidate: commitment, venue: venueSnapshot.data(),
+    commitments: availability.docs.filter((doc) => doc.id !== excludeId).map((doc) => ({ id: doc.id, ...doc.data() })), now })
+  if (conflict) throw new VenueConflictError(conflict)
+  return { venue: venueSnapshot.data(), lockRef }
+}
+
 // SPM-16: places a tentative hold unless its occupied period conflicts with an active booking, unexpired
 // hold or maintenance block at the venue; a conflict throws VenueConflictError and writes nothing. No
 // route calls this yet — SPM-14 (booking request) is expected to.
@@ -236,9 +251,6 @@ export async function createTentativeVenueHold(input, actor, db = getAdminDb(), 
   if (!actor?.uid) errors.createdByUid = 'An authenticated staff member is required.'
   if (hasVenueValidationErrors(errors)) throw new VenueValidationError(errors)
 
-  const venueRef = db.collection('venues').doc(commitment.venueId)
-  const [lockCollection, lockId] = venueBookingLockPath(commitment.venueId)
-  const lockRef = db.collection(lockCollection).doc(lockId)
   const docRef = db.collection('venueAvailability').doc()
   const at = now.toISOString()
   const record = {
@@ -251,19 +263,7 @@ export async function createTentativeVenueHold(input, actor, db = getAdminDb(), 
   }
 
   await db.runTransaction(async (tx) => {
-    // The venue is read here, so a setup or turnaround change made meanwhile also retries this check.
-    const venueSnapshot = await tx.get(venueRef)
-    if (!venueSnapshot.exists) throw new VenueNotFoundError(commitment.venueId)
-    await tx.get(lockRef)
-    const availability = await tx.get(db.collection('venueAvailability').where('venueId', '==', commitment.venueId))
-
-    const conflict = findVenueConflict({
-      candidate: commitment,
-      venue: venueSnapshot.data(),
-      commitments: availability.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      now,
-    })
-    if (conflict) throw new VenueConflictError(conflict)
+    const { lockRef } = await checkVenueHoldInTransaction(tx, db, commitment, now)
 
     tx.set(docRef, record)
     tx.set(lockRef, { venueId: commitment.venueId, lastCommitmentId: docRef.id, updatedAt: at })
