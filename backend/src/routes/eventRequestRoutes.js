@@ -1,14 +1,16 @@
 import { Router } from 'express'
 import { ORGANISER } from '../../../shared/permissions.js'
 import { createEventRequestController } from '../controllers/eventRequestController.js'
+import { createVenueSuitabilityController } from '../controllers/venueSuitabilityController.js'
 import { requireRole } from '../middleware/requireRole.js'
 import { createCoordinatorNameLoader } from '../services/assignedCoordinatorService.js'
 import { createOwnerNameLoader } from '../services/requestOwnerService.js'
 
 // Draft create, load, save and submit (SPM-7, SPM-4, SPM-3). authenticate and getDb come from
 // createApp, like the /api/requests routes, so the API tests and the E2E double can serve these too.
-export function createEventRequestRoutes({ authenticate, getDb, getUserDb = getDb }) {
+export function createEventRequestRoutes({ authenticate, getDb, getUserDb = getDb, getVenueDb = getDb }) {
   const controller = createEventRequestController(getDb, createCoordinatorNameLoader(getUserDb), createOwnerNameLoader(getUserDb))
+  const suitabilityController = createVenueSuitabilityController(getDb, getVenueDb)
   const router = Router()
 
   router.post('/', authenticate, requireRole(ORGANISER), controller.createEventRequest)
@@ -21,6 +23,8 @@ export function createEventRequestRoutes({ authenticate, getDb, getUserDb = getD
   // shared/coordinatorReassignment.js decides who may reassign.
   router.get('/:id/reassignment/candidates', authenticate, controller.listReassignmentCandidates)
   router.post('/:id/reassignment', authenticate, controller.reassignEventRequest)
+  // SPM-13 venue suitability, read-only. No role check here: shared/venueSuitability.js decides who may ask.
+  router.get('/:id/venue-suitability', authenticate, suitabilityController.getVenueSuitability)
 
   return router
 }

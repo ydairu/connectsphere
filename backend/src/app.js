@@ -38,7 +38,7 @@ export function createApp({
 
   app.use('/api/health', healthRoutes)
   app.use('/api/equipment', createEquipmentRoutes({ authenticate, getDb: getEquipmentDb }))
-  app.use('/api/event-requests', createEventRequestRoutes({ authenticate, getDb: getEventRequestDb, getUserDb }))
+  app.use('/api/event-requests', createEventRequestRoutes({ authenticate, getDb: getEventRequestDb, getUserDb, getVenueDb }))
   app.use('/api/notifications', createNotificationRoutes({ authenticate, getDb: getNotificationDb }))
   app.use('/api/profile', profileRoutes)
   app.use('/api/requests', createRequestRoutes({ authenticate, store: eventRequestStore, getUserDb, getEventRequestDb }))

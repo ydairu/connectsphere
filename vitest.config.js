@@ -74,6 +74,8 @@ export default defineConfig({
         'shared/venue.js',
         'shared/venueSearch.js',
         'shared/venueOccupancy.js',
+        'shared/venueSuitability.js',
+        'shared/operatingHours.js',
       ],
       exclude: ['**/*.test.*', '**/*.cases.js', '**/*.live.js', 'backend/src/testing/**'],
     },

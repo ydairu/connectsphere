@@ -536,6 +536,17 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Unresolved]** Missing-facility block versus warning behaviour is not fully specified.
 
+> **Resolved by the backlog — SPM-13 AC2 (Product Backlog workbook).** A missing required facility makes a venue **unsuitable**, as do capacity overflow and unavailability at the event's date/time; an unsupported layout, unmet accessibility needs and operating hours are **warnings** and the venue can still be selected. The backlog note grounds this in the Week 4 Project Instructions ("not suitable when attendance exceeds capacity or a required facility is unavailable") and CL1 (accessibility, layout and operating hours as suitability parameters). The item above is kept as the historical record.
+
+**[Team decision, 15 Oct 2026 — SPM-13, pending PO confirmation]** Where SPM-13's acceptance criteria leave room:
+
+- **A1 — the event's required facilities and accessibility features.** The event request has no such fields, and Organisers cannot see the venue catalogue to name them. The assigned Coordinator chooses them from the values the catalogue records, and they are stored in the event's venue section as `venue.requiredFacilities` and `venue.requiredAccessibilityFeatures`. They are ordinary fields, not significant changes under SPM-10, and are recorded in the change history (SPM-28). The Organiser's own `accessibilityRequired` and `accessibilityNeeds` prompt the Coordinator to choose features but are not matched directly.
+- **B1 — operating hours.** Read from the existing free text for common forms ("Monday-Friday 09:00-18:00", "Mon–Sat 8am–8pm", "Daily 08:00-22:00", "24/7"), in Singapore time. Text that cannot be read with confidence gives its own warning showing the text, rather than a guess.
+- **C — when the check is offered:** to the assigned Coordinator while the event is Under Review or in Planning.
+- **Unavailability is named by type and time only** ("already booked, Fri 20 Nov 2026, 11:00–15:00"), never by the other event's title, because Coordinators see only their assigned events (SPM-65). The event's own bookings and holds are ignored.
+
+**[Implemented — SPM-13, 15 Oct 2026 — historical record]** Rules in `shared/venueSuitability.js` and `shared/operatingHours.js`; `GET /api/event-requests/:id/venue-suitability` (optionally `?venueId=`) returns each catalogue venue's result, problems and warnings; `PATCH /api/requests/:id` validates the two requirement fields (`backend/src/middleware/validateVenueRequirements.js`); the request page shows a "Venue suitability" card. The event's own period is checked, ignoring expired tentative holds as SPM-16 does; setup/turnaround and several venues per event are SPM-76.
+
 > **Week 7 effect (Change #3).** With multiple bookings per event (§5.3), each venue arrangement is checked **independently** for suitability, availability and conflicts while remaining associated with the same event.
 
 ### 4.12 Venue Booking Request
@@ -715,7 +726,7 @@ Before implementing affected functionality, resolve and record:
 3. ~~Same-organisation Organiser visibility.~~ Resolved — team decision, 3 Oct 2026 (§2.2).
 4. Exact multi-role storage and permission evaluation model. *(open team choice)*
 5. ~~Coordinator assignment algorithm.~~ The SPM-8 algorithm itself was PO-confirmed 20 Sep 2026; **its on-submit auto-trigger (and the empty-pool = server error rule) is superseded by Change #5** (§4.5, §10). Open sub-question: whether the Lead reuses the algorithm on manual assignment.
-6. Missing venue-facility block/warning policy. *(open)*
+6. ~~Missing venue-facility block/warning policy.~~ **Resolved by SPM-13 AC2: a missing required facility makes a venue unsuitable** (§4.11).
 7. ~~Venue partial-match behaviour.~~ **Resolved by SPM-12 AC4: no results, with a clear no-matching-venues message** (§4.10).
 8. Notification channels and preferences. *(open)*
 9. Whether to retain the six-character password minimum as a team security choice. *(open)*

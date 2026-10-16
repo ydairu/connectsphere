@@ -478,6 +478,26 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
 - Existing Express endpoints and booking assignment permissions are reused. Shared pending selection orders oldest first with ID ties; expired-but-undecided requests remain pending. Queue entry/return, Refresh and error retry refetch current data.
 - Verification and limitations are recorded in `docs/evidence/spm-53-traceability.md`; Dairu's 17-case checklist is `docs/testing/spm-53-manual-testing.md`. Unit, API/component regressions, all 69 Chromium browser tests, lint and production build passed; desktop/mobile screenshots were reviewed. Manual acceptance remains unperformed. SPM-54 approval/rejection is covered only by persisted-state fixtures, not a real decision journey.
 - No database migration, rule change/deployment, production seed or live Firebase verification. The operational workbook/Sprint record remains absent; no Done status or Sprint allocation is claimed.
+28. **SPM-13 check whether a venue is suitable for an event (15 Oct 2026, branch `spm-13`):**
+    - **Built:**
+      - **Rules:** `shared/venueSuitability.js` runs six checks per venue. Capacity overflow, a missing required facility and a booking, hold or maintenance block at the event's time make a venue unsuitable; an unsupported layout, a missing accessibility feature and operating hours give warnings. Every failure and warning is named. The event's own bookings and holds are ignored, and so are tentative holds that have expired (`isExpiredHold`, SPM-16). Other events are named only by type and time.
+      - **Operating hours:** `shared/operatingHours.js` reads common free-text forms in Singapore time; unreadable text gets its own warning showing the text.
+      - **API:** `GET /api/event-requests/:id/venue-suitability` (optionally `?venueId=`) returns every catalogue venue's result, suitable first, plus the catalogue's facilities and accessibility features. Only the assigned Coordinator, Under Review or Planning: another Coordinator gets 404, other roles 403, another status 409. `GET /api/requests/:id` adds `canCheckVenueSuitability`. `createApp`'s `getVenueDb` now also reaches the event-request routes.
+      - **Requirements:** `venue.requiredFacilities` and `venue.requiredAccessibilityFeatures` on the event, chosen by the Coordinator from catalogue values and saved through `PATCH /api/requests/:id`, which validates them (`validateVenueRequirements.js`, 400 for anything but a list of text). They are ordinary fields, recorded in the change history, and kept out of the page's Venue section form (`pageEditor: false` in `requestSections.js`).
+      - **Page:** a "Venue suitability" card on the request page for the assigned Coordinator: requirement checkboxes, a prompt when the Organiser says accessibility is required, and each venue with its result and reasons.
+    - **Decisions:** AC2 resolves the missing-facility block/warning question (unsuitable). A1 (requirements chosen by the Coordinator and stored on the event), B1 (operating hours read from the text) and C (Under Review and Planning) are team decisions of 15 Oct 2026, pending PO confirmation (effective-requirements.md §4.11).
+    - **Gaps:**
+      - Setup/turnaround and several venues per event are SPM-76.
+      - Nothing stops an Organiser setting the requirement fields through the API at Draft or Returned (section-level permissions); the page does not offer it.
+      - No E2E test of the card yet. The E2E double now seeds venues (SPM-16), so one can be added.
+      - SPM-14 has its own capacity warning (`capacityWarning` in `shared/venueBooking.js`), so the booking page and the suitability card word capacity overflow differently.
+    - **Evidence:**
+      - `tests/spm-13/unit/venueSuitability.test.js`
+      - `tests/spm-13/unit/operatingHours.test.js`
+      - `tests/spm-13/integration/venueSuitabilityApi.test.js`
+      - `tests/spm-13/integration/venueSuitabilityPage.test.jsx`
+    - **Local verification (macOS, Node 24.1.0, 16 Oct 2026, on top of `main` at `b35c0f3` with SPM-14/53, SPM-16 and SPM-37):** lint passed; `test:spm13` 54 Vitest passed; 128 Node and 99 frontend tests passed; root Vitest 1418 passed (35 opt-in live and emulator tests skipped); Playwright Chromium 69/69 passed; the production build passed. The Firestore emulator suite (`test:spm14:emulator`) was not run. Two page tests first failed in a full root run because they ticked options before the check had loaded; they now wait for it.
+    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

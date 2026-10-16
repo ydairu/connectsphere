@@ -198,6 +198,22 @@ a { color: inherit; }
 .availability-slot-tentative-hold { border-left-color: #9b6a12; background: #fff8e8; }
 .availability-slot-maintenance-block { border-left-color: #5a6470; background: #f2f4f6; }
 
+.venue-suitability .form-actions { margin-bottom: 18px; }
+.suitability-list { list-style: none; display: grid; gap: 12px; margin: 0; padding: 0; }
+.suitability-item { display: grid; gap: 10px; padding: 16px 18px; border: 1px solid var(--line); border-left-width: 5px; border-radius: 12px; background: #f9fbfa; }
+.suitability-item-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.suitability-item h3 { margin: 0 0 4px; font-size: 17px; overflow-wrap: anywhere; }
+.suitability-item h3 a { color: var(--ink); }
+.suitability-badge { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.suitability-suitable { border-left-color: #1f6b4f; }
+.suitability-suitable .suitability-badge { background: #e3f3ea; color: #1f6b4f; }
+.suitability-suitable_with_warnings { border-left-color: #9b6a12; }
+.suitability-suitable_with_warnings .suitability-badge { background: #fff1d6; color: #7a520c; }
+.suitability-unsuitable { border-left-color: #8c2f39; }
+.suitability-unsuitable .suitability-badge { background: #fde8ea; color: #8c2f39; }
+.suitability-messages p { margin: 0 0 4px; font-size: 13px; font-weight: 700; }
+.suitability-messages ul { margin: 0; padding-left: 18px; color: var(--ink); font-size: 14px; line-height: 1.5; }
+
 .empty-state { display: grid; gap: 12px; justify-items: center; padding: 56px 36px; text-align: center; }
 .empty-state h2 { margin: 0; font-size: 22px; letter-spacing: -0.03em; }
 .empty-state p { margin: 0 0 6px; max-width: 420px; color: var(--muted); line-height: 1.55; }
@@ -210,6 +226,7 @@ a { color: inherit; }
   .venue-card .button { width: 100%; }
   .venue-summary-grid { grid-template-columns: 1fr; }
   .venue-search-grid, .filter-options { grid-template-columns: 1fr; }
+  .suitability-item-heading { flex-direction: column; }
   .availability-range-actions, .availability-slot { align-items: stretch; flex-direction: column; }
   .availability-slot strong { min-width: 0; }
 }

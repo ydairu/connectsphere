@@ -190,6 +190,13 @@ export function updateRequest(user, id, patch) {
 // actor: { type, name, role }, at }] }. Only the assigned Coordinator and the owning Organiser receive it
 // (others get 403, or 404 for a Coordinator outside their scope); internal planning changes are left out
 // for the Organiser.
+// SPM-13: every catalogue venue checked against this event, for its assigned Coordinator while the event is
+// Under Review or in Planning: { event, venues: [{ id, name, result, problems, warnings }], options }.
+// Others get 403 (404 for a Coordinator outside their scope); another status gets 409.
+export function getVenueSuitability(user, id) {
+  return authenticatedRequest(user, `/api/event-requests/${id}/venue-suitability`)
+}
+
 export function getRequestHistory(user, id) {
   return authenticatedRequest(user, `/api/requests/${id}/history`)
 }
