@@ -25,6 +25,7 @@ function Navbar() {
               {isOrganiser && <NavLink className="nav-link" to="/event-requests/new">Create request</NavLink>}
               {(isCoordinator || isVenueStaff) && <NavLink className="nav-link" to="/venues">Venues</NavLink>}
               {isVenueStaff && <NavLink className="nav-link" to="/venues/new">Add venue</NavLink>}
+              {isVenueStaff && <NavLink className="nav-link" to="/venues/booking-requests">Venue bookings</NavLink>}
               {(isCoordinator || isTechnicalStaff) && <NavLink className="nav-link" to="/equipment">Equipment</NavLink>}
               <NavLink className="button button-secondary button-small" to="/profile">Profile</NavLink>
             </>

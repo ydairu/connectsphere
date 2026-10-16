@@ -542,6 +542,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Customer-confirmed]** Event Coordinators request suitable venues during Planning. Tentative holds prevent another event holding the same venue/time.
 
+**[Team implementation decision, 16 Oct 2026 — SPM-14, authorised in the implementation request; this document remains a revision candidate]** The assigned Coordinator submits a pending request with a tentative hold. Venue Staff assignment uses the fewest pending booking requests, rotating equal workloads by stable UID order after the last assignee. Replacement retains its assignee. No eligible account means no request or hold is written. Staff see only their own assigned booking requests; assignment also grants existing scoped event access through `assignedStaffUids`. Capacity overflow warns and allows a request for review; this does not authorise approval beyond capacity. Submission, replacement and event-closure release are atomic. The existing seven-day hold default is reused. See `docs/plans/spm-14-venue-booking.md` for the interfaces, choices and limits, and `docs/evidence/spm-14-traceability.md` for verification. SPM-54 rejection/retry is fixture-tested only, manual acceptance is pending, and no workbook Done status is claimed.
+
 > **Week 7 effects.**
 >
 > - **Change #3:** a single event may have **more than one** venue booking (main auditorium + breakout rooms), each checked independently.

@@ -41,8 +41,8 @@ export function createApp({
   app.use('/api/event-requests', createEventRequestRoutes({ authenticate, getDb: getEventRequestDb, getUserDb }))
   app.use('/api/notifications', createNotificationRoutes({ authenticate, getDb: getNotificationDb }))
   app.use('/api/profile', profileRoutes)
-  app.use('/api/requests', createRequestRoutes({ authenticate, store: eventRequestStore, getUserDb }))
-  app.use('/api/venues', createVenueRoutes({ authenticate, getDb: getVenueDb }))
+  app.use('/api/requests', createRequestRoutes({ authenticate, store: eventRequestStore, getUserDb, getEventRequestDb }))
+  app.use('/api/venues', createVenueRoutes({ authenticate, getDb: getVenueDb, getBookingDb: getEventRequestDb }))
 
   app.use((_req, res) => {
     res.status(404).json({ message: 'Not found' })

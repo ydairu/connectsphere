@@ -1,11 +1,13 @@
 import { Router } from 'express'
+import { createVenueBookingController } from '../controllers/venueBookingController.js'
 import { COORDINATOR, VENUE_STAFF } from '../../../shared/permissions.js'
 import { createVenueController } from '../controllers/venueController.js'
 import { requireRole } from '../middleware/requireRole.js'
 
-export function createVenueRoutes({ authenticate, getDb }) {
+export function createVenueRoutes({ authenticate, getDb, getBookingDb = getDb }) {
   const controller = createVenueController(getDb)
   const router = Router()
+  router.get('/booking-requests', authenticate, createVenueBookingController(getBookingDb).queue)
 
   router.post('/', authenticate, requireRole(VENUE_STAFF), controller.createVenue)
   router.get('/', authenticate, requireRole(COORDINATOR, VENUE_STAFF), controller.listVenues)

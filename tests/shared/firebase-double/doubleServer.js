@@ -9,7 +9,7 @@
 
 import cors from 'cors'
 import express from 'express'
-import { SEED_ACCOUNTS, SEED_FIELD_HISTORY, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
+import { SEED_ACCOUNTS, SEED_FIELD_HISTORY, SEED_REQUESTS, SEED_VENUES, SEED_VENUE_AVAILABILITY } from '../../../backend/scripts/seedData.js'
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
@@ -29,6 +29,8 @@ export function createDouble() {
     state.accounts.clear()
     state.db = createFakeFirestore({
       eventRequests: Object.fromEntries(SEED_REQUESTS.map(({ id, ...request }) => [id, request])),
+      venues: Object.fromEntries(SEED_VENUES.map(({ id, ...venue }) => [id, venue])),
+      venueAvailability: Object.fromEntries(SEED_VENUE_AVAILABILITY.map(({ id, ...entry }) => [id, entry])),
       // SPM-28: the seeded field history, in each request's activity subcollection.
       ...Object.fromEntries(
         Object.entries(SEED_FIELD_HISTORY).map(([requestId, entries]) => [
@@ -164,6 +166,7 @@ export function createDouble() {
     authenticate,
     eventRequestStore: createFakeFirestoreEventRequestStore(() => state.db),
     getEventRequestDb: () => state.db,
+    getVenueDb: () => state.db,
     // SPM-37: equipment types and units start empty after every reset.
     getEquipmentDb: () => state.db,
   })
