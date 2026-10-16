@@ -7,6 +7,12 @@ export const BOOKING_REJECTED = 'rejected'
 export const BOOKING_REPLACED = 'replaced'
 export const BOOKING_CANCELLED = 'cancelled'
 
+// Expired holds do not decide a booking request; only its booking status does.
+export function pendingVenueBookings(bookings) {
+  return bookings.filter((booking) => booking.status === BOOKING_PENDING)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+}
+
 export function canRequestVenue(user, event) {
   return rolesOf(user).includes(COORDINATOR) && isAssignedCoordinator(user, event) && event.status === PLANNING
 }

@@ -30,10 +30,11 @@ test('SPM-14 submit, capacity warning, conflict, replacement and staff queue', a
   await logout(page)
   await signIn(page, ROLE_USERS.venueStaff)
   await page.getByRole('link', { name: 'Venue bookings', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Seed Hall (setup 30, turnaround 45)' })).toBeVisible()
+  await expect(page.getByText('Seed Hall (setup 30, turnaround 45)', { exact: true })).toBeVisible()
+  await expect(page.getByText('Quiet room requested')).toHaveCount(0)
+  await page.getByRole('link', { name: 'View details' }).click()
+  await expect(page.getByRole('heading', { name: 'Venue booking details', exact: true })).toBeVisible()
   await expect(page.getByText('Quiet room requested')).toBeVisible()
-  await page.getByRole('link', { name: 'View booking details' }).click()
-  await expect(page.getByRole('heading', { name: 'Venue booking requests', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Submit booking request' })).toHaveCount(0)
   const retry = await page.request.post('http://127.0.0.1:5001/api/requests/seed-req-b1-planning/venue-bookings', {
     headers: { Authorization: `Bearer test-token:${EXTRA_USERS.secondCoordinator.uid}` },

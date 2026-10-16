@@ -1,5 +1,7 @@
 # ConnectSphere
 
+Pending venue bookings (SPM-53): Venue Staff see concise assigned-booking cards, open **View details** for the selected request, and refresh the queue. Styling follows the arrangement summary cards. Run `npm run test:spm53`; see [Dairu's manual checklist](docs/testing/spm-53-manual-testing.md) and [acceptance traceability](docs/evidence/spm-53-traceability.md). Approval/rejection actions remain SPM-54.
+
 Venue booking requests (SPM-14): assigned Coordinators open **Venue booking requests** from an event in Planning; Venue Staff use **Venue bookings** in navigation. Requests create tentative holds, not confirmed bookings. See [manual testing](docs/testing/spm-14-manual-testing.md), [implementation and API notes](docs/plans/spm-14-venue-booking.md), and [test evidence and remaining gaps](docs/evidence/spm-14-traceability.md).
 
 ConnectSphere is a full-stack event management foundation. It currently provides account registration, login, persistent sessions, Firestore-backed multi-role profiles, a protected profile page, and an authenticated Express API.

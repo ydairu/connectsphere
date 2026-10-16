@@ -238,3 +238,20 @@ a { color: inherit; }
 .value-list { margin: 0; padding-left: 18px; }
 .value-empty { color: var(--muted); font-weight: 500; }
 .page-heading .eyebrow a { text-decoration: none; }
+
+/* SPM-53: arrangement-style cards with multiline requirements. */
+.booking-page .page-heading { align-items: center; }
+.booking-back { display: inline-block; margin-bottom: 24px; }
+.booking-card { margin-bottom: 20px; }
+.booking-card h2 { overflow-wrap: anywhere; }
+.booking-row { align-items: start; }
+.booking-row strong { min-width: 0; white-space: pre-wrap; }
+.booking-actions { display: flex; justify-content: flex-end; padding-top: 20px; }
+.booking-page .alert button { margin-left: 16px; }
+@media (max-width: 600px) {
+  .booking-shell .navbar { flex-wrap: wrap; padding: 16px 0; gap: 16px; }
+  .booking-shell .nav-actions { flex-wrap: wrap; }
+  .booking-page .page-heading { align-items: flex-start; flex-wrap: wrap; }
+  .booking-row { grid-template-columns: 1fr; gap: 8px; }
+  .booking-actions .button { width: 100%; }
+}

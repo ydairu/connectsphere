@@ -2,6 +2,7 @@ import { COORDINATOR, VENUE_STAFF, isAssignedCoordinator, projectRequest, rolesO
 import { BOOKING_PENDING, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_CANCELLED, canReadVenueBooking, canRequestVenue, capacityWarning, chooseVenueStaff, normaliseVenueBooking } from '../../../shared/venueBooking.js'
 import { AVAILABILITY_STATUS, REMOVED_STATUSES, tentativeHoldExpiresAt } from '../../../shared/venueAvailability.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
+import { pendingVenueBookings } from '../../../shared/venueBooking.js'
 import { checkVenueHoldInTransaction, venueBookingLockPath, VenueValidationError } from './venueService.js'
 
 export const BOOKINGS = 'venueBookingRequests'
@@ -104,7 +105,7 @@ export async function listEventVenueBookings(eventId, user, db = getAdminDb()) {
 export async function listVenueBookingQueue(user, db = getAdminDb()) {
   if (!rolesOf(user).includes(VENUE_STAFF)) throw new VenueBookingError(403, 'Only Venue Staff can view this queue.')
   const bookings = rows(await db.collection(BOOKINGS).where('assignedVenueStaffUid', '==', user.uid).get())
-  return { bookings: bookings.filter((b) => b.status === BOOKING_PENDING).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(presentBooking) }
+  return { bookings: pendingVenueBookings(bookings).map(presentBooking) }
 }
 
 // Read everything first; caller may then write its status/history and invoke the returned write phase.

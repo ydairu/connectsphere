@@ -471,6 +471,14 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
 - Verification and gaps: `docs/evidence/spm-14-traceability.md`. The user manual checklist is `docs/testing/spm-14-manual-testing.md`. Local unit/integration suites, production build, targeted browser tests and isolated Firestore emulator checks passed. Manual acceptance and SPM-54 rejection-flow integration remain outstanding.
 - No live project or production seed was used; rules were neither edited nor deployed. The workbook/Sprint record is absent, and no operational status or Sprint assignment was changed. Existing calendar/search expiry and maintenance concurrency gaps remain.
 
+## SPM-53 pending venue booking queue — 16 October 2026
+
+- Venue Staff now see concise event/venue/start/end cards with View details at `/venues/booking-requests`. A selected booking opens at `/requests/:id/venue-bookings?bookingId=:bookingId`, read-only, with full requirements, special requests and a return link.
+- User-approved UI choice: reuse Arrangements and cancellation label/value rows, spacing and dividers. Booking-page navigation wraps on mobile. The event Requests/Closed events page and Coordinator submission/replacement behaviour remain unchanged.
+- Existing Express endpoints and booking assignment permissions are reused. Shared pending selection orders oldest first with ID ties; expired-but-undecided requests remain pending. Queue entry/return, Refresh and error retry refetch current data.
+- Verification and limitations are recorded in `docs/evidence/spm-53-traceability.md`; Dairu's 17-case checklist is `docs/testing/spm-53-manual-testing.md`. Unit, API/component regressions, all 69 Chromium browser tests, lint and production build passed; desktop/mobile screenshots were reviewed. Manual acceptance remains unperformed. SPM-54 approval/rejection is covered only by persisted-state fixtures, not a real decision journey.
+- No database migration, rule change/deployment, production seed or live Firebase verification. The operational workbook/Sprint record remains absent; no Done status or Sprint allocation is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.
