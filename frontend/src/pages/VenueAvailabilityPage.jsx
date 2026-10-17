@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { VENUE_STAFF } from '../../../shared/permissions.js'
 import { AVAILABILITY_STATUS } from '../../../shared/venueAvailability.js'
+import { SETUP_SLOT, TURNAROUND_SLOT } from '../../../shared/venueCalendar.js'
 import Card from '../components/Card.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
@@ -19,6 +20,28 @@ const STATUS_LABELS = {
   [AVAILABILITY_STATUS.CONFIRMED_BOOKING]: 'Confirmed booking',
   [AVAILABILITY_STATUS.TENTATIVE_HOLD]: 'Tentative hold',
   [AVAILABILITY_STATUS.MAINTENANCE_BLOCK]: 'Maintenance block',
+  // SPM-73: the venue is occupied for these too, but they are shown apart from the event time itself.
+  [SETUP_SLOT]: 'Setup',
+  [TURNAROUND_SLOT]: 'Turnaround',
+}
+
+function minutesText(minutes) {
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`
+}
+
+// SPM-73: the venue's own setup and turnaround times, which every booking and hold occupies.
+function bufferSummary(buffers) {
+  if (!buffers) return null
+  const { setupMinutes, turnaroundMinutes } = buffers
+  if (!setupMinutes && !turnaroundMinutes) return 'This venue has no setup or turnaround time.'
+  return `This venue needs ${minutesText(setupMinutes)} of setup before and ${minutesText(turnaroundMinutes)} of turnaround after each booking or hold. Those periods are unavailable.`
+}
+
+function slotTitle(slot) {
+  if (!slot.title) return null
+  if (slot.status === SETUP_SLOT) return `Before ${slot.title}`
+  if (slot.status === TURNAROUND_SLOT) return `After ${slot.title}`
+  return slot.title
 }
 
 const MAINTENANCE_REASONS = [
@@ -373,6 +396,7 @@ function VenueAvailabilityPage() {
                 <p className="request-meta">
                   {toDisplayTime(availability.range.from)} to {toDisplayTime(availability.range.to)}
                 </p>
+                {bufferSummary(availability.buffers) && <p className="request-meta">{bufferSummary(availability.buffers)}</p>}
               </div>
             </div>
             <div className="availability-legend" aria-label="Availability legend">
@@ -385,7 +409,7 @@ function VenueAvailabilityPage() {
                 <li key={`${slot.id ?? slot.status}-${slot.startsAt}-${slot.endsAt}`} className={slotClassName(slot.status)}>
                   <strong>{STATUS_LABELS[slot.status] ?? slot.status}</strong>
                   <span>{toDisplayTime(slot.startsAt)} to {toDisplayTime(slot.endsAt)}</span>
-                  {slot.title && <span>{slot.title}</span>}
+                  {slotTitle(slot) && <span>{slotTitle(slot)}</span>}
                   {slot.reason && <span>Reason: {MAINTENANCE_REASONS.find((reason) => reason.value === slot.reason)?.label ?? slot.reason}</span>}
                   {canManageMaintenanceBlocks && slot.status === AVAILABILITY_STATUS.MAINTENANCE_BLOCK && slot.id && (
                     <span className="maintenance-block-actions">

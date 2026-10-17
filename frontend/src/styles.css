@@ -197,6 +197,8 @@ a { color: inherit; }
 .availability-slot-confirmed-booking { border-left-color: #8c2f39; background: #fff5f6; }
 .availability-slot-tentative-hold { border-left-color: #9b6a12; background: #fff8e8; }
 .availability-slot-maintenance-block { border-left-color: #5a6470; background: #f2f4f6; }
+/* SPM-73: setup and turnaround are unavailable, but drawn apart from the event time with a dashed edge and stripes. */
+.availability-slot-setup, .availability-slot-turnaround { border-style: dashed; border-left-style: dashed; border-left-color: #6b5b95; background: repeating-linear-gradient(135deg, #f6f3fb, #f6f3fb 8px, #ece6f6 8px, #ece6f6 16px); }
 
 .venue-suitability .form-actions { margin-bottom: 18px; }
 .suitability-list { list-style: none; display: grid; gap: 12px; margin: 0; padding: 0; }

@@ -1,7 +1,6 @@
 import { buildVenueRecord, hasVenueValidationErrors, normaliseVenueInput } from '../../../shared/venue.js'
 import {
   AVAILABILITY_STATUS,
-  buildAvailabilityResponse,
   normaliseAvailabilityCommitment,
   normaliseMaintenanceBlockInput,
   tentativeHoldExpiresAt,
@@ -10,6 +9,7 @@ import {
 import { findVenueConflict } from '../../../shared/venueConflicts.js'
 import { buildVenueFilterOptions, normaliseVenueSearchQuery, venueAvailableFor, venueMatchesFilters } from '../../../shared/venueSearch.js'
 import { hasConfirmedBooking, venueBufferMinutes } from '../../../shared/venueOccupancy.js'
+import { buildVenueCalendar } from '../../../shared/venueCalendar.js'
 import { VENUE_STAFF } from '../../../shared/permissions.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 
@@ -216,8 +216,9 @@ export async function updateVenue(id, input, venueStaff, db = getAdminDb(), now 
   })
 }
 
+// SPM-11 calendar; SPM-73 adds each booking's and hold's setup and turnaround, from the venue's times.
 export async function listVenueAvailability(venueId, query, db = getAdminDb()) {
-  await getVenue(venueId, db)
+  const venue = await getVenue(venueId, db)
 
   const range = validateAvailabilityRange({ from: query?.from, to: query?.to })
   if (hasVenueValidationErrors(range.errors)) throw new VenueValidationError(range.errors)
@@ -225,7 +226,7 @@ export async function listVenueAvailability(venueId, query, db = getAdminDb()) {
   const snapshot = await db.collection('venueAvailability').where('venueId', '==', venueId).get()
   const commitments = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
 
-  return buildAvailabilityResponse(commitments, range)
+  return buildVenueCalendar(commitments, range, venue)
 }
 
 // SPM-16: one lock document per venue. Every hold or booking for the venue reads and writes it in its
