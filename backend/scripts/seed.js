@@ -24,6 +24,7 @@
 //
 // SPM-16: it also writes SEED_VENUES and SEED_VENUE_AVAILABILITY (a venue with setup and turnaround times
 // holding a confirmed booking, an active tentative hold and an expired one), with the same tag checks.
+// SPM-17: and SEED_EQUIPMENT_TYPES, SEED_EQUIPMENT_UNITS and SEED_EQUIPMENT_REQUESTS.
 
 import { parseArgs } from 'node:util'
 import { Timestamp } from 'firebase-admin/firestore'
@@ -38,8 +39,14 @@ import {
   SEED_FIELD_HISTORY,
   SEED_REQUESTS,
   SEED_TAG,
+  SEED_EQUIPMENT_REQUESTS,
+  SEED_EQUIPMENT_TYPES,
+  SEED_EQUIPMENT_UNITS,
   SEED_VENUE_AVAILABILITY,
   SEED_VENUES,
+  EQUIPMENT_REQUESTS_COLLECTION,
+  EQUIPMENT_TYPES_COLLECTION,
+  EQUIPMENT_UNITS_COLLECTION,
   VENUE_AVAILABILITY_COLLECTION,
   VENUES_COLLECTION,
 } from './seedData.js'
@@ -106,9 +113,15 @@ async function preflight(auth, db) {
     if (refs.length > 0) strays.push({ request, refs })
   }
 
-  // SPM-16: venues and their venueAvailability entries.
+  // SPM-16: venues and their venueAvailability entries. SPM-37 / SPM-17: equipment types, units and requests.
   const venueDocuments = []
-  for (const [collection, documents] of [[VENUES_COLLECTION, SEED_VENUES], [VENUE_AVAILABILITY_COLLECTION, SEED_VENUE_AVAILABILITY]]) {
+  for (const [collection, documents] of [
+    [VENUES_COLLECTION, SEED_VENUES],
+    [VENUE_AVAILABILITY_COLLECTION, SEED_VENUE_AVAILABILITY],
+    [EQUIPMENT_TYPES_COLLECTION, SEED_EQUIPMENT_TYPES],
+    [EQUIPMENT_UNITS_COLLECTION, SEED_EQUIPMENT_UNITS],
+    [EQUIPMENT_REQUESTS_COLLECTION, SEED_EQUIPMENT_REQUESTS],
+  ]) {
     for (const document of documents) {
       const snapshot = await db.collection(collection).doc(document.id).get()
       if (snapshot.exists && snapshot.get('seedTag') !== SEED_TAG) {
@@ -187,9 +200,12 @@ async function main() {
   if (strays.length === 0) console.log('  none')
   for (const { request, refs } of strays) console.log(`  ${request.id}: ${refs.length}`)
 
-  console.log(`\nVenues and availability (${venueDocuments.length}):`)
+  console.log(`\nVenues, availability and equipment (${venueDocuments.length}):`)
   for (const { collection, document, docAction } of venueDocuments) {
-    const detail = document.status
+    const detail = collection === EQUIPMENT_TYPES_COLLECTION ? document.name
+      : collection === EQUIPMENT_UNITS_COLLECTION ? `${document.assetTag}  ${document.status}  type=${document.equipmentTypeId}`
+      : collection === EQUIPMENT_REQUESTS_COLLECTION ? `${document.status}  event=${document.eventRequestId}  items=${document.items.length}  replaces=${document.replacesId ?? 'none'}`
+      : document.status
       ? `${document.status.padEnd(18)} ${document.startsAt} to ${document.endsAt}${document.holdExpiresAt ? `  expires ${document.holdExpiresAt}` : ''}  event=${document.eventRequestId ?? 'none'}`
       : `setup ${document.setupMinutes} min, turnaround ${document.turnaroundMinutes} min`
     console.log(`  ${docAction.padEnd(9)} ${collection}/${document.id}  ${detail}`)
@@ -238,7 +254,7 @@ async function main() {
     removed.push(`${request.id}: ${refs.length}`)
   }
 
-  console.log(`\nWrote ${accounts.length} Auth users, ${accounts.length} users documents, ${requests.length} ${EVENT_REQUESTS_COLLECTION} documents, ${history.length} field history entries and ${venueDocuments.length} venue and availability documents to ${env.firebaseProjectId}.`)
+  console.log(`\nWrote ${accounts.length} Auth users, ${accounts.length} users documents, ${requests.length} ${EVENT_REQUESTS_COLLECTION} documents, ${history.length} field history entries and ${venueDocuments.length} venue, availability and equipment documents to ${env.firebaseProjectId}.`)
   console.log(`Removed stray ${FIELD_CHANGED} entries: ${removed.length === 0 ? 'none' : removed.join(', ')}`)
 }
 

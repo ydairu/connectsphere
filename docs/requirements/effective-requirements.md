@@ -599,6 +599,30 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Customer-confirmed]** Organisers record preliminary equipment needs. Coordinators and Technical Support Staff review/refine them. Technical staff approve or reject according to requested staff/equipment availability.
 
+**[Team decisions, 17 Oct 2026 — SPM-17, pending PO confirmation]** Where SPM-17's acceptance criteria leave room:
+
+- **Storage.** An equipment request is its own record in `equipmentRequests`, linked to its event by `eventRequestId`, as SPM-14's venue booking requests are. The Organiser's free-text `equipment` section is unchanged and is shown beside the Coordinator's form for reference only.
+- **Items.** Each item names an SPM-37 equipment type, a quantity (a whole number, 1 or more) and optional technical requirements (up to 500 characters). A request has 1 to 50 items and names each type at most once. It records types and quantities, never units; units are chosen at reservation (SPM-62).
+- **Period.** The event's start and end at submission are stored with the request as the period the equipment is needed.
+- **Statuses.** Pending Review, Reserved, Rejected and Closed. SPM-17 creates only Pending Review; reserving and rejecting are SPM-56 / SPM-62 / SPM-36. An event has at most one Pending Review request. A request made after a rejection records the rejected request it replaces (`replacesId`, set by the server, never by the client). A request made after a Reserved one replaces nothing.
+- **Access.** Only the assigned Coordinator may submit, and only at Planning. The assigned Coordinator and the request's assigned Technical Support Staff member may read it; Organisers, Venue Staff and Attendees may not. A user without the Coordinator role gets 403; an unassigned Coordinator gets 404 (AGENTS.md §6). Requests follow the event when its Coordinator is reassigned (G8!C14).
+- **Technical Support Staff assignment.** On submission one Technical Support Staff member is assigned and added to the event's `assignedStaffUids`, in the same transaction. The order is:
+  1. the assignee of the event's most recent earlier equipment request, while they still hold the Technical Support role;
+  2. a member of `assignedStaffUids` holding Technical Support but not Venue Staff, lowest uid first;
+  3. a member of `assignedStaffUids` holding both roles, lowest uid first;
+  4. otherwise the member with the fewest Pending Review requests, ties rotated through uid order (SPM-14's rule, now `chooseStaff` in `shared/staffAssignment.js`, with its own lock `systemLocks/technicalStaffAssignment`).
+  If no account holds the role, nothing is written.
+- **Closing.** When the event is rejected, cancelled directly or has its cancellation approved, its Pending Review requests are closed in the same transaction, with the reason. A cancellation request alone closes nothing.
+- **No notification.** An `equipment_requested` entry is written to the event's activity; Technical Support Staff are not notified (SPM-14 does not notify either; SPM-56 is expected to give staff a queue).
+- **Not changed:** `arrangementApprovals` and the SPM-10 automatic sign-off reset (SPM-87).
+
+**[Implemented — SPM-17, 17 Oct 2026 — historical record]** Rules in `shared/equipmentRequest.js` and `shared/staffAssignment.js`; service `backend/src/services/equipmentRequestService.js`; `GET`/`POST /api/requests/:id/equipment-requests`; the "Equipment requests" card on the request page. Known gaps:
+
+- **No review, reservation or rejection exists yet** (SPM-56 / SPM-62 / SPM-36), so Reserved and Rejected are set only by test fixtures and seed data, and Technical Support Staff have no queue.
+- **The request's period is a snapshot.** A later change to the event's date, time or duration does not update it.
+- **Equipment availability is not checked on submission** (SPM-18).
+- **Two places may hold the technical decision** once SPM-56 exists: the equipment request's status and `arrangementApprovals.technical`, which SPM-9's Confirm reads. SPM-56 should decide which is the source.
+
 ### 4.16 Equipment Availability Checking
 
 **[Customer-confirmed]** Check requested type/quantity for the event time. Equipment modelling by quantity/type versus individual asset ID is a team choice.

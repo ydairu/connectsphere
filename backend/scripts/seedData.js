@@ -31,6 +31,8 @@ import {
 } from '../../shared/status.js'
 import { ARRANGEMENT_APPROVED, TECHNICAL_ARRANGEMENT, VENUE_ARRANGEMENT } from '../../shared/arrangementDecisions.js'
 import { buildVenueRecord } from '../../shared/venue.js'
+import { EQUIPMENT_UNIT_STATUS, normaliseEquipmentTypeInput, normaliseEquipmentUnitInput } from '../../shared/equipment.js'
+import { EQUIPMENT_REQUEST_STATUS, normaliseEquipmentRequest } from '../../shared/equipmentRequest.js'
 import { AVAILABILITY_STATUS } from '../../shared/venueAvailability.js'
 
 export const SEED_TAG = 'spm42-spm24-sprint1'
@@ -38,6 +40,9 @@ export const SEED_ID_PREFIX = 'seed-'
 export const EVENT_REQUESTS_COLLECTION = 'eventRequests'
 export const VENUES_COLLECTION = 'venues'
 export const VENUE_AVAILABILITY_COLLECTION = 'venueAvailability'
+export const EQUIPMENT_TYPES_COLLECTION = 'equipmentTypes'
+export const EQUIPMENT_UNITS_COLLECTION = 'equipmentUnits'
+export const EQUIPMENT_REQUESTS_COLLECTION = 'equipmentRequests'
 
 // `.test` is reserved (RFC 6761) and never resolves, so no seeded address can reach a real inbox.
 const EMAIL_DOMAIN = 'seed.connectsphere.test'
@@ -260,5 +265,95 @@ export const SEED_VENUE_AVAILABILITY = Object.freeze([
     createdByUid: coordinator.uid,
     createdByName: coordinator.name,
     createdAt: '2026-09-24T02:00:00.000Z',
+  }),
+])
+
+// SPM-37 / SPM-17 — equipment types with a few Available units each, so availability is not empty in demos,
+// and A1's Planning event with an equipment request that was rejected and the Pending Review request that
+// replaced it. Built with SPM-37's and SPM-17's normalisers so they pass the same validation as the app.
+// The rejected request records only its status: what a rejection records (who, why) belongs to SPM-56/36.
+const EQUIPMENT_CREATED_AT = '2026-09-20T01:00:00.000Z'
+
+function seedEquipmentType(slug, input) {
+  const { equipmentType, errors } = normaliseEquipmentTypeInput(input)
+  if (Object.keys(errors).length > 0) throw new Error(`Seed equipment type ${slug} is invalid: ${JSON.stringify(errors)}`)
+  return { id: `${SEED_ID_PREFIX}equipment-${slug}`, ...equipmentType, createdByUid: technicalStaff.uid, createdByName: technicalStaff.name, createdAt: EQUIPMENT_CREATED_AT }
+}
+
+export const SEED_EQUIPMENT_TYPES = Object.freeze([
+  seedEquipmentType('projector', { name: 'Projector', location: 'AV store, Level 1' }),
+  seedEquipmentType('wireless-mic', { name: 'Wireless microphone', location: 'AV store, Level 1' }),
+  seedEquipmentType('pa-speaker', { name: 'PA speaker set', location: 'AV store, Level 2' }),
+])
+
+function seedEquipmentUnit(type, number) {
+  const assetTag = `${type.name.split(' ').map((word) => word[0]).join('').toUpperCase()}-${String(number).padStart(3, '0')}`
+  const { unit, errors } = normaliseEquipmentUnitInput({ assetTag })
+  if (Object.keys(errors).length > 0) throw new Error(`Seed equipment unit ${assetTag} is invalid: ${JSON.stringify(errors)}`)
+  return {
+    id: `${type.id}-unit-${number}`,
+    equipmentTypeId: type.id,
+    assetTag: unit.assetTag,
+    status: EQUIPMENT_UNIT_STATUS.AVAILABLE,
+    statusNote: null,
+    createdByUid: technicalStaff.uid,
+    createdByName: technicalStaff.name,
+    createdAt: EQUIPMENT_CREATED_AT,
+    updatedByUid: technicalStaff.uid,
+    updatedByName: technicalStaff.name,
+    updatedAt: EQUIPMENT_CREATED_AT,
+  }
+}
+
+const UNITS_PER_TYPE = { projector: 3, 'wireless-mic': 3, 'pa-speaker': 2 }
+export const SEED_EQUIPMENT_UNITS = Object.freeze(
+  SEED_EQUIPMENT_TYPES.flatMap((type) => {
+    const count = UNITS_PER_TYPE[type.id.slice(`${SEED_ID_PREFIX}equipment-`.length)]
+    return Array.from({ length: count }, (_, index) => seedEquipmentUnit(type, index + 1))
+  }),
+)
+
+const [projectorType, micType, speakerType] = SEED_EQUIPMENT_TYPES
+const REJECTED_EQUIPMENT_REQUEST_ID = `${SEED_ID_PREFIX}equipment-request-a1-planning-1`
+const PENDING_EQUIPMENT_REQUEST_ID = `${SEED_ID_PREFIX}equipment-request-a1-planning-2`
+
+function seedEquipmentRequest(id, { items, submissionKey, createdAt, ...fields }) {
+  const { value, errors } = normaliseEquipmentRequest({ items: items.map(({ type, ...item }) => ({ ...item, equipmentTypeId: type.id })), submissionKey })
+  if (Object.keys(errors).length > 0) throw new Error(`Seed equipment request ${id} is invalid: ${JSON.stringify(errors)}`)
+  const names = new Map(SEED_EQUIPMENT_TYPES.map((type) => [type.id, type.name]))
+  return {
+    id,
+    eventRequestId: PLANNING_REQUEST_ID,
+    eventTitle: planningRequest.core.title,
+    items: value.items.map((item) => ({ ...item, equipmentTypeName: names.get(item.equipmentTypeId) })),
+    requiredPeriod: seedEventPeriod('a1-planning'),
+    assignedTechnicalStaffUid: technicalStaff.uid,
+    assignedTechnicalStaffName: technicalStaff.name,
+    submissionKey: value.submissionKey,
+    createdByUid: coordinator.uid,
+    createdAt,
+    ...fields,
+  }
+}
+
+export const SEED_EQUIPMENT_REQUESTS = Object.freeze([
+  seedEquipmentRequest(REJECTED_EQUIPMENT_REQUEST_ID, {
+    items: [{ type: projectorType, quantity: 4, technicalRequirements: 'Four screens round the room' }],
+    submissionKey: 'seed-a1-planning-equipment-1',
+    status: EQUIPMENT_REQUEST_STATUS.REJECTED,
+    replacesId: null,
+    replacedById: PENDING_EQUIPMENT_REQUEST_ID,
+    createdAt: '2026-09-15T02:00:00.000Z',
+  }),
+  seedEquipmentRequest(PENDING_EQUIPMENT_REQUEST_ID, {
+    items: [
+      { type: projectorType, quantity: 2, technicalRequirements: 'HDMI at the lectern' },
+      { type: micType, quantity: 2 },
+      { type: speakerType, quantity: 1 },
+    ],
+    submissionKey: 'seed-a1-planning-equipment-2',
+    status: EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW,
+    replacesId: REJECTED_EQUIPMENT_REQUEST_ID,
+    createdAt: '2026-09-16T02:00:00.000Z',
   }),
 ])

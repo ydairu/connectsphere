@@ -272,3 +272,15 @@ a { color: inherit; }
   .booking-row { grid-template-columns: 1fr; gap: 8px; }
   .booking-actions .button { width: 100%; }
 }
+
+/* SPM-17: equipment request rows on the request page. */
+.equipment-request { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.equipment-request:last-of-type { border-bottom: 0; }
+.equipment-items { margin: 8px 0 0; padding-left: 18px; }
+.equipment-items li { margin-bottom: 4px; overflow-wrap: anywhere; }
+.equipment-reference { margin: 16px 0; padding: 12px 16px; background: #f4f6f5; border-radius: 8px; }
+.equipment-reference h3 { margin: 0 0 4px; font-size: 15px; }
+.equipment-reference ul { margin: 8px 0; padding-left: 18px; }
+.equipment-row { margin: 0 0 16px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.equipment-row legend { padding: 0 6px; font-weight: 600; }
+.equipment-request-form .form-actions { flex-wrap: wrap; }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { COORDINATOR, ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
+import { COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
 import { CONFIRMED, DRAFT, PLANNING } from '../../../shared/status.js'
 import { CANCELLATION_REQUEST_OPEN, SIGNIFICANT_FIELDS, significantFieldsIn } from '../../../shared/significantChanges.js'
 import ArrangementsSummary from '../components/ArrangementsSummary.jsx'
@@ -10,6 +10,7 @@ import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import ClarificationRequests from '../components/ClarificationRequests.jsx'
 import CoordinatorReassignment from '../components/CoordinatorReassignment.jsx'
+import EquipmentRequests from '../components/EquipmentRequests.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import StatusActions from '../components/StatusActions.jsx'
@@ -386,6 +387,11 @@ function RequestDetailPage() {
                   setHistoryVersion((version) => version + 1)
                 }}
               />
+            )}
+
+            {/* SPM-17: the API decides who may see equipment requests; for anyone else the card renders nothing. */}
+            {(roles?.includes(COORDINATOR) || roles?.includes(TECHNICAL_STAFF)) && (
+              <EquipmentRequests user={user} eventId={id} organiserEquipment={request.equipment} busy={acting || saving} />
             )}
 
             {visibleSections.map((section) => {

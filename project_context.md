@@ -499,6 +499,39 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
     - **Local verification (macOS, Node 24.1.0, 16 Oct 2026, on top of `main` at `b35c0f3` with SPM-14/53, SPM-16 and SPM-37):** lint passed; `test:spm13` 54 Vitest passed; 128 Node and 99 frontend tests passed; root Vitest 1418 passed (35 opt-in live and emulator tests skipped); Playwright Chromium 69/69 passed; the production build passed. The Firestore emulator suite (`test:spm14:emulator`) was not run. Two page tests first failed in a full root run because they ticked options before the check had loaded; they now wait for it.
     - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
+29. **SPM-17 Coordinator records and submits equipment requirements (17 Oct 2026, branch `feature/SPM-17-equipment-requests`):**
+    - **Built:**
+      - **Rules:** `shared/equipmentRequest.js` validates a request: 1–50 items, each an SPM-37 equipment type, a whole-number quantity of 1 or more and optional technical requirements (500 characters). Each type appears once. Errors are keyed by field (`items.1.quantity`), and only `items` and `submissionKey` may be sent. It also holds `canRequestEquipment` (assigned Coordinator, Planning), `canReadEquipmentRequest` (assigned Coordinator, or the request's Technical Support assignee) and the Technical Support Staff reuse order.
+      - **Staff chooser:** `shared/staffAssignment.js` `chooseStaff(users, role, pendingAssigneeUids, lastUid)`, SPM-14's rule with the role as a parameter. SPM-14's `chooseVenueStaff` is now a wrapper around it, with the same results and its tests unchanged.
+      - **API:** `GET`/`POST /api/requests/:id/equipment-requests` (`backend/src/services/equipmentRequestService.js`). One transaction checks the submission reference, Planning, no other Pending Review request, the event period and every equipment type. It assigns Technical Support Staff (reuse order, else `chooseStaff` with `systemLocks/technicalStaffAssignment`) and writes the request (Pending Review, period snapshot, `replacesId` set by the server after a rejection), the event's `assignedStaffUids` and an `equipment_requested` activity entry. Codes: 201, 400 with field errors, 403 for a user without the Coordinator role, 404 for an unassigned Coordinator or an unreadable list, 409 for a status or state refusal.
+      - **Closing:** event reject, cancel and approved cancellation close Pending Review requests in the status transaction (`prepareEquipmentRequestClose`).
+      - **Page:** an "Equipment requests" card on the request page. The Coordinator gets a form (type, quantity, optional technical requirements; add and remove rows) beside the Organiser's free-text needs. Errors are shown per row and the entered values and retry key are kept. Technical Support Staff get the list read-only; anyone the API refuses sees nothing. A load failure is a plain note with Try again, not an alert, so the page's own alerts stay unique.
+      - **Seed:** three equipment types with 2–3 Available units each, and on `seed-req-a1-planning` a rejected request replaced by a Pending Review request assigned to `seed-technical-staff`.
+    - **Changed outside SPM-17 (SPM-14-adjacent):**
+      - `backend/src/services/statusTransitionService.js`: on reject, cancel and approved cancellation, `prepareVenueHoldRelease` and `prepareEquipmentRequestClose` both read first, then both write. Before, the hold release wrote straight after its reads, so no later read was possible in that transaction. Hold release behaviour is unchanged (SPM-14 tests pass), and an SPM-17 test fails if the old order is restored.
+      - `shared/venueBooking.js`: `chooseVenueStaff` delegates to `chooseStaff`.
+      - `AGENTS.md` §6: the `/api/requests` row lists `/:id/venue-bookings` and `/:id/equipment-requests`.
+    - **Decisions:** team decisions of 17 Oct 2026, pending PO confirmation, including the reuse order (effective-requirements.md §4.15).
+    - **Gaps:**
+      - No review, reservation or rejection (SPM-56 / SPM-62 / SPM-36); Reserved and Rejected exist only in fixtures and seed data. No Technical Support queue.
+      - The period is a snapshot; a later date change does not update it. Availability is not checked (SPM-18).
+      - The equipment request status and `arrangementApprovals.technical` may both hold the technical decision once SPM-56 exists.
+      - No E2E test; no live or emulator run.
+    - **Evidence:**
+      - `tests/spm-17/unit/equipmentRequest.test.js`
+      - `tests/spm-17/unit/staffAssignment.test.js`
+      - `tests/spm-17/unit/seedEquipmentRequests.test.js`
+      - `tests/spm-17/integration/equipmentRequestService.test.js`
+      - `tests/spm-17/integration/equipmentRequestApi.test.js`
+      - `tests/spm-17/integration/equipmentRequestsPage.test.jsx`
+    - **Local verification (macOS, 17 Oct 2026, on top of `main` at `5ea4277`):**
+      - Lint passed. `test:spm17`: 76 passed.
+      - Vitest suites: SPM-14 28 passed (4 emulator tests skipped), SPM-53 12, SPM-9 18, SPM-63 34, SPM-47 35, SPM-45 26, SPM-37 40, SPM-42 76 passed (23 live tests skipped).
+      - Root Vitest 1494 passed, 35 opt-in live and emulator tests skipped. 128 Node and 99 frontend tests passed.
+      - Playwright Chromium 69/69 passed. The production build passed with the existing bundle-size warning.
+      - Seed dry run against `connectsphere-6546c`: 18 venue, availability and equipment documents to create, no blockers, nothing written.
+    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.
