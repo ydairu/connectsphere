@@ -64,7 +64,7 @@ test.describe('SPM-18 — Check equipment availability for an event (E2E)', () =
     await signIn(page, ROLE_USERS.technicalStaff)
     await page.goto(`/requests/${planning.id}`)
     const staffCard = equipmentCard(page)
-    await staffCard.getByRole('button', { name: 'Check availability' }).click()
+    // SPM-56 (AC2): for the assignee who may approve, the check runs as soon as the card loads.
     await expect(staffCard.getByText('Shortfall: this request cannot be fulfilled.')).toBeVisible()
     await expect(staffCard.getByText(/1 available, 2 requested — short by 1/)).toBeVisible()
 
@@ -72,7 +72,7 @@ test.describe('SPM-18 — Check equipment availability for an event (E2E)', () =
     await page.goto(equipmentUrl)
     await setStatus(page, 'PRJ-001', 'Available')
     await page.goto(`/requests/${planning.id}`)
-    await equipmentCard(page).getByRole('button', { name: 'Check availability' }).click()
+    // SPM-56: reloading the event page runs the check again automatically.
     await expect(equipmentCard(page).getByText('Can be fulfilled: every equipment type has enough available units.')).toBeVisible()
     await expect(equipmentCard(page).getByText(/2 available, 2 requested — enough/)).toBeVisible()
   })

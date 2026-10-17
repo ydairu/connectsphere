@@ -17,6 +17,8 @@
 //                                     and every registered Attendee passed in `attendeeUids`
 //   significant change at Planning /   every assigned Venue Staff and Technical Support Staff member, as
 //   Confirmed                          filtered by role before the save (SPM-10)
+//   equipment request approved, or   the assigned Coordinator                    (SPM-56)
+//   its approval re-confirmed
 // The user who acted is never notified of their own action.
 
 import { REFUSE_CANCELLATION, REQUEST_CANCELLATION, RESUBMIT_CANCELLATION, RETURN_CANCELLATION } from './requestActions.js'
@@ -31,6 +33,8 @@ export const CANCELLATION_REFUSED_NOTICE = 'cancellation_refused'
 export const EVENT_CANCELLED_NOTICE = 'event_cancelled'
 // SPM-10: a significant change reset the sign-off (and, from Confirmed, moved the event back to Planning).
 export const SIGNIFICANT_CHANGE_NOTICE = 'significant_change'
+// SPM-56: the assigned Technical Support Staff member approved the event's equipment request (or re-confirmed it).
+export const EQUIPMENT_REQUEST_APPROVED_NOTICE = 'equipment_request_approved'
 
 function titleOf(request) {
   const title = request.core?.title
@@ -105,4 +109,17 @@ export function significantChangeNotifications(request, actor, { recipientUids =
     status,
   }))
   return addressed(notices, request, actor, title, at)
+}
+
+/**
+ * SPM-56 — the notice for the assigned Coordinator when `actor` approves the event's equipment request, or
+ * re-confirms an approval after the technical sign-off was cleared. `event` is the record before the action.
+ */
+export function equipmentRequestApprovedNotifications(event, actor, { equipmentRequestId, reconfirmed = false, at }) {
+  const title = titleOf(event)
+  const message = reconfirmed
+    ? `The equipment request for “${title}” was re-confirmed. The technical arrangement is approved again.`
+    : `The equipment request for “${title}” was approved. The technical arrangement is approved.`
+  const notices = [{ recipientUid: event.assignedCoordinatorUid, type: EQUIPMENT_REQUEST_APPROVED_NOTICE, message, reason: null, equipmentRequestId }]
+  return addressed(notices, event, actor, title, at)
 }

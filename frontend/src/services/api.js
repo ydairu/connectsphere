@@ -20,6 +20,16 @@ export function submitEquipmentRequest(user, eventId, input) {
 export function checkEquipmentAvailability(user, eventId, equipmentRequestId) {
   return authenticatedRequest(user, `/api/requests/${eventId}/equipment-requests/${equipmentRequestId}/availability`)
 }
+// SPM-56: approve or re-confirm an equipment request (SPM-36 adds 'reject'), and the Technical Support queue.
+export function decideEquipmentRequest(user, eventId, equipmentRequestId, action) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/equipment-requests/${equipmentRequestId}/actions`, {
+    method: 'POST',
+    body: JSON.stringify({ action }),
+  })
+}
+export function listAssignedEquipmentRequests(user) {
+  return authenticatedRequest(user, '/api/equipment/requests/assigned')
+}
 
 export class ApiRequestError extends Error {
   constructor(message, { status, details } = {}) {

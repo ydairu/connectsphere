@@ -46,7 +46,10 @@ describe('Seed data — SPM-17 equipment requests', () => {
     expect(rejected).toMatchObject({ status: EQUIPMENT_REQUEST_STATUS.REJECTED, replacedById: pending.id, eventRequestId: event.id })
     expect(pending).toMatchObject({ status: EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW, replacesId: rejected.id })
     expect(pending.requiredPeriod).toEqual(seedEventPeriod('a1-planning'))
-    expect(SEED_EQUIPMENT_REQUESTS.filter((request) => request.status === EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW)).toHaveLength(1)
+    // SPM-56 seeds a second Pending Review request on another event; the rule is at most one per event.
+    const pendingPerEvent = SEED_EQUIPMENT_REQUESTS.filter((request) => request.status === EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW).map((request) => request.eventRequestId)
+    expect(new Set(pendingPerEvent).size).toBe(pendingPerEvent.length)
+    expect(pendingPerEvent.filter((id) => id === event.id)).toHaveLength(1)
   })
 
   it('spm17_seed_pending_request_is_assigned_to_technical_staff_on_the_event_who_can_read_it', () => {

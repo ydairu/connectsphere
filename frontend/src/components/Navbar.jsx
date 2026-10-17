@@ -27,6 +27,7 @@ function Navbar() {
               {isVenueStaff && <NavLink className="nav-link" to="/venues/new">Add venue</NavLink>}
               {isVenueStaff && <NavLink className="nav-link" to="/venues/booking-requests">Venue bookings</NavLink>}
               {(isCoordinator || isTechnicalStaff) && <NavLink className="nav-link" to="/equipment">Equipment</NavLink>}
+              {isTechnicalStaff && <NavLink className="nav-link" to="/equipment/requests">Equipment requests</NavLink>}
               <NavLink className="button button-secondary button-small" to="/profile">Profile</NavLink>
             </>
           ) : (

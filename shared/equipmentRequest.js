@@ -5,19 +5,24 @@
 // linked to its event by eventRequestId (backend/src/services/equipmentRequestService.js):
 //   { eventRequestId, eventTitle, items: [{ equipmentTypeId, equipmentTypeName, quantity, technicalRequirements }],
 //     requiredPeriod: { startsAt, endsAt }, status, assignedTechnicalStaffUid, assignedTechnicalStaffName,
-//     submissionKey, replacesId, replacedById?, createdByUid, createdAt }
+//     submissionKey, replacesId, replacedById?, createdByUid, createdAt,
+//     approvedByUid?, approvedByName?, approvedAt?, reconfirmedByUid?, reconfirmedAt? }   (SPM-56)
+// The event carries a summary of its current request as top-level metadata, currentEquipmentRequest:
+// { id, status } (SPM-56), so the shared sign-off rules, which see only the event, know a request exists.
 // The request names equipment types and quantities, never physical units: units are chosen at reservation
 // (SPM-62). The Organiser's free-text `equipment` section on the event is left as it is.
 
 import { COORDINATOR, TECHNICAL_STAFF, VENUE_STAFF, isAssignedCoordinator, rolesOf } from './permissions.js'
 import { PLANNING } from './status.js'
+import { ARRANGEMENT_APPROVED, TECHNICAL_ARRANGEMENT, arrangementDecision } from './arrangementDecisions.js'
 
 export const EQUIPMENT_REQUESTS_COLLECTION = 'equipmentRequests'
 
-// SPM-17 creates only Pending Review. Reserved and Rejected are set by later stories (SPM-56 / SPM-62 /
-// SPM-36); Closed is set when the event is rejected or cancelled.
+// SPM-17 creates Pending Review; SPM-56 approves it (Approved); SPM-62 is expected to move Approved to Reserved
+// once units are reserved; SPM-36 rejects (Rejected). Closed is set when the event is rejected or cancelled.
 export const EQUIPMENT_REQUEST_STATUS = Object.freeze({
   PENDING_REVIEW: 'pending_review',
+  APPROVED: 'approved',
   RESERVED: 'reserved',
   REJECTED: 'rejected',
   CLOSED: 'closed',
@@ -25,12 +30,15 @@ export const EQUIPMENT_REQUEST_STATUS = Object.freeze({
 
 export const EQUIPMENT_REQUEST_STATUS_LABELS = Object.freeze({
   [EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW]: 'Pending Review',
+  [EQUIPMENT_REQUEST_STATUS.APPROVED]: 'Approved',
   [EQUIPMENT_REQUEST_STATUS.RESERVED]: 'Reserved',
   [EQUIPMENT_REQUEST_STATUS.REJECTED]: 'Rejected',
   [EQUIPMENT_REQUEST_STATUS.CLOSED]: 'Closed',
 })
 
 export const EQUIPMENT_REQUESTED = 'equipment_requested'
+export const EQUIPMENT_REQUEST_APPROVED = 'equipment_request_approved'
+export const EQUIPMENT_REQUEST_APPROVAL_RECONFIRMED = 'equipment_request_approval_reconfirmed'
 
 // [Team decisions, 17 Oct 2026 — SPM-17, pending PO confirmation]
 export const MAX_EQUIPMENT_REQUEST_ITEMS = 50
@@ -152,4 +160,68 @@ export function rejectedRequestToReplace(requests) {
   return [...requests]
     .filter((request) => request.status === EQUIPMENT_REQUEST_STATUS.REJECTED && !request.replacedById)
     .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0] ?? null
+}
+
+// --- SPM-56: the event's summary of its current request -------------------------------------------
+
+/** The summary stored on the event as currentEquipmentRequest. */
+export function equipmentRequestSummary(id, status) {
+  return { id, status }
+}
+
+/**
+ * Does the event have an equipment request that is still current (anything but Closed)? Read from the
+ * event's summary; an event with no summary (no request, or one made before SPM-56) has none.
+ */
+export function hasCurrentEquipmentRequest(event) {
+  const status = event?.currentEquipmentRequest?.status
+  return typeof status === 'string' && status !== EQUIPMENT_REQUEST_STATUS.CLOSED
+}
+
+// --- SPM-56: Technical Support Staff decide a request ---------------------------------------------
+//
+// The client sends an action, never a status, to POST /api/requests/:id/equipment-requests/:requestId/actions.
+// SPM-36 is expected to add a 'reject' action here and to equipmentDecision() below.
+
+export const APPROVE_EQUIPMENT_REQUEST = 'approve'
+// [Temporary — until SPM-87] SPM-10 clears the technical sign-off on a significant change while the request
+// stays Approved; re-confirming checks availability again and sets the sign-off again.
+export const RECONFIRM_EQUIPMENT_APPROVAL = 'reconfirm_approval'
+export const EQUIPMENT_REQUEST_ACTIONS = Object.freeze([APPROVE_EQUIPMENT_REQUEST, RECONFIRM_EQUIPMENT_APPROVAL])
+
+// Refusal reasons, in the order they are checked. The service maps each to an HTTP status.
+export const UNKNOWN_EQUIPMENT_ACTION = 'unknown_equipment_action'
+export const NOT_TECHNICAL_STAFF = 'not_technical_staff'
+export const NOT_REQUEST_ASSIGNEE = 'not_request_assignee'
+export const EVENT_NOT_AT_PLANNING = 'event_not_at_planning'
+export const REQUEST_NOT_PENDING_REVIEW = 'request_not_pending_review'
+export const REQUEST_NOT_APPROVED = 'request_not_approved'
+export const SIGN_OFF_ALREADY_APPROVED = 'sign_off_already_approved'
+
+/**
+ * May this user take `action` on this request now? { allowed: true } or { allowed: false, reason }.
+ * Only the request's assigned Technical Support Staff member, who must also be on the event's
+ * assignedStaffUids, and only while the event is at Planning (SPM-56 AC1).
+ */
+export function equipmentDecision(user, event, request, action) {
+  if (!EQUIPMENT_REQUEST_ACTIONS.includes(action)) return { allowed: false, reason: UNKNOWN_EQUIPMENT_ACTION }
+  if (!rolesOf(user).includes(TECHNICAL_STAFF)) return { allowed: false, reason: NOT_TECHNICAL_STAFF }
+  const assignee = user?.uid != null && request?.assignedTechnicalStaffUid === user.uid
+  if (!assignee || !(event?.assignedStaffUids ?? []).includes(user.uid) || request?.eventRequestId !== event?.id) {
+    return { allowed: false, reason: NOT_REQUEST_ASSIGNEE }
+  }
+  if (event.status !== PLANNING) return { allowed: false, reason: EVENT_NOT_AT_PLANNING }
+  if (action === APPROVE_EQUIPMENT_REQUEST && request.status !== EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW) {
+    return { allowed: false, reason: REQUEST_NOT_PENDING_REVIEW }
+  }
+  if (action === RECONFIRM_EQUIPMENT_APPROVAL) {
+    if (request.status !== EQUIPMENT_REQUEST_STATUS.APPROVED) return { allowed: false, reason: REQUEST_NOT_APPROVED }
+    if (arrangementDecision(event, TECHNICAL_ARRANGEMENT) === ARRANGEMENT_APPROVED) return { allowed: false, reason: SIGN_OFF_ALREADY_APPROVED }
+  }
+  return { allowed: true }
+}
+
+/** The actions this user may take on this request now, for the page to offer. */
+export function equipmentRequestActions(user, event, request) {
+  return EQUIPMENT_REQUEST_ACTIONS.filter((action) => equipmentDecision(user, event, request, action).allowed)
 }

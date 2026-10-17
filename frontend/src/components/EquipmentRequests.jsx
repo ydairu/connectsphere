@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  APPROVE_EQUIPMENT_REQUEST,
   EQUIPMENT_REQUEST_STATUS_LABELS,
+  RECONFIRM_EQUIPMENT_APPROVAL,
   MAX_EQUIPMENT_REQUEST_ITEMS,
   MAX_TECHNICAL_REQUIREMENTS_LENGTH,
   normaliseEquipmentRequest,
@@ -8,7 +10,7 @@ import {
 import { CHECKABLE_REQUEST_STATUSES } from '../../../shared/equipmentAvailabilityCheck.js'
 import { TECHNICAL_STAFF } from '../../../shared/permissions.js'
 import { useAuth } from '../hooks/useAuth.js'
-import { checkEquipmentAvailability, listEquipment, listEquipmentRequests, submitEquipmentRequest } from '../services/api.js'
+import { checkEquipmentAvailability, decideEquipmentRequest, listEquipment, listEquipmentRequests, submitEquipmentRequest } from '../services/api.js'
 import Button from './Button.jsx'
 import Card from './Card.jsx'
 
@@ -45,23 +47,33 @@ function OrganiserEquipment({ equipment }) {
 
 // SPM-18 — the assigned Technical Support Staff member checks whether the request can be fulfilled for its
 // period. The button is shown to the Technical Support role; the API decides whether this member may check.
-function AvailabilityCheck({ user, eventId, request }) {
-  const [result, setResult] = useState(null)
+// SPM-56: when the member may act on the request, the check runs as soon as the card loads (each item shows
+// its available quantity), and the review panel owns the result so Approve can follow it.
+function AvailabilityCheck({ user, eventId, request, autoCheck = false, result: controlledResult, onResult }) {
+  const [ownResult, setOwnResult] = useState(null)
+  const result = onResult ? controlledResult : ownResult
+  const setResult = onResult ?? setOwnResult
   const [error, setError] = useState(null)
   const [checking, setChecking] = useState(false)
 
-  async function check() {
+  const requestId = request.id
+  const check = useCallback(async () => {
     setChecking(true)
     setError(null)
     try {
-      setResult((await checkEquipmentAvailability(user, eventId, request.id)).availability)
+      setResult((await checkEquipmentAvailability(user, eventId, requestId)).availability)
     } catch (failure) {
       setResult(null)
       setError(failure?.status === 404 ? 'Only the Technical Support Staff member assigned to this request can check it.' : failure?.details?.message ?? 'Availability could not be checked. Please try again.')
     } finally {
       setChecking(false)
     }
-  }
+  }, [user, eventId, requestId, setResult])
+
+  // Checked once when the panel appears for a member who may act; "Check again" re-runs it.
+  useEffect(() => {
+    if (autoCheck) check()
+  }, [autoCheck, check])
 
   return (
     <div className="equipment-availability" aria-label={`Availability for equipment request ${request.id}`}>
@@ -93,7 +105,57 @@ function AvailabilityCheck({ user, eventId, request }) {
   )
 }
 
-function EquipmentRequests({ user, eventId, organiserEquipment, busy = false }) {
+// SPM-56 — what the user may do with this request now comes from the API (`actions`). Approve and Re-confirm
+// sit here next to the availability check; SPM-36 is expected to add Reject to the same action area.
+const ACTION_LABELS = Object.freeze({
+  [APPROVE_EQUIPMENT_REQUEST]: 'Approve request',
+  [RECONFIRM_EQUIPMENT_APPROVAL]: 'Re-confirm approval',
+})
+
+function ReviewPanel({ user, eventId, request, busy, onDecided }) {
+  const [result, setResult] = useState(null)
+  const [deciding, setDeciding] = useState(false)
+  const [message, setMessage] = useState(null)
+  const actions = request.actions ?? []
+
+  async function decide(action) {
+    setDeciding(true)
+    setMessage(null)
+    try {
+      await decideEquipmentRequest(user, eventId, request.id, action)
+      await onDecided(action === APPROVE_EQUIPMENT_REQUEST ? 'Approved. The technical arrangement is approved.' : 'Approval re-confirmed. The technical arrangement is approved again.')
+    } catch (failure) {
+      // A shortfall found by the server's own check replaces the result shown, so the reason is visible.
+      if (failure?.details?.availability) setResult(failure.details.availability)
+      setMessage(failure?.details?.message ?? 'The request could not be updated. Please try again.')
+    } finally {
+      setDeciding(false)
+    }
+  }
+
+  return (
+    <div className="equipment-review">
+      <AvailabilityCheck user={user} eventId={eventId} request={request} autoCheck={actions.length > 0} result={result} onResult={setResult} />
+      {actions.length > 0 && (
+        <div className="equipment-actions" role="group" aria-label={`Review equipment request ${request.id}`}>
+          {actions.map((action) => (
+            <Button key={action} type="button" disabled={busy || deciding || result?.fulfillable !== true} onClick={() => decide(action)}>
+              {deciding ? 'Saving…' : ACTION_LABELS[action] ?? action}
+            </Button>
+          ))}
+          {result?.fulfillable === false && <p className="form-note">A request with a shortfall cannot be approved.</p>}
+          {result === null && <p className="form-note">Approval is available once availability has been checked.</p>}
+          {actions.includes(RECONFIRM_EQUIPMENT_APPROVAL) && (
+            <p className="form-note">A significant change to the event cleared the technical sign-off. Re-confirm to approve it again (until SPM-87 removes the automatic reset).</p>
+          )}
+          {message && <p className="field-error" role="alert">{message}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EquipmentRequests({ user, eventId, organiserEquipment, busy = false, onDecided }) {
   const { roles = [] } = useAuth()
   const isTechnicalStaff = roles.includes(TECHNICAL_STAFF)
   const [data, setData] = useState(null)
@@ -117,6 +179,12 @@ function EquipmentRequests({ user, eventId, organiserEquipment, busy = false }) 
   useEffect(() => {
     load()
   }, [load])
+
+  // SPM-56: the queue links to /requests/:id#equipment-requests; scroll there once the card has loaded.
+  const shown = Boolean(data && !data.hidden)
+  useEffect(() => {
+    if (shown && window.location.hash === '#equipment-requests') document.getElementById('equipment-requests')?.scrollIntoView?.()
+  }, [shown])
 
   if (!data || data.hidden) return null
 
@@ -161,9 +229,15 @@ function EquipmentRequests({ user, eventId, organiserEquipment, busy = false }) 
 
   const disabled = busy || submitting
 
+  async function handleDecided(text) {
+    setMessage({ type: 'success', text })
+    await load()
+    if (onDecided) await onDecided()
+  }
+
   return (
     <Card className="request-form-section equipment-requests">
-      <div className="section-heading"><h2>Equipment requests</h2></div>
+      <div className="section-heading" id="equipment-requests"><h2>Equipment requests</h2></div>
       {/* A plain note, not an alert: loading this card is secondary to the request page's own messages. */}
       {data.failed && (
         <p className="form-note">
@@ -181,6 +255,8 @@ function EquipmentRequests({ user, eventId, organiserEquipment, busy = false }) 
           <Row label="Required until">{displayTime(request.requiredPeriod?.endsAt)}</Row>
           <Row label="Technical Support Staff">{request.assignedTechnicalStaffName}</Row>
           {request.replacesId && <Row label="Replaces">The rejected request {request.replacesId}</Row>}
+          {request.approvedAt && <Row label="Approved by">{`${request.approvedByName ?? 'Technical Support Staff'}, ${displayTime(request.approvedAt)}`}</Row>}
+          {request.reconfirmedAt && <Row label="Re-confirmed by">{`${request.reconfirmedByName ?? 'Technical Support Staff'}, ${displayTime(request.reconfirmedAt)}`}</Row>}
           <ul className="equipment-items">
             {request.items.map((item) => (
               <li key={item.equipmentTypeId}>
@@ -189,7 +265,9 @@ function EquipmentRequests({ user, eventId, organiserEquipment, busy = false }) 
               </li>
             ))}
           </ul>
-          {isTechnicalStaff && CHECKABLE_REQUEST_STATUSES.includes(request.status) && <AvailabilityCheck user={user} eventId={eventId} request={request} />}
+          {isTechnicalStaff && CHECKABLE_REQUEST_STATUSES.includes(request.status) && (
+            <ReviewPanel user={user} eventId={eventId} request={request} busy={busy} onDecided={handleDecided} />
+          )}
         </div>
       ))}
 

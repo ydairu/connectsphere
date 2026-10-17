@@ -198,12 +198,14 @@ describe('SPM-17 reading equipment requests', () => {
     const created = await submit()
     const listed = await listEventEquipmentRequests('event', coordinator, db)
     expect(listed.canSubmit).toBe(false)
-    expect(listed.requests).toEqual([created])
+    // SPM-56 added `actions` to each listed request: the Coordinator has none.
+    expect(listed.requests).toEqual([{ ...created, actions: [] }])
   })
 
   it('spm17_the_assigned_technical_staff_member_can_read_it', async () => {
     const created = await submit()
-    expect((await listEventEquipmentRequests('event', tech, db))).toEqual({ canSubmit: false, requests: [created] })
+    // SPM-56 added `actions`: the assignee may approve a Pending Review request at Planning.
+    expect((await listEventEquipmentRequests('event', tech, db))).toEqual({ canSubmit: false, requests: [{ ...created, actions: ['approve'] }] })
   })
 
   it('spm17_organisers_venue_staff_attendees_and_other_staff_cannot', async () => {
@@ -217,7 +219,7 @@ describe('SPM-17 reading equipment requests', () => {
   it('spm17_requests_follow_the_event_when_its_coordinator_is_reassigned', async () => {
     const created = await submit()
     theEvent().assignedCoordinatorUid = 'c2'
-    expect((await listEventEquipmentRequests('event', otherCoordinator, db)).requests).toEqual([created])
+    expect((await listEventEquipmentRequests('event', otherCoordinator, db)).requests).toEqual([{ ...created, actions: [] }])
     await expectRefused(listEventEquipmentRequests('event', coordinator, db), 404)
   })
 })

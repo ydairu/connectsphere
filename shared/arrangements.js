@@ -22,6 +22,8 @@
 import { TECHNICAL_STAFF, VENUE_STAFF, rolesOf } from './permissions.js'
 import { PLANNING } from './status.js'
 import { ARRANGEMENTS, ARRANGEMENT_APPROVED, TECHNICAL_ARRANGEMENT, VENUE_ARRANGEMENT, arrangementDecision } from './arrangementDecisions.js'
+// SPM-56. equipmentRequest.js must not import this file (it would make a circular import).
+import { hasCurrentEquipmentRequest } from './equipmentRequest.js'
 
 // The decision constants and arrangementDecision() live in arrangementDecisions.js (SPM-48: no circular
 // import through preparation.js); they are re-exported so every existing import keeps working.
@@ -40,6 +42,9 @@ export const ARRANGEMENT_NOT_REQUIRED = 'arrangement_not_required'
 export const NOT_AT_PLANNING = 'not_at_planning'
 export const NOT_ASSIGNED_STAFF = 'not_assigned_staff'
 export const UNKNOWN_ARRANGEMENT = 'unknown_arrangement'
+// SPM-56: while the event has a current equipment request, the technical sign-off is set by deciding that
+// request, not by the manual approve/reject technical actions.
+export const EQUIPMENT_REQUEST_DECIDES = 'equipment_request_decides'
 
 // Which staff role decides each arrangement.
 const DECIDED_BY = Object.freeze({
@@ -49,11 +54,15 @@ const DECIDED_BY = Object.freeze({
 
 /**
  * Does this request need technical sign-off? Only when it asks for equipment or technical support:
- * approval "is based on what the event actually requests" (Clarification 2).
+ * approval "is based on what the event actually requests" (Clarification 2). SPM-56: a current equipment
+ * request (currentEquipmentRequest, not Closed) also asks for equipment. An event without one is decided
+ * by the Organiser's equipment section alone, as before.
  */
 export function technicalArrangementRequired(request) {
   const requirements = request.equipment?.requirements
-  return request.equipment?.technicalSupportNeeded === true || (Array.isArray(requirements) && requirements.length > 0)
+  return request.equipment?.technicalSupportNeeded === true ||
+    (Array.isArray(requirements) && requirements.length > 0) ||
+    hasCurrentEquipmentRequest(request)
 }
 
 /** The arrangements this request needs approved before it can be confirmed. Venue is always mandatory. */
@@ -76,6 +85,7 @@ export function canDecideArrangement(user, request, arrangement) {
   if (request.status !== PLANNING) return { allowed: false, reason: NOT_AT_PLANNING }
   const assigned = user?.uid != null && (request.assignedStaffUids ?? []).includes(user.uid)
   if (!assigned || !rolesOf(user).includes(DECIDED_BY[arrangement])) return { allowed: false, reason: NOT_ASSIGNED_STAFF }
+  if (arrangement === TECHNICAL_ARRANGEMENT && hasCurrentEquipmentRequest(request)) return { allowed: false, reason: EQUIPMENT_REQUEST_DECIDES }
   if (!requiredArrangements(request).includes(arrangement)) return { allowed: false, reason: ARRANGEMENT_NOT_REQUIRED }
   return { allowed: true }
 }

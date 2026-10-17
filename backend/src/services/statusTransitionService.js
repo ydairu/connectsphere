@@ -11,6 +11,7 @@
 
 import {
   ARRANGEMENT_NOT_REQUIRED,
+  EQUIPMENT_REQUEST_DECIDES,
   NOT_ASSIGNED_STAFF,
   NOT_AT_PLANNING,
   UNKNOWN_ARRANGEMENT,
@@ -96,6 +97,7 @@ const MESSAGES = Object.freeze({
   [NOT_AT_PLANNING]: 'Arrangements are approved or rejected while the event is in planning.',
   [NOT_ASSIGNED_STAFF]: 'Only staff assigned to this event can decide this arrangement.',
   [ARRANGEMENT_NOT_REQUIRED]: 'This event did not request equipment or technical support.',
+  [EQUIPMENT_REQUEST_DECIDES]: 'The technical arrangement is decided by reviewing the event\'s equipment request.',
   [UNKNOWN_ARRANGEMENT]: 'Unknown arrangement.',
   [REASON_REQUIRED]: 'A reason is required for this action.',
   [REASON_INVALID]: `A reason must be text of at most ${MAX_REASON_LENGTH} characters.`,
@@ -211,14 +213,16 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }
       // Read release data before status/history writes; only actual terminal actions release holds (SPM-14)
-      // and close Pending Review equipment requests (SPM-17). Both read first, then both write, because a
-      // transaction may not read after it has written.
+      // and close Pending Review and Approved equipment requests (SPM-17, SPM-56). Both read first, then both
+      // write, because a transaction may not read after it has written. Closing returns the event's summary
+      // change, which is written with this update rather than as a second write to the event.
       const terminal = [REJECT, CANCEL, APPROVE_CANCELLATION].includes(action)
       const releaseHolds = terminal ? await prepareVenueHoldRelease(tx, db, id, user, now) : null
       const closeEquipmentRequests = terminal
-        ? await prepareEquipmentRequestClose(tx, db, id, user, now, action === REJECT ? 'event_rejected' : 'event_cancelled') : null
+        ? await prepareEquipmentRequestClose(tx, db, id, user, now, action === REJECT ? 'event_rejected' : 'event_cancelled', existing.currentEquipmentRequest ?? null)
+        : null
       if (releaseHolds) releaseHolds()
-      if (closeEquipmentRequests) closeEquipmentRequests()
+      if (closeEquipmentRequests) Object.assign(update, closeEquipmentRequests())
       // SPM-25: the clarification message is kept as record metadata for the Organiser, and every earlier
       // one is kept with it, so a second return does not overwrite the first.
       if (action === RETURN_FOR_CLARIFICATION) {

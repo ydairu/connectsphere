@@ -6,7 +6,7 @@ import { EQUIPMENT_REQUESTS_COLLECTION } from '../../../shared/equipmentRequest.
 import { TECHNICAL_STAFF, rolesOf } from '../../../shared/permissions.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { EquipmentRequestError, EquipmentRequestValidationError } from './equipmentRequestService.js'
-import { EQUIPMENT_UNITS } from './equipmentService.js'
+import { loadUnitsByType } from './equipmentService.js'
 
 export async function checkEquipmentRequestAvailability(eventId, equipmentRequestId, user, db = getAdminDb(), now = new Date()) {
   // A user without the Technical Support role is refused outright (403). A Technical Support Staff member
@@ -24,16 +24,14 @@ export async function checkEquipmentRequestAvailability(eventId, equipmentReques
     throw new EquipmentRequestError(404, 'Equipment request not found.')
   }
   if (!CHECKABLE_REQUEST_STATUSES.includes(request.status)) {
-    throw new EquipmentRequestError(409, 'Availability can only be checked for a request that is waiting for review or reserved.')
+    throw new EquipmentRequestError(409, 'Availability can only be checked for a request that is waiting for review, approved or reserved.')
   }
 
   const items = Array.isArray(request.items) ? request.items : []
   const errors = validateRequestedQuantities(items)
   if (Object.keys(errors).length) throw new EquipmentRequestValidationError(errors)
 
-  const typeIds = [...new Set(items.map((item) => item.equipmentTypeId))]
-  const snapshots = await Promise.all(typeIds.map((typeId) => db.collection(EQUIPMENT_UNITS).where('equipmentTypeId', '==', typeId).get()))
-  const unitsByType = new Map(typeIds.map((typeId, index) => [typeId, snapshots[index].docs.map((doc) => doc.data())]))
+  const unitsByType = await loadUnitsByType(db, items.map((item) => item.equipmentTypeId))
 
   return {
     equipmentRequestId,
