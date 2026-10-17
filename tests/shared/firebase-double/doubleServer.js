@@ -107,6 +107,27 @@ export function createDouble() {
       profiles: Object.fromEntries(state.profiles),
     })
   })
+  // Test-only venue snapshots expose persisted audit entries without adding a product history API.
+  // Fixture replacement is limited to venue collections and is cleared by the usual per-test reset.
+  router.post('/venue-fixtures', (req, res) => {
+    for (const path of ['venues', 'venueAvailability']) {
+      if (!req.body?.[path]) continue
+      const collection = state.db.collectionData(path)
+      collection.clear()
+      for (const [id, record] of Object.entries(req.body[path])) collection.set(id, structuredClone(record))
+    }
+    res.status(204).end()
+  })
+  router.get('/venue-state', (_req, res) => {
+    const venues = Object.fromEntries(state.db.collectionData('venues'))
+    res.json({
+      venues,
+      availability: Object.fromEntries(state.db.collectionData('venueAvailability')),
+      history: Object.fromEntries(Object.keys(venues).map((id) => [
+        id, Object.fromEntries(state.db.collectionData(`venues/${id}/activity`)),
+      ])),
+    })
+  })
 
   router.post('/auth/signUp', (req, res) => {
     const { email, password } = req.body ?? {}

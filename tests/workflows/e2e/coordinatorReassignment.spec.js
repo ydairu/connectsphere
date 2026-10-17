@@ -1,4 +1,4 @@
-// Cross-story E2E: SPM-46 × SPM-26, in Chromium. The assigned Coordinator reassigns the Organiser's event
+// Cross-story E2E: SPM-46 / SPM-26, in Chromium. The assigned Coordinator reassigns the Organiser's event
 // through the real SPM-26 API; the Organiser then opens the event and sees the new Coordinator's name.
 // Firebase is the in-memory double; the API and app are real. Not an SPM-64 test.
 
@@ -13,7 +13,7 @@ const submitted = SEED_REQUESTS.find(
   (request) => request.status === SUBMITTED && request.ownerUid === ROLE_USERS.organiser.uid && request.assignedCoordinatorUid === FROM.uid,
 )
 
-test.describe('SPM-46 × SPM-26 — the Organiser sees the reassigned Coordinator (E2E)', () => {
+test.describe('SPM-46 / SPM-26 - the Organiser sees the reassigned Coordinator (E2E)', () => {
   test('spm46_spm26_organiser_sees_the_new_coordinator_after_reassignment', async ({ page }) => {
     expect(submitted).toBeDefined()
 

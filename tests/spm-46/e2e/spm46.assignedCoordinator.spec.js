@@ -4,7 +4,7 @@
 //
 // This uses an event assigned to `coordinator`. Since SPM-26 the double also holds Seed Coordinator 2
 // (EXTRA_USERS.secondCoordinator); the name after a real reassignment is checked end to end in
-// spm46.reassignedCoordinatorName.spec.js. "Not yet assigned" and "name unavailable" need records the
+// tests/workflows/e2e/coordinatorReassignment.spec.js. "Not yet assigned" and "name unavailable" need records the
 // double cannot produce through the app, so they are covered in tests/spm-46/integration.
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
