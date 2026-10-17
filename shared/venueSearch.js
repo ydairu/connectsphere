@@ -3,9 +3,21 @@
 // Every filter is optional, and a venue is returned only when it meets all of the filters applied.
 // Location, layout, facility and accessibility options are the values recorded in the venue
 // catalogue; they match regardless of letter case and extra spaces. Date/time availability is
-// checked separately by shared/venueAvailability.js.
+// venueAvailableFor below.
+
+import { findVenueConflict } from './venueConflicts.js'
 
 const MAX_FILTER_TEXT_LENGTH = 160
+
+/**
+ * SPM-75: is `venue` free for the searched period? The period is treated as a booking request would be
+ * by SPM-16's findVenueConflict, so search and booking agree: both sides' setup and turnaround count,
+ * maintenance blocks use their own times, and expired tentative holds do not block. `venue` must be the
+ * full venue record (with setupMinutes/turnaroundMinutes); `commitments` are its venueAvailability entries.
+ */
+export function venueAvailableFor(venue, commitments, { startsAt, endsAt }, now = new Date()) {
+  return findVenueConflict({ candidate: { venueId: venue.id, startsAt, endsAt }, venue, commitments, now }) === null
+}
 
 export const EMPTY_VENUE_SEARCH_FILTERS = Object.freeze({
   attendance: null,

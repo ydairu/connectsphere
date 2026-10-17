@@ -532,6 +532,17 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - Seed dry run against `connectsphere-6546c`: 18 venue, availability and equipment documents to create, no blockers, nothing written.
     - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
+30. **SPM-75 search venues using setup, turnaround and hold expiry (17 Oct 2026, branch `spm-75`):**
+    - **Built:** `GET /api/venues` with `availableFrom`/`availableTo` now keeps a venue only when `venueAvailableFor` (`shared/venueSearch.js`) finds no conflict. That helper calls SPM-16's `findVenueConflict` with the searched period as the candidate, so setup and turnaround count on both sides, maintenance blocks use their own times, and expired tentative holds (`isExpiredHold`) no longer block. `listVenues` reads each venue's full record for its setup and turnaround; the response shape is unchanged. The catalogue page's search text says so.
+    - **Decision:** the searched venue's own setup and turnaround apply to the searched period, so search agrees with SPM-16/SPM-14 booking checks; team decision of 17 Oct 2026, pending PO confirmation (effective-requirements.md §4.10).
+    - **Not changed:** the availability calendar (SPM-73 for setup/turnaround, SPM-78 for expired holds). SPM-13's suitability check still compares the event's own times (SPM-76).
+    - **To agree:** SPM-78 (In Progress, Sprint 3) has an AC4 that also covers expired holds in venue search; with SPM-75 merged, SPM-78 needs only the calendar half.
+    - **Evidence:**
+      - `tests/spm-75/unit/venueAvailableFor.test.js`
+      - `tests/spm-75/integration/venueSearchBuffersApi.test.js`
+    - **Local verification (macOS, Node 24.1.0, 17 Oct 2026, on `main` at `41b6a5a`):** lint passed; `test:spm75` 14 Vitest passed; the venue suites (SPM-11, 12, 13, 14, 16, 30, 49, 72) passed; 128 Node and 99 frontend tests passed; root Vitest 1508 passed (35 opt-in live and emulator tests skipped); Playwright Chromium 69/69 passed; the production build passed. The backlog ACs were re-read from the sheet on 17 Oct 2026 and are unchanged since 15 Oct.
+    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.

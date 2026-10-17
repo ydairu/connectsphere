@@ -259,8 +259,9 @@ function VenueCataloguePage() {
         <Card className="request-form-section availability-controls">
           <h2>Search by event requirements</h2>
           <p className="request-meta">
-            Every filter is optional. A venue is shown only if it meets all of the filters you apply. Bookings,
-            tentative holds and maintenance blocks make a venue unavailable for the period.
+            Every filter is optional. A venue is shown only if it meets all of the filters you apply. For a date and
+            time, a venue is unavailable if it would clash with a booking, an unexpired tentative hold or a maintenance
+            block, counting the setup and turnaround time each venue needs before and after an event.
           </p>
           <form onSubmit={searchVenues} noValidate>
             <div className="field-row">
