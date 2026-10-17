@@ -649,6 +649,26 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Known gaps — SPM-37]** Reservations are not subtracted, so the count is usable stock rather than stock free for the period (SPM-18, SPM-38). Organisers' equipment needs remain free text, not linked to equipment types (§4.15). Unit activity history is not displayed.
 
+**[Implemented — SPM-18, 17 Oct 2026]** (`shared/equipmentAvailabilityCheck.js`, `backend/src/services/equipmentAvailabilityService.js`, `GET /api/requests/:id/equipment-requests/:requestId/availability`):
+
+- the check takes an SPM-17 equipment request and its `requiredPeriod`, which comes from the event's date, start time and duration; transit and transfer time is zero (CL1 §6);
+- each requested type is checked separately: the available quantity is the type's Available units (SPM-37), and a type with fewer than the requested quantity has a shortfall;
+- the request can be fulfilled only if every type has enough units; otherwise it cannot be fulfilled (no partial fulfilment, CL1 §6);
+- a stored quantity that is not a whole number of 1 or more is refused with a validation message (400); SPM-17 already refuses it when the request is submitted;
+- only Technical Support Staff can check: any other role gets 403. The check is read-only and writes nothing.
+
+**[Team decisions, 17 Oct 2026 — SPM-18, pending PO confirmation]**
+
+- Only the Technical Support Staff member **assigned to the request** can check it, matching SPM-17's read rule (`canReadEquipmentRequest`). Another Technical Support Staff member gets the same 404 as a missing request.
+- A request can be checked while it is Pending Review or Reserved (the AC's re-check). A Closed or Rejected request is refused with 409.
+
+**[Unresolved — SPM-18 vs SPM-37]** SPM-18's "Only Technical Support Staff can check equipment availability" conflicts with SPM-37's team decision that Event Coordinators may view equipment availability read-only (`/api/equipment`). SPM-18 applies the restriction to the request check only; the SPM-37 view is unchanged. The PO should decide whether Coordinators keep that view.
+
+**[Blocked — SPM-18]**
+
+- **Reserved units:** "excludes units reserved for overlapping events (SPM-57)" and "an event's own reserved units are not subtracted on a re-check" need equipment reservations, which do not exist (§4.17, SPM-57 / SPM-62). Nothing is subtracted yet.
+- **Technical requirements:** "only units matching the requested type and technical requirements are counted" needs units with technical attributes and structured requirements. SPM-17 stores requirements as free text, and SPM-37 units have only an asset tag and status. Units are matched by type only; the requirements are shown to the staff member to judge. Matching needs a team decision on the unit model.
+
 ### 4.17 Equipment Reservation
 
 **[Customer-confirmed]** Fulfilment is all-or-nothing. Conflicts or breakdowns are flagged for manual resolution; automatic substitutes are not required. Transit/setup buffers may be zero.

@@ -553,6 +553,26 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
     - **Local verification (macOS, Node 24.1.0, 17 Oct 2026, on `main` at `ebde1b3`, with SPM-75):** lint passed; `test:spm73` 15 Vitest + 1 Playwright passed, with the SPM-11, 12, 16, 30 and 75 suites; 128 Node and 99 frontend tests passed; root Vitest 1523 passed (35 opt-in live and emulator tests skipped); Playwright Chromium 70/70 passed; the production build passed.
     - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check outside Playwright. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
+32. **SPM-18 check equipment availability for an event (17 Oct 2026, branch `feature/spm-18`):**
+    - **Built:**
+      - **Rules:** `shared/equipmentAvailabilityCheck.js`. Each requested type in an SPM-17 equipment request is checked separately against its Available units (SPM-37). The result gives the available and requested quantity, any shortfall, and `fulfillable`, which is true only if every type has enough units.
+      - **Period:** the request's `requiredPeriod` (the event's date, start time and duration). Transit time is zero.
+      - **API:** `GET /api/requests/:id/equipment-requests/:requestId/availability` (`backend/src/services/equipmentAvailabilityService.js`), read-only. Codes: 200; 400 for a stored quantity below 1; 403 for a user without the Technical Support role; 404 for a missing request, a request from another event, or Technical Support Staff not assigned to it; 409 for a Closed or Rejected request.
+      - **Page:** on the request page's Equipment requests card, a "Check availability" button on each Pending Review or Reserved request, for the Technical Support role. It shows "Can be fulfilled" or "Shortfall", each type's counts, and any technical requirements for the staff member to judge.
+    - **Decisions:** assigned-staff-only checking and the checkable statuses are team decisions of 17 Oct 2026, pending PO confirmation (effective-requirements.md §4.16).
+    - **Unresolved:** "Only Technical Support Staff can check" conflicts with SPM-37's Coordinator read-only view of `/api/equipment`, which is unchanged. This is for the PO to decide.
+    - **Blocked:**
+      - Subtracting units reserved for overlapping events, and not subtracting the event's own reservations on a re-check: no equipment reservations exist (SPM-57, SPM-62).
+      - Matching units to technical requirements: requirements are free text and units have no technical attributes. Units are matched by type only.
+      - SPM-18 is not Done until these are built or the PO agrees to defer them.
+    - **Evidence:**
+      - `tests/spm-18/unit/equipmentAvailabilityCheck.test.js`
+      - `tests/spm-18/integration/equipmentAvailabilityApi.test.js` (requests created through SPM-17's real POST route)
+      - `tests/spm-18/integration/availabilityCheckPage.test.jsx`
+      - `tests/spm-18/e2e/spm18.equipmentAvailability.spec.js` (SPM-37 units, an SPM-17 request on A1 planning, a shortfall, then a repair and re-check)
+    - **Local verification (Windows, 17 Oct 2026):** lint passed; `test:spm18`: 26 Vitest and 1 Playwright passed; 128 Node and 99 frontend tests passed; root Vitest 1534 passed (35 opt-in live and emulator tests skipped); the production build passed with the existing bundle-size warning; Playwright Chromium passed all 70 tests.
+    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.

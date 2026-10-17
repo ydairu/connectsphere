@@ -16,6 +16,10 @@ export function listEquipmentRequests(user, eventId) {
 export function submitEquipmentRequest(user, eventId, input) {
   return authenticatedRequest(user, `/api/requests/${eventId}/equipment-requests`, { method: 'POST', body: JSON.stringify(input) })
 }
+// SPM-18: whether the request's equipment is available for its period, type by type.
+export function checkEquipmentAvailability(user, eventId, equipmentRequestId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/equipment-requests/${equipmentRequestId}/availability`)
+}
 
 export class ApiRequestError extends Error {
   constructor(message, { status, details } = {}) {

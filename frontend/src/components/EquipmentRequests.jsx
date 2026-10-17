@@ -5,7 +5,10 @@ import {
   MAX_TECHNICAL_REQUIREMENTS_LENGTH,
   normaliseEquipmentRequest,
 } from '../../../shared/equipmentRequest.js'
-import { listEquipment, listEquipmentRequests, submitEquipmentRequest } from '../services/api.js'
+import { CHECKABLE_REQUEST_STATUSES } from '../../../shared/equipmentAvailabilityCheck.js'
+import { TECHNICAL_STAFF } from '../../../shared/permissions.js'
+import { useAuth } from '../hooks/useAuth.js'
+import { checkEquipmentAvailability, listEquipment, listEquipmentRequests, submitEquipmentRequest } from '../services/api.js'
 import Button from './Button.jsx'
 import Card from './Card.jsx'
 
@@ -40,7 +43,59 @@ function OrganiserEquipment({ equipment }) {
   )
 }
 
+// SPM-18 — the assigned Technical Support Staff member checks whether the request can be fulfilled for its
+// period. The button is shown to the Technical Support role; the API decides whether this member may check.
+function AvailabilityCheck({ user, eventId, request }) {
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+  const [checking, setChecking] = useState(false)
+
+  async function check() {
+    setChecking(true)
+    setError(null)
+    try {
+      setResult((await checkEquipmentAvailability(user, eventId, request.id)).availability)
+    } catch (failure) {
+      setResult(null)
+      setError(failure?.status === 404 ? 'Only the Technical Support Staff member assigned to this request can check it.' : failure?.details?.message ?? 'Availability could not be checked. Please try again.')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  return (
+    <div className="equipment-availability" aria-label={`Availability for equipment request ${request.id}`}>
+      <Button type="button" variant="secondary" disabled={checking} onClick={check}>
+        {checking ? 'Checking…' : result ? 'Check again' : 'Check availability'}
+      </Button>
+      {error && <p className="field-error" role="alert">{error}</p>}
+      {result && (
+        <>
+          <p className={`alert alert-${result.fulfillable ? 'success' : 'error'}`} role="status">
+            {result.fulfillable ? 'Can be fulfilled: every equipment type has enough available units.' : 'Shortfall: this request cannot be fulfilled.'}
+          </p>
+          <ul className="equipment-items">
+            {result.items.map((item) => (
+              <li key={item.equipmentTypeId}>
+                <strong>{item.equipmentTypeName ?? item.equipmentTypeId}</strong>: {item.availableQuantity} available, {item.requestedQuantity} requested
+                {item.sufficient ? ' — enough' : ` — short by ${item.shortfall}`}
+                {item.technicalRequirements && <span className="form-note"> Check the technical requirements yourself: {item.technicalRequirements}</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="form-note">
+            Counts Available units of each type for {displayTime(result.requiredPeriod?.startsAt)} to {displayTime(result.requiredPeriod?.endsAt)}.
+            Equipment reservations are not recorded yet, so units reserved for other events are not subtracted.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
 function EquipmentRequests({ user, eventId, organiserEquipment, busy = false }) {
+  const { roles = [] } = useAuth()
+  const isTechnicalStaff = roles.includes(TECHNICAL_STAFF)
   const [data, setData] = useState(null)
   const [types, setTypes] = useState([])
   const [rows, setRows] = useState(() => [emptyRow()])
@@ -134,6 +189,7 @@ function EquipmentRequests({ user, eventId, organiserEquipment, busy = false }) 
               </li>
             ))}
           </ul>
+          {isTechnicalStaff && CHECKABLE_REQUEST_STATUSES.includes(request.status) && <AvailabilityCheck user={user} eventId={eventId} request={request} />}
         </div>
       ))}
 
