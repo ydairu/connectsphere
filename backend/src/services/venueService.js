@@ -1,7 +1,6 @@
 import { buildVenueRecord, hasVenueValidationErrors, normaliseVenueInput } from '../../../shared/venue.js'
 import {
   AVAILABILITY_STATUS,
-  activeCommitmentsInRange,
   buildAvailabilityResponse,
   normaliseAvailabilityCommitment,
   normaliseMaintenanceBlockInput,
@@ -9,7 +8,7 @@ import {
   validateAvailabilityRange,
 } from '../../../shared/venueAvailability.js'
 import { findVenueConflict } from '../../../shared/venueConflicts.js'
-import { buildVenueFilterOptions, normaliseVenueSearchQuery, venueMatchesFilters } from '../../../shared/venueSearch.js'
+import { buildVenueFilterOptions, normaliseVenueSearchQuery, venueAvailableFor, venueMatchesFilters } from '../../../shared/venueSearch.js'
 import { hasConfirmedBooking, venueBufferMinutes } from '../../../shared/venueOccupancy.js'
 import { VENUE_STAFF } from '../../../shared/permissions.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
@@ -101,10 +100,13 @@ export async function createVenue(input, venueStaff, db = getAdminDb()) {
 
 // SPM-12: every search filter is optional and a venue must meet all of those applied. The filter
 // options always describe the whole catalogue, whatever the search.
-export async function listVenues(query = {}, db = getAdminDb()) {
+// SPM-75: a date/time search uses SPM-16's conflict rule, so it counts setup and turnaround and ignores
+// expired holds, as a booking request for that period would.
+export async function listVenues(query = {}, db = getAdminDb(), now = new Date()) {
   const snapshot = await db.collection('venues').get()
-  const catalogue = snapshot.docs
-    .map((doc) => projectVenueCatalogueItem({ id: doc.id, ...doc.data() }))
+  const records = new Map(snapshot.docs.map((doc) => [doc.id, { id: doc.id, ...doc.data() }]))
+  const catalogue = [...records.values()]
+    .map(projectVenueCatalogueItem)
     .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
   const filterOptions = buildVenueFilterOptions(catalogue)
 
@@ -120,10 +122,18 @@ export async function listVenues(query = {}, db = getAdminDb()) {
   if (!range || venues.length === 0) return { venues, filterOptions }
 
   const availabilitySnapshot = await db.collection('venueAvailability').get()
-  const commitments = availabilitySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-  const unavailableVenueIds = new Set(activeCommitmentsInRange(commitments, range).map((commitment) => commitment.venueId))
+  const commitmentsByVenue = new Map()
+  for (const doc of availabilitySnapshot.docs) {
+    const commitment = { id: doc.id, ...doc.data() }
+    if (!commitmentsByVenue.has(commitment.venueId)) commitmentsByVenue.set(commitment.venueId, [])
+    commitmentsByVenue.get(commitment.venueId).push(commitment)
+  }
+  const period = { startsAt: range.from.toISOString(), endsAt: range.to.toISOString() }
 
-  return { venues: venues.filter((venue) => !unavailableVenueIds.has(venue.id)), filterOptions }
+  return {
+    venues: venues.filter((venue) => venueAvailableFor(records.get(venue.id), commitmentsByVenue.get(venue.id) ?? [], period, now)),
+    filterOptions,
+  }
 }
 
 export async function getVenue(id, db = getAdminDb()) {

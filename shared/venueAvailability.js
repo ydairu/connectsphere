@@ -30,7 +30,8 @@ export function tentativeHoldExpiresAt(createdAt) {
 }
 
 // A tentative hold has expired once its holdExpiresAt is reached. Holds saved before SPM-16 have no
-// holdExpiresAt and still count as active. The calendar and search do not apply this yet (SPM-78).
+// holdExpiresAt and still count as active. Conflict detection (SPM-16), venue search (SPM-75) and
+// suitability (SPM-13) apply this; the availability calendar does not yet (SPM-78).
 export function isExpiredHold(commitment, now = new Date()) {
   return (
     commitment.status === AVAILABILITY_STATUS.TENTATIVE_HOLD &&
