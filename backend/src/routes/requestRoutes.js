@@ -32,6 +32,8 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   const equipmentRequests = createEquipmentRequestController(getEventRequestDb)
   router.get('/:id/equipment-requests', authenticate, equipmentRequests.list)
   router.post('/:id/equipment-requests', authenticate, equipmentRequests.submit)
+  // SPM-18: only the request's assigned Technical Support Staff (shared/equipmentAvailabilityCheck.js).
+  router.get('/:id/equipment-requests/:requestId/availability', authenticate, equipmentRequests.checkAvailability)
 
   router.get('/', authenticate, controller.loadAll, controller.loadOwnerNames, authoriseList, controller.sendList)
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead, controller.sendOne)

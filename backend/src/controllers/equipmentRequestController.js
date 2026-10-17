@@ -4,8 +4,9 @@ import {
   listEventEquipmentRequests,
   submitEquipmentRequest,
 } from '../services/equipmentRequestService.js'
+import { checkEquipmentRequestAvailability } from '../services/equipmentAvailabilityService.js'
 
-// SPM-17 — GET and POST /api/requests/:id/equipment-requests.
+// SPM-17 — GET and POST /api/requests/:id/equipment-requests; SPM-18 — GET .../:requestId/availability.
 export function createEquipmentRequestController(getDb) {
   const handle = (operation, status = 200) => async (req, res, next) => {
     try {
@@ -19,5 +20,8 @@ export function createEquipmentRequestController(getDb) {
   return {
     submit: handle(async (req) => ({ equipmentRequest: await submitEquipmentRequest(req.params.id, req.body, req.user, getDb()) }), 201),
     list: handle((req) => listEventEquipmentRequests(req.params.id, req.user, getDb())),
+    checkAvailability: handle(async (req) => ({
+      availability: await checkEquipmentRequestAvailability(req.params.id, req.params.requestId, req.user, getDb()),
+    })),
   }
 }
