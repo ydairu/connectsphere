@@ -542,6 +542,16 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - `tests/spm-75/integration/venueSearchBuffersApi.test.js`
     - **Local verification (macOS, Node 24.1.0, 17 Oct 2026, on `main` at `41b6a5a`):** lint passed; `test:spm75` 14 Vitest passed; the venue suites (SPM-11, 12, 13, 14, 16, 30, 49, 72) passed; 128 Node and 99 frontend tests passed; root Vitest 1508 passed (35 opt-in live and emulator tests skipped); Playwright Chromium 69/69 passed; the production build passed. The backlog ACs were re-read from the sheet on 17 Oct 2026 and are unchanged since 15 Oct.
     - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
+31. **SPM-73 show setup and turnaround on the availability calendar (17 Oct 2026, branch `spm-73`):**
+    - **Built:** `shared/venueCalendar.js` (`buildVenueCalendar`) replaces `buildAvailabilityResponse`, which moved out of `shared/venueAvailability.js` with its gap-filling helper (`venueOccupancy.js` already imports that module). Each confirmed booking and tentative hold gets a `setup` slot before it and a `turnaround` slot after it, sized from the venue's SPM-72 times and naming the booking (`commitmentId`, `commitmentStatus`, `title`). Commitments are read wider than the period by the venue's times, then every slot is cut to the period. Maintenance blocks get neither. `GET /api/venues/:id/availability` also returns the venue's `buffers`. The calendar page labels the new slots "Setup"/"Turnaround" ("Before …"/"After …" the booking), adds them to the legend with a dashed, striped style, and states the venue's times.
+    - **Unchanged:** a venue with no setup or turnaround gets exactly the SPM-11 calendar; the SPM-11, SPM-30 and SPM-16 tests pass without changes. Expired holds are still shown (SPM-78).
+    - **Evidence:**
+      - `tests/spm-73/unit/venueCalendar.test.js`
+      - `tests/spm-73/integration/venueCalendarApi.test.js`
+      - `tests/spm-73/integration/venueCalendarPage.test.jsx`
+      - `tests/spm-73/e2e/spm73.calendarBuffers.spec.js` (the seeded hall, setup 30 and turnaround 45)
+    - **Local verification (macOS, Node 24.1.0, 17 Oct 2026, on `main` at `ebde1b3`, with SPM-75):** lint passed; `test:spm73` 15 Vitest + 1 Playwright passed, with the SPM-11, 12, 16, 30 and 75 suites; 128 Node and 99 frontend tests passed; root Vitest 1523 passed (35 opt-in live and emulator tests skipped); Playwright Chromium 70/70 passed; the production build passed.
+    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check outside Playwright. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

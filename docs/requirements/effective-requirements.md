@@ -512,6 +512,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 >
 > **[Customer-confirmed — CL3 overlap rule]** The venue is occupied from the start of setup through the end of turnaround; a later booking's setup may begin exactly when the earlier booking's turnaround ends, but the intervals must not overlap. Availability and conflict checks run on these effective intervals, not the advertised event times (G8!C5).
 
+**[Implemented — SPM-73, 17 Oct 2026 — historical record]** The availability calendar shows each confirmed booking's and tentative hold's setup and turnaround as their own **Setup** and **Turnaround** slots, either side of the event time and drawn differently from it (`buildVenueCalendar` in `shared/venueCalendar.js`, using `occupiedPeriod`). Those slots are unavailable, so a period that only overlaps setup or turnaround is never shown as available. A booking just outside the viewed period still shows its setup or turnaround inside it. Maintenance blocks have no setup or turnaround (SPM-16 team decision). The page states the venue's times. This supersedes SPM-11's criterion that a booking ending at 08:30 leaves the venue available from 08:30 with no turnaround; it still holds for a venue whose times are 0. Expired tentative holds are still shown on the calendar until SPM-78. Bookings that overlap once setup and turnaround are counted are shown as they are, without a warning (SPM-82 was removed).
+
 ### 4.10 Venue Search and Filtering
 
 **[Customer-confirmed]** Event Coordinators search/filter by relevant date/time, capacity, location, accessibility, layout, and facilities.

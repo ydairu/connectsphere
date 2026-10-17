@@ -114,32 +114,6 @@ export function activeCommitmentsInRange(commitments, range) {
     .sort((left, right) => left.startsAt.localeCompare(right.startsAt) || left.endsAt.localeCompare(right.endsAt))
 }
 
-export function buildAvailabilityResponse(commitments, range) {
-  const busySlots = activeCommitmentsInRange(commitments, range).map((commitment) => {
-    const startsAt = new Date(Math.max(Date.parse(commitment.startsAt), range.from.getTime())).toISOString()
-    const endsAt = new Date(Math.min(Date.parse(commitment.endsAt), range.to.getTime())).toISOString()
-
-    return {
-      id: commitment.id,
-      venueId: commitment.venueId,
-      status: commitment.status,
-      startsAt,
-      endsAt,
-      title: commitment.title || null,
-      reason: commitment.reason ?? null,
-      eventRequestId: commitment.eventRequestId ?? null,
-    }
-  })
-
-  return {
-    range: {
-      from: range.from.toISOString(),
-      to: range.to.toISOString(),
-    },
-    slots: fillAvailableSlots(busySlots, range),
-  }
-}
-
 function maintenanceBlockTitle(reason) {
   if (reason === 'internal_activity') return 'Internal activity'
   return reason ? reason[0].toUpperCase() + reason.slice(1) : ''
@@ -149,33 +123,4 @@ function parseIsoDate(value) {
   if (typeof value !== 'string' || value.trim() === '') return null
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? null : date
-}
-
-function fillAvailableSlots(busySlots, range) {
-  const slots = []
-  let cursor = range.from.getTime()
-
-  for (const busySlot of busySlots) {
-    const busyStart = Date.parse(busySlot.startsAt)
-    const busyEnd = Date.parse(busySlot.endsAt)
-    if (cursor < busyStart) {
-      slots.push({
-        status: AVAILABILITY_STATUS.AVAILABLE,
-        startsAt: new Date(cursor).toISOString(),
-        endsAt: new Date(busyStart).toISOString(),
-      })
-    }
-    slots.push(busySlot)
-    cursor = Math.max(cursor, busyEnd)
-  }
-
-  if (cursor < range.to.getTime()) {
-    slots.push({
-      status: AVAILABILITY_STATUS.AVAILABLE,
-      startsAt: new Date(cursor).toISOString(),
-      endsAt: range.to.toISOString(),
-    })
-  }
-
-  return slots
 }
