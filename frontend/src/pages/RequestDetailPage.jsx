@@ -391,7 +391,14 @@ function RequestDetailPage() {
 
             {/* SPM-17: the API decides who may see equipment requests; for anyone else the card renders nothing. */}
             {(roles?.includes(COORDINATOR) || roles?.includes(TECHNICAL_STAFF)) && (
-              <EquipmentRequests user={user} eventId={id} organiserEquipment={request.equipment} busy={acting || saving} />
+              <EquipmentRequests
+                user={user}
+                eventId={id}
+                organiserEquipment={request.equipment}
+                busy={acting || saving}
+                // SPM-56: an approval changes the technical sign-off, so the page reloads the request.
+                onDecided={async () => applyResponse(await getRequest(user, id))}
+              />
             )}
 
             {visibleSections.map((section) => {

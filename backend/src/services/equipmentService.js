@@ -48,6 +48,14 @@ export class DuplicateAssetTagError extends Error {
   }
 }
 
+// SPM-18 / SPM-56: the units of each equipment type, as a Map from type id to unit records. `read` runs a
+// query: pass `(query) => tx.get(query)` inside a transaction (SPM-56 approval); the default reads outside one.
+export async function loadUnitsByType(db, typeIds, read = (query) => query.get()) {
+  const ids = [...new Set(typeIds)]
+  const snapshots = await Promise.all(ids.map((typeId) => read(db.collection(EQUIPMENT_UNITS).where('equipmentTypeId', '==', typeId))))
+  return new Map(ids.map((typeId, index) => [typeId, snapshots[index].docs.map((doc) => doc.data())]))
+}
+
 function actorName(staff) {
   return staff.name ?? staff.email ?? null
 }

@@ -43,7 +43,8 @@ describe('SPM-17 equipment request API', () => {
 
     const forCoordinator = await get(coordinator)
     expect(forCoordinator.status).toBe(200)
-    expect(forCoordinator.body).toEqual({ canSubmit: false, requests: [created.body.equipmentRequest] })
+    // SPM-56 added `actions` to each listed request: the Coordinator has none.
+    expect(forCoordinator.body).toEqual({ canSubmit: false, requests: [{ ...created.body.equipmentRequest, actions: [] }] })
     expect((await get(tech)).body.requests).toHaveLength(1)
   })
 

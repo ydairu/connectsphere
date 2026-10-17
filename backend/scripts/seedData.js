@@ -89,7 +89,15 @@ const { coordinator, coordinator2, coordinator3, venueStaff, technicalStaff, ven
 // `coordinator` is set on every non-draft request: a submitted event is always assigned exactly one
 // Coordinator (Clarification 1, Coordinator and Staff Assignment). Drafts carry no assignment field.
 // `approvals` is SPM-9's arrangementApprovals record metadata, set only where a request needs it.
-function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', createdAt }) {
+// SPM-56: the equipment requests each seeded event's summary (currentEquipmentRequest) names; the requests
+// themselves are SEED_EQUIPMENT_REQUESTS below. A1's Planning event is deliberately left without a summary:
+// SPM-9 and SPM-10 demonstrate the manual technical sign-off on it, which a summary would refuse. Its
+// Pending Review request is therefore in the state of a request made before SPM-56; approving it writes the
+// summary. B1's Planning event carries one, so the seed shows both.
+const A1_PENDING_EQUIPMENT_REQUEST_ID = `${SEED_ID_PREFIX}equipment-request-a1-planning-2`
+const B1_SHORT_EQUIPMENT_REQUEST_ID = `${SEED_ID_PREFIX}equipment-request-b1-planning-1`
+
+function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', currentEquipmentRequest, createdAt }) {
   const core = draft
     ? { title, purpose: null, description: null, preferredDateTime: null, durationHours: null, expectedAttendees: null, ...draftCore }
     : {
@@ -114,6 +122,7 @@ function eventRequest({ slug, status, owner, title, coordinator, assigned = [], 
     registration: { enabled: registrationEnabled },
     internal: { planningNotes: draft ? '' : `Seed internal note (${status}) — must never reach an attendee.` },
     ...(approvals ? { arrangementApprovals: approvals } : {}),
+    ...(currentEquipmentRequest ? { currentEquipmentRequest } : {}),
     createdAt,
   }
 }
@@ -156,7 +165,7 @@ export const SEED_REQUESTS = Object.freeze([
   // staff cannot see it while the venue+technical account can. SPM-16: a week after the other events, so
   // its tentative hold on the seeded hall (SEED_VENUE_AVAILABILITY) does not clash with A1's booking.
   eventRequest({ slug: 'b1-draft', status: DRAFT, owner: organiserB1, title: 'B1 draft (private to B1)', draft: true, createdAt: '2026-09-11T10:00:00+08:00' }),
-  eventRequest({ slug: 'b1-planning', coordinator: coordinator2, status: PLANNING, owner: organiserB1, title: 'B1 planning (technical staff only)', assigned: [technicalStaff, venueTechnicalStaff], preferredDateTime: '2026-11-27T09:00:00+08:00', createdAt: '2026-09-11T11:00:00+08:00' }),
+  eventRequest({ slug: 'b1-planning', coordinator: coordinator2, status: PLANNING, owner: organiserB1, title: 'B1 planning (technical staff only)', assigned: [technicalStaff, venueTechnicalStaff], preferredDateTime: '2026-11-27T09:00:00+08:00', currentEquipmentRequest: { id: B1_SHORT_EQUIPMENT_REQUEST_ID, status: 'pending_review' }, createdAt: '2026-09-11T11:00:00+08:00' }),
 ])
 
 // SPM-28 — field change history on A1's planning event, so the Change history panel can be checked on the
@@ -315,18 +324,18 @@ export const SEED_EQUIPMENT_UNITS = Object.freeze(
 
 const [projectorType, micType, speakerType] = SEED_EQUIPMENT_TYPES
 const REJECTED_EQUIPMENT_REQUEST_ID = `${SEED_ID_PREFIX}equipment-request-a1-planning-1`
-const PENDING_EQUIPMENT_REQUEST_ID = `${SEED_ID_PREFIX}equipment-request-a1-planning-2`
+const PENDING_EQUIPMENT_REQUEST_ID = A1_PENDING_EQUIPMENT_REQUEST_ID
 
-function seedEquipmentRequest(id, { items, submissionKey, createdAt, ...fields }) {
+function seedEquipmentRequest(id, { items, submissionKey, createdAt, event = planningRequest, ...fields }) {
   const { value, errors } = normaliseEquipmentRequest({ items: items.map(({ type, ...item }) => ({ ...item, equipmentTypeId: type.id })), submissionKey })
   if (Object.keys(errors).length > 0) throw new Error(`Seed equipment request ${id} is invalid: ${JSON.stringify(errors)}`)
   const names = new Map(SEED_EQUIPMENT_TYPES.map((type) => [type.id, type.name]))
   return {
     id,
-    eventRequestId: PLANNING_REQUEST_ID,
-    eventTitle: planningRequest.core.title,
+    eventRequestId: event.id,
+    eventTitle: event.core.title,
     items: value.items.map((item) => ({ ...item, equipmentTypeName: names.get(item.equipmentTypeId) })),
-    requiredPeriod: seedEventPeriod('a1-planning'),
+    requiredPeriod: seedEventPeriod(event.id.slice(`${SEED_ID_PREFIX}req-`.length)),
     assignedTechnicalStaffUid: technicalStaff.uid,
     assignedTechnicalStaffName: technicalStaff.name,
     submissionKey: value.submissionKey,
@@ -355,5 +364,18 @@ export const SEED_EQUIPMENT_REQUESTS = Object.freeze([
     status: EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW,
     replacesId: REJECTED_EQUIPMENT_REQUEST_ID,
     createdAt: '2026-09-16T02:00:00.000Z',
+  }),
+  // SPM-56: B1's Planning event asks for more PA speaker sets than exist (3 against 2 Available units), so
+  // approval is refused with a shortfall. A1's request above can be fulfilled (2, 2 and 1 against 3, 3 and 2).
+  seedEquipmentRequest(B1_SHORT_EQUIPMENT_REQUEST_ID, {
+    event: SEED_REQUESTS.find((request) => request.id === `${SEED_ID_PREFIX}req-b1-planning`),
+    items: [
+      { type: speakerType, quantity: 3, technicalRequirements: 'Outdoor coverage for 120 people' },
+      { type: projectorType, quantity: 1 },
+    ],
+    submissionKey: 'seed-b1-planning-equipment-1',
+    status: EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW,
+    replacesId: null,
+    createdAt: '2026-09-17T02:00:00.000Z',
   }),
 ])

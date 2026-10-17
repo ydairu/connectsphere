@@ -20,7 +20,12 @@ import { TECHNICAL_STAFF, rolesOf } from './permissions.js'
 
 // [Team decision, 17 Oct 2026 — SPM-18, pending PO confirmation] A request is checked while it is waiting
 // for review or reserved (the AC's re-check). A closed or rejected request has nothing left to fulfil.
-export const CHECKABLE_REQUEST_STATUSES = Object.freeze([EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW, EQUIPMENT_REQUEST_STATUS.RESERVED])
+// SPM-56 adds Approved, so an approved request can be checked again (and re-confirmed).
+export const CHECKABLE_REQUEST_STATUSES = Object.freeze([
+  EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW,
+  EQUIPMENT_REQUEST_STATUS.APPROVED,
+  EQUIPMENT_REQUEST_STATUS.RESERVED,
+])
 
 /**
  * May this user check this request's availability? Only Technical Support Staff (SPM-18), and only the

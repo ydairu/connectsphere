@@ -627,6 +627,32 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - **Equipment availability is not checked on submission** (SPM-18).
 - **Two places may hold the technical decision** once SPM-56 exists: the equipment request's status and `arrangementApprovals.technical`, which SPM-9's Confirm reads. SPM-56 should decide which is the source.
 
+**[Team decisions, 17 Oct 2026 — SPM-56, pending PO confirmation]** Where SPM-56's acceptance criteria leave room:
+
+- **Approved status.** A new status, Approved, sits between Pending Review and Reserved. Approving does not reserve units; SPM-62 is expected to move an Approved request to Reserved.
+- **Approving sets the technical sign-off.** In one transaction the request becomes Approved and the event's `arrangementApprovals.technical` becomes `{ decision: 'approved', byUid, at }`. This resolves SPM-17's known gap about two places holding the technical decision: the equipment request decides it.
+- **The event summary.** The event carries `currentEquipmentRequest: { id, status }` as top-level metadata, written by SPM-17's submit and close and by SPM-56's approve, so the shared sign-off rules (which see only the event) know a request exists. Only roles that view the internal section (the Coordinator) receive it.
+- **Technical sign-off required.** `technicalArrangementRequired` is true when the Organiser's equipment section asks for equipment or support (as before) **or** the event has a current (not Closed) equipment request. An event without an equipment request behaves exactly as before.
+- **No manual technical sign-off while a request is current.** `approve_technical` and `reject_technical` are refused (`equipment_request_decides`, 409) and not offered. The venue sign-off is unaffected.
+- **Availability is checked again on approval**, inside the approval transaction, with SPM-18's `checkRequestAvailability`. A request that cannot be fulfilled is refused with 409 and the per-item shortfall; nothing is written. There is no override.
+- **Who may approve.** Only the request's assigned Technical Support Staff member, who must also be in the event's `assignedStaffUids`, only a Pending Review request, only while the event is in Planning. A user without the Technical Support role gets 403; another Technical Support Staff member, or one removed from the event, gets 404; a wrong event or request status gets 409.
+- **Actions, not statuses.** The client sends an action (`approve`, `reconfirm_approval`) to `POST /api/requests/:id/equipment-requests/:requestId/actions`. SPM-36 is expected to add `reject` to the same route and to `equipmentRequestActions`, setting the request to Rejected, `arrangementApprovals.technical` to `{ decision: 'rejected', ... }` and the summary to Rejected.
+- **A new request while one is Approved is refused** (409), as one waiting for review already was.
+- **A new request clears a technical sign-off left from an earlier request.** Reason: the new request has not been reviewed yet, so the event must not be confirmable on an earlier request's approval. This is not the automatic reset on a significant change that CL3 G8!C51 (Session 3, row 51) ruled out: it happens only when a new equipment request is submitted, and it is what the Coordinator asked for by submitting one.
+- **Closing on event rejection or cancellation** now also closes an Approved request (nothing is reserved yet), and the summary becomes Closed.
+- **The Coordinator is notified** in-app (`equipment_request_approved`) when a request is approved or its approval re-confirmed, in the same transaction.
+- **History.** Approval writes an `equipment_request_approved` activity entry (who, when, the availability counts) and the same `arrangement_decided` entry the manual sign-off writes. Activity entries other than field changes are not displayed yet; the request shows "Approved by" with the name and time.
+- **Queue.** `GET /api/equipment/requests/assigned` (Technical Support role only) lists the member's requests, Pending Review first, oldest first. The queue page links each one to its event's Equipment requests card, where Approve (and later Reject) is the only place to act.
+
+**[Temporary — until SPM-87] Re-confirm approval.** SPM-10 still clears `arrangementApprovals` on a significant change while the equipment request stays Approved, which would block Confirm. The assignee may "Re-confirm approval" on an Approved request whose technical sign-off is not approved: availability is checked again and the sign-off is set again, with an `equipment_request_approval_reconfirmed` entry and a notice to the Coordinator. SPM-87 removes the automatic reset, and with it the need for this action.
+
+**[Implemented — SPM-56, 17 Oct 2026 — historical record]** Rules in `shared/equipmentRequest.js` (`equipmentDecision`, `equipmentRequestActions`, `hasCurrentEquipmentRequest`) and `shared/arrangements.js`; notice in `shared/notifications.js`; service `decideEquipmentRequest` and `listAssignedEquipmentRequests` in `backend/src/services/equipmentRequestService.js`; the Review panel on the Equipment requests card and the `/equipment/requests` queue page. Notes:
+
+- **Pattern for SPM-54.** SPM-56 sets the approve pattern (an action route, the decision and the sign-off in one transaction, a fresh check inside it, a Coordinator notice) that SPM-54's venue booking approval may follow.
+- **Preparation unlocks before reservation.** Equipment preparation (SPM-48) unlocks when the technical sign-off is approved, which now happens on approval, before any units are reserved, until SPM-62 / SPM-88.
+- **Requests made before SPM-56** have no event summary, so the manual technical sign-off still applies to them until they are approved, closed or replaced.
+- **Seed.** A1's Planning event is left without a summary on purpose, because SPM-9 and SPM-10 demonstrate the manual technical sign-off on it; its Pending Review request behaves as one made before SPM-56. B1's Planning event carries the summary.
+
 ### 4.16 Equipment Availability Checking
 
 **[Customer-confirmed]** Check requested type/quantity for the event time. Equipment modelling by quantity/type versus individual asset ID is a team choice.
@@ -661,6 +687,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 - Only the Technical Support Staff member **assigned to the request** can check it, matching SPM-17's read rule (`canReadEquipmentRequest`). Another Technical Support Staff member gets the same 404 as a missing request.
 - A request can be checked while it is Pending Review or Reserved (the AC's re-check). A Closed or Rejected request is refused with 409.
+
+**[Team decision, 17 Oct 2026 — SPM-56, pending PO confirmation]** An Approved request can also be checked, so the assignee can check it again and re-confirm it (§4.15).
 
 **[Unresolved — SPM-18 vs SPM-37]** SPM-18's "Only Technical Support Staff can check equipment availability" conflicts with SPM-37's team decision that Event Coordinators may view equipment availability read-only (`/api/equipment`). SPM-18 applies the restriction to the request check only; the SPM-37 view is unchanged. The PO should decide whether Coordinators keep that view.
 

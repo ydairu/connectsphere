@@ -99,6 +99,7 @@ describe('SPM-18 — validation and access (unit)', () => {
   })
 
   it('spm18_pending_review_and_reserved_requests_can_be_checked', () => {
-    expect([...CHECKABLE_REQUEST_STATUSES].sort()).toEqual([EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW, EQUIPMENT_REQUEST_STATUS.RESERVED].sort())
+    // SPM-56 added Approved, so an approved request can be checked again and re-confirmed.
+    expect([...CHECKABLE_REQUEST_STATUSES].sort()).toEqual([EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW, EQUIPMENT_REQUEST_STATUS.APPROVED, EQUIPMENT_REQUEST_STATUS.RESERVED].sort())
   })
 })

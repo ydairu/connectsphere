@@ -5,6 +5,7 @@ import CreateEventRequestPage from './pages/CreateEventRequestPage.jsx'
 import CreateVenuePage from './pages/CreateVenuePage.jsx'
 import DraftRequestsPage from './pages/DraftRequestsPage.jsx'
 import EquipmentDetailPage from './pages/EquipmentDetailPage.jsx'
+import EquipmentRequestQueuePage from './pages/EquipmentRequestQueuePage.jsx'
 import EquipmentPage from './pages/EquipmentPage.jsx'
 import EditVenuePage from './pages/EditVenuePage.jsx'
 import HomePage from './pages/HomePage.jsx'
@@ -55,6 +56,10 @@ function App() {
       <Route element={<ProtectedRoute allowedRoles={[COORDINATOR, TECHNICAL_STAFF]} />}>
         <Route path="/equipment" element={<EquipmentPage />} />
         <Route path="/equipment/:id" element={<EquipmentDetailPage />} />
+      </Route>
+      {/* SPM-56: the Technical Support Staff member's own equipment request queue. The API enforces the role too. */}
+      <Route element={<ProtectedRoute allowedRoles={[TECHNICAL_STAFF]} />}>
+        <Route path="/equipment/requests" element={<EquipmentRequestQueuePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

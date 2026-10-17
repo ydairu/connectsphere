@@ -286,3 +286,8 @@ a { color: inherit; }
 .equipment-row { margin: 0 0 16px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
 .equipment-row legend { padding: 0 6px; font-weight: 600; }
 .equipment-request-form .form-actions { flex-wrap: wrap; }
+
+/* SPM-56: the review area under each equipment request (Approve, Re-confirm; SPM-36 adds Reject). */
+.equipment-review { margin-top: 12px; }
+.equipment-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
+.equipment-actions .form-note, .equipment-actions .field-error { flex-basis: 100%; margin: 0; }

@@ -573,6 +573,37 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
     - **Local verification (Windows, 17 Oct 2026):** lint passed; `test:spm18`: 26 Vitest and 1 Playwright passed; 128 Node and 99 frontend tests passed; root Vitest 1534 passed (35 opt-in live and emulator tests skipped); the production build passed with the existing bundle-size warning; Playwright Chromium passed all 70 tests.
     - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
+33. **SPM-56 Technical Support Staff review and approve an equipment request (17 Oct 2026, branch `feature/SPM-56-approve-equipment`):**
+    - **Built:**
+      - **Status and summary:** `approved` added between Pending Review and Reserved. The event carries `currentEquipmentRequest: { id, status }`, written by SPM-17's submit and close and by approval. Only the Coordinator receives it (`projectRequest` passes extra metadata only to internal-section viewers).
+      - **Rules:** `equipmentDecision` / `equipmentRequestActions` in `shared/equipmentRequest.js`: the request's assignee, also on the event's `assignedStaffUids`, a Pending Review request, the event at Planning. Re-confirm needs an Approved request with no approved technical sign-off. `technicalArrangementRequired` also counts a current request; `canDecideArrangement` refuses the manual technical decision while one exists (`equipment_request_decides`).
+      - **API:** `POST /api/requests/:id/equipment-requests/:requestId/actions` with `approve` or `reconfirm_approval`. One transaction reads the event, the request and the units, re-runs SPM-18's `checkRequestAvailability` (refusing with 409 and the per-item shortfall), then writes the request status, `arrangementApprovals.technical`, the summary, `equipment_request_approved` (or `…_reconfirmed`) and `arrangement_decided` activity entries, and the Coordinator's notice. Codes: 200; 400 unknown action; 403 without the Technical Support role; 404 for another member, a removed assignee or a missing request; 409 for status, event state or a shortfall.
+      - **Queue:** `GET /api/equipment/requests/assigned` (Technical Support only): the member's requests, Pending Review first, oldest first, trimmed. Page `/equipment/requests` with a navbar link; each card links to the event's Equipment requests card.
+      - **Card:** for the assignee who may act, the availability check runs on load, and Approve (or Re-confirm) is enabled only when it can be fulfilled. A server shortfall replaces the result. The Coordinator sees "Approved by" with name and time. The action area is where SPM-36's Reject goes.
+      - **Seed:** B1's Planning event has a short Pending Review request (3 PA speaker sets against 2 units) with its summary. A1's existing request is fulfillable; A1 is left without a summary on purpose (below).
+    - **Changed in SPM-17 / SPM-18 behaviour (decided 17 Oct 2026):** a new request is refused while one is Approved; a new request clears a technical sign-off left from an earlier request; event rejection or cancellation also closes Approved requests and sets the summary to Closed; SPM-18's checkable statuses include Approved; SPM-18's unit loading moved to `loadUnitsByType` in `equipmentService.js` (route responses unchanged).
+    - **Existing tests changed (expected effects, not regressions):**
+      - `tests/spm-17/integration/equipmentRequestService.test.js` (3 assertions) and `tests/spm-17/integration/equipmentRequestApi.test.js` (1): listed requests now carry `actions`.
+      - `tests/spm-17/unit/seedEquipmentRequests.test.js`: "one Pending Review request in the seed" became "at most one per event", because B1 now has one too.
+      - `tests/spm-18/unit/equipmentAvailabilityCheck.test.js`: the checkable statuses include Approved.
+      - `tests/spm-18/e2e/spm18.equipmentAvailability.spec.js`: the two "Check availability" clicks were removed, because the check now runs on load for the assignee (AC2); every assertion is kept.
+    - **Seed choice:** giving A1's Planning event a summary made SPM-9's and SPM-10's manual technical sign-off tests on A1 fail with 409, as the new rule intends. A1 is left without a summary instead, so those tests are unchanged; its request behaves as one made before SPM-56.
+    - **Decisions:** team decisions of 17 Oct 2026, pending PO confirmation (effective-requirements.md §4.15, §4.16), including why a new request clears the technical sign-off (it has not been reviewed; not the CL3 G8!C51 automatic reset).
+    - **Gaps:** no units are reserved (SPM-62); equipment preparation unlocks on approval, before reservation (SPM-62 / SPM-88); Re-confirm is temporary until SPM-87; reject is SPM-36; activity entries other than field changes are not displayed; requests made before SPM-56 have no summary until approved, closed or replaced.
+    - **Evidence:**
+      - `tests/spm-56/unit/equipmentApproval.test.js`
+      - `tests/spm-56/unit/seedEquipmentApproval.test.js`
+      - `tests/spm-56/integration/equipmentApprovalService.test.js` (including SPM-10's reset through the real PATCH route on the E2E double's store)
+      - `tests/spm-56/integration/equipmentApprovalApi.test.js`
+      - `tests/spm-56/integration/equipmentApprovalPages.test.jsx`
+    - **Local verification (macOS, 17 Oct 2026, on top of `main` at `e3b0aa3`):**
+      - Lint passed. `test:spm56`: 51 passed.
+      - Vitest suites: SPM-17 76, SPM-18 26, SPM-9 18, SPM-10 147, SPM-48 96, SPM-14 28 passed (4 emulator tests skipped).
+      - Root Vitest 1600 passed, 35 opt-in live and emulator tests skipped. 128 Node and 99 frontend tests passed.
+      - Playwright Chromium 71/71 passed, after the SPM-18 spec change above. The production build passed with the existing bundle-size warning.
+      - Seed dry run against `connectsphere-6546c`: no blockers, nothing written.
+    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.
