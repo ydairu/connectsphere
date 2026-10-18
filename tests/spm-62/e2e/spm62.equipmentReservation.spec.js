@@ -23,6 +23,10 @@ async function openEquipmentTab(page) {
 }
 
 test.describe('SPM-62 — Reserve available equipment for an event (E2E)', () => {
+  // The period is typed in the browser's local time, and A1 planning is at 09:00 Singapore time. Pinning the
+  // browser to Singapore keeps the overlap check the same on a UTC CI runner as on a machine in Singapore.
+  test.use({ timezoneId: 'Asia/Singapore' })
+
   test('spm62_assigned_technical_staff_reserve_and_the_organiser_sees_reserved_equipment', async ({ page }) => {
     expect(planning.ownerUid).toBe(ROLE_USERS.organiser.uid)
 
