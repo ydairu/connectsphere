@@ -39,6 +39,7 @@ export const EQUIPMENT_REQUEST_STATUS_LABELS = Object.freeze({
 export const EQUIPMENT_REQUESTED = 'equipment_requested'
 export const EQUIPMENT_REQUEST_APPROVED = 'equipment_request_approved'
 export const EQUIPMENT_REQUEST_APPROVAL_RECONFIRMED = 'equipment_request_approval_reconfirmed'
+export const EQUIPMENT_REQUEST_REJECTED = 'equipment_request_rejected'
 
 // [Team decisions, 17 Oct 2026 — SPM-17, pending PO confirmation]
 export const MAX_EQUIPMENT_REQUEST_ITEMS = 50
@@ -181,13 +182,15 @@ export function hasCurrentEquipmentRequest(event) {
 // --- SPM-56: Technical Support Staff decide a request ---------------------------------------------
 //
 // The client sends an action, never a status, to POST /api/requests/:id/equipment-requests/:requestId/actions.
-// SPM-36 is expected to add a 'reject' action here and to equipmentDecision() below.
 
 export const APPROVE_EQUIPMENT_REQUEST = 'approve'
+// SPM-36: the whole request is rejected (no partial fulfilment) with a reason and an optional suggested
+// alternative. Nothing is reserved, and the event stays in Planning.
+export const REJECT_EQUIPMENT_REQUEST = 'reject'
 // [Temporary — until SPM-87] SPM-10 clears the technical sign-off on a significant change while the request
 // stays Approved; re-confirming checks availability again and sets the sign-off again.
 export const RECONFIRM_EQUIPMENT_APPROVAL = 'reconfirm_approval'
-export const EQUIPMENT_REQUEST_ACTIONS = Object.freeze([APPROVE_EQUIPMENT_REQUEST, RECONFIRM_EQUIPMENT_APPROVAL])
+export const EQUIPMENT_REQUEST_ACTIONS = Object.freeze([APPROVE_EQUIPMENT_REQUEST, REJECT_EQUIPMENT_REQUEST, RECONFIRM_EQUIPMENT_APPROVAL])
 
 // Refusal reasons, in the order they are checked. The service maps each to an HTTP status.
 export const UNKNOWN_EQUIPMENT_ACTION = 'unknown_equipment_action'
@@ -211,7 +214,8 @@ export function equipmentDecision(user, event, request, action) {
     return { allowed: false, reason: NOT_REQUEST_ASSIGNEE }
   }
   if (event.status !== PLANNING) return { allowed: false, reason: EVENT_NOT_AT_PLANNING }
-  if (action === APPROVE_EQUIPMENT_REQUEST && request.status !== EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW) {
+  const decidesPending = action === APPROVE_EQUIPMENT_REQUEST || action === REJECT_EQUIPMENT_REQUEST
+  if (decidesPending && request.status !== EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW) {
     return { allowed: false, reason: REQUEST_NOT_PENDING_REVIEW }
   }
   if (action === RECONFIRM_EQUIPMENT_APPROVAL) {
@@ -224,4 +228,29 @@ export function equipmentDecision(user, event, request, action) {
 /** The actions this user may take on this request now, for the page to offer. */
 export function equipmentRequestActions(user, event, request) {
   return EQUIPMENT_REQUEST_ACTIONS.filter((action) => equipmentDecision(user, event, request, action).allowed)
+}
+
+// --- SPM-36: the rejection's reason and suggested alternative -------------------------------------
+
+// The same limit as shared/requestActions.js's MAX_REASON_LENGTH (a test keeps them equal). Not imported:
+// requestActions.js imports arrangements.js, which imports this file.
+export const MAX_REJECTION_TEXT_LENGTH = 1000
+
+function rejectionText(value, { required }) {
+  if (value === undefined || value === null) return required ? { error: 'A reason is required.' } : { value: null }
+  if (typeof value !== 'string') return { error: 'Must be text.' }
+  const trimmed = value.trim()
+  if (!trimmed) return required ? { error: 'A reason is required.' } : { value: null }
+  if (trimmed.length > MAX_REJECTION_TEXT_LENGTH) return { error: `Must be ${MAX_REJECTION_TEXT_LENGTH} characters or fewer.` }
+  return { value: trimmed }
+}
+
+/** The rejection as submitted: { value: { reason, suggestedAlternative }, errors } keyed by field. */
+export function normaliseRejection(input = {}) {
+  const errors = {}
+  const reason = rejectionText(input?.reason, { required: true })
+  const suggestedAlternative = rejectionText(input?.suggestedAlternative, { required: false })
+  if (reason.error) errors.reason = reason.error
+  if (suggestedAlternative.error) errors.suggestedAlternative = suggestedAlternative.error
+  return { value: { reason: reason.value ?? null, suggestedAlternative: suggestedAlternative.value ?? null }, errors }
 }

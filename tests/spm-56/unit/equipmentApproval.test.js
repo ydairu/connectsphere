@@ -109,11 +109,13 @@ describe('SPM-56 who may approve', () => {
 
   it('spm56_the_assigned_member_on_the_event_at_planning_may_approve_a_pending_request', () => {
     expect(decide(tech)).toEqual({ allowed: true })
-    expect(equipmentRequestActions(tech, event, pending)).toEqual([APPROVE_EQUIPMENT_REQUEST])
+    // SPM-36 added 'reject' for the same member on the same request.
+    expect(equipmentRequestActions(tech, event, pending)).toEqual([APPROVE_EQUIPMENT_REQUEST, 'reject'])
   })
 
   it('spm56_refusals_in_order', () => {
-    expect(decide(tech, {}, {}, 'reject').reason).toBe(UNKNOWN_EQUIPMENT_ACTION)
+    // SPM-36 made 'reject' a real action; an obviously fake one stays unknown.
+    expect(decide(tech, {}, {}, 'not_an_action').reason).toBe(UNKNOWN_EQUIPMENT_ACTION)
     for (const user of [coordinator, organiser, venueStaff]) expect(decide(user).reason).toBe(NOT_TECHNICAL_STAFF)
     expect(decide(secondTech).reason).toBe(NOT_REQUEST_ASSIGNEE)
     expect(decide(tech, { assignedStaffUids: ['v1'] }).reason).toBe(NOT_REQUEST_ASSIGNEE)

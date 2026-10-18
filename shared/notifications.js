@@ -19,6 +19,7 @@
 //   Confirmed                          filtered by role before the save (SPM-10)
 //   equipment request approved, or   the assigned Coordinator                    (SPM-56)
 //   its approval re-confirmed
+//   equipment request rejected       the assigned Coordinator, with the reason    (SPM-36)
 // The user who acted is never notified of their own action.
 
 import { REFUSE_CANCELLATION, REQUEST_CANCELLATION, RESUBMIT_CANCELLATION, RETURN_CANCELLATION } from './requestActions.js'
@@ -35,6 +36,8 @@ export const EVENT_CANCELLED_NOTICE = 'event_cancelled'
 export const SIGNIFICANT_CHANGE_NOTICE = 'significant_change'
 // SPM-56: the assigned Technical Support Staff member approved the event's equipment request (or re-confirmed it).
 export const EQUIPMENT_REQUEST_APPROVED_NOTICE = 'equipment_request_approved'
+// SPM-36: the assigned Technical Support Staff member rejected the event's equipment request.
+export const EQUIPMENT_REQUEST_REJECTED_NOTICE = 'equipment_request_rejected'
 
 function titleOf(request) {
   const title = request.core?.title
@@ -121,5 +124,16 @@ export function equipmentRequestApprovedNotifications(event, actor, { equipmentR
     ? `The equipment request for “${title}” was re-confirmed. The technical arrangement is approved again.`
     : `The equipment request for “${title}” was approved. The technical arrangement is approved.`
   const notices = [{ recipientUid: event.assignedCoordinatorUid, type: EQUIPMENT_REQUEST_APPROVED_NOTICE, message, reason: null, equipmentRequestId }]
+  return addressed(notices, event, actor, title, at)
+}
+
+/**
+ * SPM-36 — the notice for the assigned Coordinator when `actor` rejects the event's equipment request. The
+ * reason is shown with it; a suggested alternative, when given, is added to the message.
+ */
+export function equipmentRequestRejectedNotifications(event, actor, { equipmentRequestId, reason, suggestedAlternative = null, at }) {
+  const title = titleOf(event)
+  const message = `The equipment request for “${title}” was rejected. Submit a revised request.${suggestedAlternative ? ` Suggested alternative: ${suggestedAlternative}` : ''}`
+  const notices = [{ recipientUid: event.assignedCoordinatorUid, type: EQUIPMENT_REQUEST_REJECTED_NOTICE, message, reason, equipmentRequestId }]
   return addressed(notices, event, actor, title, at)
 }
