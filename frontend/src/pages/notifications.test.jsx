@@ -61,6 +61,12 @@ describe('SPM-63 / SPM-47 — notifications page', () => {
     expect(screen.queryByRole('button', { name: 'Mark as read' })).toBeNull()
   })
 
+  it('links a venue rejection notice to its booking details', async () => {
+    showNotifications([{ ...notice, type: 'venue_booking_rejected', bookingRequestId: 'booking-1', reason: 'Too small' }])
+    expect((await screen.findByRole('link', { name: 'View booking' })).getAttribute('href')).toBe('/requests/req-1/venue-bookings?bookingId=booking-1')
+    expect(screen.getByText('Reason: Too small')).toBeTruthy()
+  })
+
   it('spm63_says_so_when_there_are_none', async () => {
     showNotifications([])
     expect(await screen.findByText('No notifications')).toBeTruthy()

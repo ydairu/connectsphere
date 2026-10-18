@@ -28,6 +28,7 @@ test.describe('SPM-48 — Venue and Technical Support Staff update preparation s
 
     await signIn(page, ROLE_USERS.venueStaff)
     await page.goto(`/requests/${confirmed.id}`)
+    await page.getByRole('tab', { name: 'Venue Details' }).click()
     await expect(page.getByRole('heading', { name: 'Venue preparation' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Equipment preparation' })).toHaveCount(0)
     await expect(page.getByLabel('Venue preparation status')).toHaveValue('not_started')
@@ -40,12 +41,14 @@ test.describe('SPM-48 — Venue and Technical Support Staff update preparation s
     await logout(page)
     await signIn(page, COORDINATOR)
     await page.goto(`/requests/${confirmed.id}`)
+    await page.getByRole('tab', { name: 'Venue Details' }).click()
     const card = page.locator('.request-form-section', { has: page.getByRole('heading', { name: 'Venue preparation' }) })
     await expect(card.getByText('Read only')).toBeVisible()
     await expect(card.getByText('In Progress')).toBeVisible()
     await expect(card.getByText('Chairs ordered for theatre layout')).toBeVisible()
     await expect(page.getByLabel('Venue preparation status')).toHaveCount(0)
 
+    await page.getByRole('tab', { name: 'Change Log' }).click()
     await expect(historyRows(page).filter({ hasText: 'Not Started → In Progress' })).toHaveCount(1)
     await expect(historyRows(page).filter({ hasText: `${ROLE_USERS.venueStaff.name}` }).first()).toBeVisible()
   })
@@ -55,6 +58,7 @@ test.describe('SPM-48 — Venue and Technical Support Staff update preparation s
 
     await signIn(page, ROLE_USERS.technicalStaff)
     await page.goto(`/requests/${planning.id}`)
+    await page.getByRole('tab', { name: 'Equipment Required' }).click()
     const card = page.locator('.request-form-section', { has: page.getByRole('heading', { name: 'Equipment preparation' }) })
     await expect(card.getByText('Read only')).toBeVisible()
     await expect(card.getByText('Available once the technical sign-off is approved.')).toBeVisible()
@@ -66,6 +70,7 @@ test.describe('SPM-48 — Venue and Technical Support Staff update preparation s
   test('spm48_the_organiser_sees_no_preparation', async ({ page }) => {
     await signIn(page, ROLE_USERS.organiser)
     await page.goto(`/requests/${confirmed.id}`)
+    await page.getByRole('tab', { name: 'Venue Details' }).click()
     await expect(page.getByRole('heading', { name: 'Venue', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Venue preparation' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Equipment preparation' })).toHaveCount(0)

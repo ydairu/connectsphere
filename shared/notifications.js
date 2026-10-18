@@ -19,6 +19,7 @@
 //   Confirmed                          filtered by role before the save (SPM-10)
 //   equipment request approved, or   the assigned Coordinator                    (SPM-56)
 //   its approval re-confirmed
+//   venue booking rejected           the assigned Coordinator                    (SPM-34)
 //   equipment request rejected       the assigned Coordinator, with the reason    (SPM-36)
 // The user who acted is never notified of their own action.
 
@@ -36,6 +37,8 @@ export const EVENT_CANCELLED_NOTICE = 'event_cancelled'
 export const SIGNIFICANT_CHANGE_NOTICE = 'significant_change'
 // SPM-56: the assigned Technical Support Staff member approved the event's equipment request (or re-confirmed it).
 export const EQUIPMENT_REQUEST_APPROVED_NOTICE = 'equipment_request_approved'
+export const VENUE_BOOKING_REJECTED_NOTICE = 'venue_booking_rejected'
+export const VENUE_BOOKING_APPROVED_NOTICE = 'venue_booking_approved'
 // SPM-36: the assigned Technical Support Staff member rejected the event's equipment request.
 export const EQUIPMENT_REQUEST_REJECTED_NOTICE = 'equipment_request_rejected'
 
@@ -125,6 +128,28 @@ export function equipmentRequestApprovedNotifications(event, actor, { equipmentR
     : `The equipment request for “${title}” was approved. The technical arrangement is approved.`
   const notices = [{ recipientUid: event.assignedCoordinatorUid, type: EQUIPMENT_REQUEST_APPROVED_NOTICE, message, reason: null, equipmentRequestId }]
   return addressed(notices, event, actor, title, at)
+}
+
+export function venueBookingRejectedNotifications(event, booking, actor, { reason, at }) {
+  const title = titleOf(event)
+  return addressed([{
+    recipientUid: event.assignedCoordinatorUid,
+    type: VENUE_BOOKING_REJECTED_NOTICE,
+    message: `The venue booking for “${title}” at ${booking.venueName} was rejected.`,
+    reason,
+    bookingRequestId: booking.id,
+  }], event, actor, title, at)
+}
+
+export function venueBookingApprovedNotifications(event, booking, actor, { at }) {
+  const title = titleOf(event)
+  return addressed([{
+    recipientUid: event.assignedCoordinatorUid,
+    type: VENUE_BOOKING_APPROVED_NOTICE,
+    message: `The venue booking for “${title}” at ${booking.venueName} was approved. The venue is confirmed for the booked period.`,
+    reason: null,
+    bookingRequestId: booking.id,
+  }], event, actor, title, at)
 }
 
 /**

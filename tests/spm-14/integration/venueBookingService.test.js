@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { BOOKINGS, listEventVenueBookings, listVenueBookingQueue, submitVenueBooking } from '../../../backend/src/services/venueBookingService.js'
+import { BOOKINGS, listEventVenueBookings, listVenueBookingQueue, rejectVenueBooking, submitVenueBooking } from '../../../backend/src/services/venueBookingService.js'
 import { transitionEventRequest } from '../../../backend/src/services/statusTransitionService.js'
 import { AVAILABILITY_STATUS } from '../../../shared/venueAvailability.js'
 import { BOOKING_REJECTED } from '../../../shared/venueBooking.js'
 import { CANCEL, REJECT, APPROVE_CANCELLATION } from '../../../shared/statusTransitions.js'
 import { REQUEST_CANCELLATION } from '../../../shared/requestActions.js'
 import { CONFIRMED, PLANNING } from '../../../shared/status.js'
+import { eventPeriod } from '../../../shared/venueSuitability.js'
 import { coordinator, staff, secondStaff, organiser, fixture, input, now } from '../fixtures.js'
 
 let db
 beforeEach(() => { db = fixture() })
-const submit = (overrides = {}, eventId = 'event', actor = coordinator) => submitVenueBooking(eventId, { ...input, ...overrides }, actor, db, now)
+const submit = (overrides = {}, eventId = 'event', actor = coordinator) => submitVenueBooking(eventId, { ...input, ...eventPeriod(db.store.get(eventId)), ...overrides }, actor, db, now)
 const values = (collection) => [...db.collectionData(collection).values()]
 
 describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
@@ -34,8 +35,10 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
     const first = await submit()
     const second = await submit({ venueId: 'room', submissionKey: 'second' })
     expect(second.assignedVenueStaffName).toBe(secondStaff.name)
+    db.store.get('event').core.preferredDateTime = '2027-03-02T10:00:00Z'
     const third = await submit({ venueId: 'room', startsAt: '2027-03-02T10:00:00Z', endsAt: '2027-03-02T12:00:00Z', submissionKey: 'third' })
     expect(third.assignedVenueStaffName).toBe(staff.name)
+    db.store.get('event').core.preferredDateTime = '2027-03-03T10:00:00Z'
     const replacement = await submit({ replacesId: first.id, submissionKey: 'replacement', startsAt: '2027-03-03T10:00:00Z', endsAt: '2027-03-03T12:00:00Z' })
     expect(replacement.assignedVenueStaffName).toBe(staff.name)
   })
@@ -61,15 +64,25 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
     expect(values('venueAvailability')).toEqual([])
     expect(values('systemLocks')).toEqual([])
   })
+  it('refuses a booking period that differs from the current event without writing a hold', async () => {
+    await expect(submit({ startsAt: '2027-03-01T11:00:00Z', endsAt: '2027-03-01T13:00:00Z' }))
+      .rejects.toMatchObject({ errors: { startsAt: 'Use the event start time.', endsAt: 'Use the event end time.' } })
+    expect(values(BOOKINGS)).toEqual([])
+    expect(values('venueAvailability')).toEqual([])
+  })
   it('refuses overlaps including buffers and permits exact occupied boundaries', async () => {
     await submit()
     await expect(submit({ submissionKey: 'overlap' })).rejects.toMatchObject({ name: 'VenueConflictError' })
-    await expect(submit({ submissionKey: 'buffer', startsAt: '2027-03-01T13:14:59Z', endsAt: '2027-03-01T14:00:00Z' })).rejects.toMatchObject({ name: 'VenueConflictError' })
-    await submit({ submissionKey: 'adjacent', startsAt: '2027-03-01T13:15:00Z', endsAt: '2027-03-01T14:00:00Z' })
+    db.store.get('event').core.preferredDateTime = '2027-03-01T13:14:59Z'
+    db.store.get('event').core.durationHours = 1
+    await expect(submit({ submissionKey: 'buffer', startsAt: '2027-03-01T13:14:59Z', endsAt: '2027-03-01T14:14:59Z' })).rejects.toMatchObject({ name: 'VenueConflictError' })
+    db.store.get('event').core.preferredDateTime = '2027-03-01T13:15:00Z'
+    await submit({ submissionKey: 'adjacent', startsAt: '2027-03-01T13:15:00Z', endsAt: '2027-03-01T14:15:00Z' })
     expect(values(BOOKINGS)).toHaveLength(2)
   })
   it('safely replaces same-venue times and releases the old venue on a move', async () => {
     const first = await submit()
+    db.store.get('event').core.durationHours = 3
     const second = await submit({ replacesId: first.id, submissionKey: 'revise', endsAt: '2027-03-01T13:00:00Z' })
     expect(values('venueAvailability').filter((v) => v.lifecycleStatus === 'active')).toHaveLength(1)
     const third = await submit({ replacesId: second.id, submissionKey: 'move', venueId: 'room' })
@@ -92,14 +105,14 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
     delete hold.holdExpiresAt
     await expect(submit({ submissionKey: 'legacy' })).rejects.toMatchObject({ name: 'VenueConflictError' })
   })
-  it.each([REJECT, CANCEL, APPROVE_CANCELLATION])('releases tentative holds on %s but preserves confirmed bookings', async (action) => {
+  it.each([REJECT, CANCEL, APPROVE_CANCELLATION])('releases tentative holds and confirmed bookings on %s (SPM-54)', async (action) => {
     await submit()
     await db.collection('venueAvailability').doc('confirmed').set({ venueId: 'room', eventRequestId: 'event', status: AVAILABILITY_STATUS.CONFIRMED_BOOKING, lifecycleStatus: 'active' })
     if (action !== REJECT) db.store.get('event').status = CONFIRMED
     if (action === APPROVE_CANCELLATION) await transitionEventRequest('event', REQUEST_CANCELLATION, organiser, db, now, { reason: 'Cancel please' })
     await transitionEventRequest('event', action, coordinator, db, now, { reason: 'Unable to proceed' })
     expect(values('venueAvailability')[0].lifecycleStatus).toBe('removed')
-    expect(db.collectionData('venueAvailability').get('confirmed').lifecycleStatus).toBe('active')
+    expect(db.collectionData('venueAvailability').get('confirmed').lifecycleStatus).toBe('removed')
     expect((await listVenueBookingQueue(staff, db)).bookings).toEqual([])
   })
   it('does not release a hold merely because cancellation was requested', async () => {
@@ -110,7 +123,7 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
   })
   it('supports a rejected-booking fixture without inventing the approval workflow', async () => {
     const first = await submit()
-    db.collectionData(BOOKINGS).get(first.id).status = BOOKING_REJECTED
+    await rejectVenueBooking('event', first.id, { action: 'reject', reason: 'Unable to host' }, staff, db, now)
     const next = await submit({ replacesId: first.id, venueId: 'room', submissionKey: 'retry-rejected' })
     expect(next.assignedVenueStaffName).toBe(first.assignedVenueStaffName)
     expect(db.collectionData(BOOKINGS).get(first.id).status).toBe(BOOKING_REJECTED)

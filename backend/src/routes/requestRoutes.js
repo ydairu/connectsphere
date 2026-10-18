@@ -27,6 +27,7 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   const bookings = createVenueBookingController(getEventRequestDb)
   router.get('/:id/venue-bookings', authenticate, bookings.list)
   router.post('/:id/venue-bookings', authenticate, bookings.submit)
+  router.post('/:id/venue-bookings/:bookingId/actions', authenticate, bookings.decide)
   // SPM-17: the event's equipment requests. Who may read and submit is decided in the service
   // (shared/equipmentRequest.js), as SPM-14's booking routes do.
   const equipmentRequests = createEquipmentRequestController(getEventRequestDb)

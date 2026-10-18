@@ -33,9 +33,12 @@ test.describe('SPM-5 — Review a request and approve it for Planning (E2E)', ()
     await expect(page.getByLabel('Expected attendees')).toHaveValue(String(submitted.core.expectedAttendees))
     await expect(page.getByLabel('Duration (hours)')).toHaveValue(String(submitted.core.durationHours))
     await expect(page.getByLabel('Preferred date and time')).not.toHaveValue('')
+    await page.getByRole('tab', { name: 'Venue Details' }).click()
     await expect(page.getByLabel('Layout preference')).toHaveValue(submitted.venue.layoutPreference)
     await expect(page.getByLabel('Accessibility required')).toBeChecked()
+    await page.getByRole('tab', { name: 'Equipment Required' }).click()
     await expect(page.getByLabel('Equipment required (one per line)')).toHaveValue(submitted.equipment.requirements.join('\n'))
+    await page.getByRole('tab', { name: 'Event Status' }).click()
 
     // Opening the page alone does not change the status; starting review does.
     await expect(page.getByRole('button', { name: 'Approve for planning' })).toHaveCount(0)

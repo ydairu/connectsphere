@@ -1,12 +1,15 @@
 import { expect, test, ROLE_USERS, loginAs, logout } from '../../shared/e2e/fixtures.js'
 
-test('SPM-53 concise queue, selected details, mobile layout and role protection', async ({ page }) => {
+test('SPM-53 concise queue, selected details, mobile layout and role protection', async ({ page, request }) => {
+  const changed = await request.patch('http://127.0.0.1:5001/api/requests/seed-req-a1-planning', {
+    headers: { Authorization: `Bearer test-token:${ROLE_USERS.coordinator.uid}` },
+    data: { core: { preferredDateTime: '2027-03-01T10:00:00.000Z', durationHours: 2 } },
+  })
+  expect(changed.status()).toBe(200)
   await loginAs(page, ROLE_USERS.coordinator)
   await expect(page).toHaveURL(/\/profile$/)
   await page.goto('/requests/seed-req-a1-planning/venue-bookings')
   await page.getByLabel('Venue', { exact: true }).selectOption('seed-venue-room')
-  await page.getByLabel('Start', { exact: true }).fill('2027-03-01T10:00')
-  await page.getByLabel('End', { exact: true }).fill('2027-03-01T12:00')
   await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre with wheelchair access')
   await page.getByLabel('Special requests', { exact: true }).fill('Quiet room requested')
   await page.getByRole('button', { name: 'Submit booking request', exact: true }).click()
@@ -22,7 +25,9 @@ test('SPM-53 concise queue, selected details, mobile layout and role protection'
   await link.focus()
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { name: 'Venue booking details' })).toBeVisible()
-  await expect(page.getByText('Theatre with wheelchair access')).toBeVisible()
+  const requirementsRow = page.locator('.booking-row').filter({ has: page.getByText('Venue requirements', { exact: true }) })
+  await expect(requirementsRow.locator('strong')).toHaveText('Theatre with wheelchair access')
+  await expect(page.getByRole('region', { name: 'Suitability warnings' })).toContainText('Booking requirements "Theatre with wheelchair access"')
   await expect(page.getByText('Quiet room requested')).toBeVisible()
   await expect(page.getByRole('button', { name: /Submit|Replace/ })).toHaveCount(0)
   const detailUrl = page.url()

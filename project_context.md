@@ -604,31 +604,71 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - Seed dry run against `connectsphere-6546c`: no blockers, nothing written.
     - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
-34. **SPM-36 Technical Support Staff reject an equipment request, and three walkthrough fixes (18 Oct 2026, branch `feature/SPM-36-reject-equipment`, four commits):**
-    - **SPM-36 built:**
-      - **Action:** `reject` on `POST /api/requests/:id/equipment-requests/:requestId/actions`, with `reason` (required, 1–1000 characters) and `suggestedAlternative` (optional, up to 1000). Same permission checks as approval (403 / 404 / 409), then field errors (400, nothing written).
-      - **Writes, in one transaction:** the request Rejected with who, when, reason and alternative; `arrangementApprovals.technical` rejected; the event summary Rejected; `equipment_request_rejected` and `arrangement_decided` activity entries; a notice to the assigned Coordinator with the reason. The event stays in Planning; nothing is reserved; no availability check is run or recorded.
-      - **After a rejection:** Confirm stays blocked and the manual technical sign-off stays refused until a revised request is approved. A revised request replaces the rejected one (`replacesId`), clears its sign-off and goes to the same Technical Support member (SPM-17 / SPM-56 rules, now tested for a rejection).
-      - **Page:** **Reject request** beside Approve (not gated on fulfilment) opens **Reason for rejection (required)**, prefilled from a shortfall (`shortfallSummary`), and **Suggested alternative (optional)**, with **Confirm rejection** / **Cancel**. The Coordinator sees **Rejected by**, the reason and alternative, and a form headed **Submit a revised request**. The queue groups requests under **Waiting for review** and **Reviewed**.
-      - **Organisers** see no equipment request, but the existing SPM-9 summary shows them "Technical arrangement: Rejected", without a reason.
-    - **Fix A:** the SPM-16 conflict message names the occupied period in Singapore time ("on Fri 20 Nov 2026, 08:30–13:45 SGT", both dates across midnight) and the 409 message ends with a full stop. The structured `conflict` keeps ISO values.
-    - **Fix B:** `seed-req-a1-confirmed-past` (organiser-a1, Seed Coordinator, 1 Oct 2026, both sign-offs approved, no venue entries) so **Mark as completed** can be demonstrated. Seed Coordinator's workload is now 5 (coordinator-3 is still next).
-    - **Fix C:** `docs/testing/end-to-end-walkthrough.md`, updated for the conflict wording, the rejection path and the past event.
-    - **Existing tests changed:**
-      - `tests/spm-56/unit/equipmentApproval.test.js`, `tests/spm-56/unit/seedEquipmentApproval.test.js`, `tests/spm-17/integration/equipmentRequestService.test.js`: the assignee's actions on a Pending Review request are now `['approve', 'reject']`.
-      - `tests/spm-56/unit/equipmentApproval.test.js`, `tests/spm-56/integration/equipmentApprovalService.test.js`, `tests/spm-56/integration/equipmentApprovalApi.test.js`: the unknown action is now `'not_an_action'` (was `'reject'`).
-      - `tests/spm-56/integration/equipmentApprovalPages.test.jsx`: queue event titles are read at heading level 3 under the new groups.
-      - `tests/spm-16/integration/tentativeHoldConflicts.test.js`: the new conflict wording (fix A).
-      - `backend/scripts/seedData.test.js`: workloads 5, 2 and 1 (fix B).
-      - No Playwright spec needed a change.
-    - **Evidence:** `tests/spm-36/` (unit, service, API and page tests); the new fix A case in `tests/spm-16/integration/tentativeHoldConflicts.test.js`; `tests/spm-27/unit/seedPastConfirmedEvent.test.js`.
-    - **Local verification (macOS, 18 Oct 2026, on top of `main` at `01e0f8b`):**
-      - Lint passed. `test:spm36`: 30 passed.
-      - Vitest suites: SPM-56 51, SPM-17 76, SPM-18 26, SPM-16 43 (1 live test skipped), SPM-14 28 (4 emulator tests skipped), SPM-9 18, SPM-10 147, SPM-48 96 passed.
-      - Root Vitest 1635 passed, 35 opt-in live and emulator tests skipped. 128 Node and 99 frontend tests passed.
-      - Playwright Chromium 87/87 passed. The production build passed with the existing bundle-size warning.
-      - Seed dry run against `connectsphere-6546c`: `seed-req-a1-confirmed-past` to create, no blockers, nothing written.
-    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check (the walkthrough has not been run). `firestore.rules` is unchanged, and no backlog status change is claimed.
+## SPM-34 venue booking rejection — 18 October 2026
+
+- The assigned Venue Staff member can reject one pending booking while its event is in Planning. The API requires a reason and accepts an optional free-text suggested alternative. The booking decision, release of its tentative hold, activity entry, cleared legacy venue sign-off and in-app notice to the current assigned Coordinator are written together in one transaction. Other bookings on the event are unchanged.
+- The assigned Coordinator sees the rejection details beside the booking and receives a notice linking to it. A replacement request may use a rejected booking whose hold has already been released. Venue approval remains SPM-54; the full all-required-venues confirmation gate and per-venue sign-off remain SPM-54/SPM-81 work.
+- `docs/evidence/spm-34-traceability.md` maps the six backlog criteria to implementation and automated checks. `docs/testing/spm-34-manual-testing.md` is the pending human acceptance checklist. The untracked operational workbook still says **In Progress**; no Done or Sprint change is claimed.
+- Local verification: `npm test` passed 128 Node tests, 100 frontend tests, 1,611 root Vitest tests (35 opt-in live/emulator tests skipped), and 88 Chromium browser tests. The final SPM-34 rerun passed 13 Vitest tests and one Chromium test after two additional service cases and a UI state adjustment. Targeted SPM-14/SPM-53 regressions, lint and production build passed; the build retained its existing bundle-size warning. HTTP tests use mocked token verification with in-memory persistence; Playwright uses a Firebase double. No Firebase emulator, live project, human manual acceptance, or rules deployment is claimed. `firestore.rules` was not edited.
+
+## SPM-54 venue booking approval — 18 October 2026
+
+- **Implemented locally:** assigned Venue Staff can approve a pending booking while the event is in Planning. The existing booking action API rechecks current attendance, required facilities and the booking's buffered interval; only its verified own hold is excluded from conflicts. Approval converts that same hold to a confirmed reservation and saves the approval, activity and Coordinator notification in one transaction. Expired holds have no priority; removed or mismatched holds are refused.
+- **UI and availability:** booking details include confirmation, approval time, saved status and stale-decision reload. Approved bookings leave the pending queue, appear as confirmed on the calendar and are excluded from overlapping availability searches. Each booking remains independent; approving it does not confirm the event or set its legacy venue sign-off.
+- **Lifecycle integration:** whole-event rejection, direct cancellation and approved Organiser cancellation release confirmed reservations as well as tentative holds. Cancellation requests, returns and refusals release nothing. Significant edits preserve the booking's approval and original reserved interval.
+- **Verified:** SPM-54 has 43 passing unit/service/API/component tests, three passing browser tests and four passing isolated Firestore emulator concurrency tests. Full `npm test`: 128 Node, 100 frontend, 1,656 root Vitest and 91 Chromium tests passed (39 opt-in live/emulator cases skipped in the normal root run). Lint and production build passed, with the existing bundle-size warning. The mobile approval screenshot was visually inspected. No live Firebase, human acceptance or rules deployment is claimed; rules were not edited.
+- **Progress:** remains **In Progress, Sprint 3**, not Done. Human acceptance and independent peer review remain outstanding. Preparation integration (SPM-67/88, SPM-48/89), required-venue readiness/per-venue attendance (SPM-79/81) and Coordinator-controlled reapproval (SPM-87) remain separate dependencies. Existing maintenance-write concurrency risk remains documented.
+- **Evidence:** `docs/evidence/spm-54-traceability.md`; human acceptance and implementation checklist: `docs/testing/spm-54-manual-testing.md`. Delivery is local only by user instruction: no commit, push or pull request.
+
+## SPM-54 warning preview and replacement corrections — 18 October 2026
+
+- Pending booking GET now returns read-only suitability problems/warnings using current event/venue data and the booking interval. Staff see warnings before approval; confirmation refreshes them, blocks on problems and offers Retry on failure. Saved approval warnings are explicitly historical. The approval transaction still rechecks all conditions.
+- Starting a pending/rejected replacement fetches the current event's layout/accessibility defaults; venue, interval and special requests remain for review. Requirements stay editable and survive failed submission; the original booking remains historical.
+- Verification: final SPM-54/SPM-14/SPM-34 targeted run passed 93 tests (eight emulator cases skipped). Full `npm test` passed 128 Node, 100 frontend, 1,664 root Vitest (39 opt-in cases skipped) and 92 Chromium tests. One additional replacement-refresh failure component case was added afterward and passed in the final targeted run. Final lint/build passed, retaining the existing bundle-size warning.
+- Manual checks M1/M2/M8 were updated; M16–M18 cover corrected replacement text, preserved history/notes and refresh failure. Human results remain Not run. In-memory API and Firebase-double browser tests are not live Firebase evidence; emulator was not rerun for this correction. Story stays In Progress with existing dependency and peer-review gaps. All changes remain local.
+
+## Booking-form requirement overrides — later correction, 18 October 2026
+
+The previous correction covered changing the event before replacement but missed changing only the booking form. `venueBookingSuitability` now uses the submitted booking requirements for layout review in both pending GET and transactional approval. Current event attendance and structured facilities/accessibility still apply. Unmatched free text explicitly asks staff to review the requested layout/additional instructions; it is not parsed as structured facilities or accessibility. Existing records without requirements retain the legacy event-layout fallback. Historical booking and approved-warning snapshots are not rewritten.
+
+Regression evidence: unit tests cover case-insensitive classroom matching against an unchanged Breakkout Room event and free-text review; service tests cover rejected replacement, preview, approval and preservation of event/history; the new browser case edits only the replacement form and checks pending, confirmation and reloaded approval. Manual check M19 covers the reported flow and remains Not run.
+
+Verification: `npm run test:spm54` passed 54 unit/service/API/component tests and five Chromium tests; four opt-in emulator cases skipped. Lint, production build and whitespace checks passed (existing bundle-size warning). API tests use in-memory persistence and browser tests use the Firebase double. Full regression results above precede this follow-up; the full suite, emulator and live project were not rerun for this narrowly scoped helper change. No deployment or Git publication. SPM-54 remains In Progress; human acceptance, peer review and dependent workflows remain outstanding.
+
+## Event request and venue booking page tabs — 18 October 2026
+
+- The event detail page now groups its existing content into Event Status, Venue Details, Equipment Required and Change Log tabs. Conditional coordinator, arrangement and status notices follow the named Event Status sections. Venue suitability moved to Recommendations on the event's venue booking page, beside Submit a Request and Requests. Request summaries show the venue and recorded status before expansion.
+- The venue request form shows read-only event start/end values and searches for venues available in that period. The submission API rejects a different period before writing a new booking; replacement may still select its own pending hold. This is a later user-directed implementation rule; previously submitted booking periods are unchanged.
+- Verification: lint and production build passed (existing bundle-size warning); 128 Node, 101 frontend and 1,669 root Vitest tests passed (39 opt-in cases skipped). The full Chromium run passed 91 of 93 tests; two tab-related test expectations were corrected and the affected suite then passed 10 of 10. After the final venue tab-panel adjustment, 25 venue Chromium regressions passed. API tests use in-memory persistence and browser tests use a Firebase double. No live Firebase or human acceptance was run, and no Firestore rules were edited or deployed. Operational backlog/Sprint status was not changed.
+
+## SPM-36 equipment request rejection and walkthrough fixes — 18 October 2026
+
+Branch `feature/SPM-36-reject-equipment`, four commits:
+
+- **SPM-36 built:**
+  - **Action:** `reject` on `POST /api/requests/:id/equipment-requests/:requestId/actions`, with `reason` (required, 1–1000 characters) and `suggestedAlternative` (optional, up to 1000). Same permission checks as approval (403 / 404 / 409), then field errors (400, nothing written).
+  - **Writes, in one transaction:** the request Rejected with who, when, reason and alternative; `arrangementApprovals.technical` rejected; the event summary Rejected; `equipment_request_rejected` and `arrangement_decided` activity entries; a notice to the assigned Coordinator with the reason. The event stays in Planning; nothing is reserved; no availability check is run or recorded.
+  - **After a rejection:** Confirm stays blocked and the manual technical sign-off stays refused until a revised request is approved. A revised request replaces the rejected one (`replacesId`), clears its sign-off and goes to the same Technical Support member (SPM-17 / SPM-56 rules, now tested for a rejection).
+  - **Page:** **Reject request** beside Approve (not gated on fulfilment) opens **Reason for rejection (required)**, prefilled from a shortfall (`shortfallSummary`), and **Suggested alternative (optional)**, with **Confirm rejection** / **Cancel**. The Coordinator sees **Rejected by**, the reason and alternative, and a form headed **Submit a revised request**. The queue groups requests under **Waiting for review** and **Reviewed**.
+  - **Organisers** see no equipment request, but the existing SPM-9 summary shows them "Technical arrangement: Rejected", without a reason.
+- **Fix A:** the SPM-16 conflict message names the occupied period in Singapore time ("on Fri 20 Nov 2026, 08:30–13:45 SGT", both dates across midnight) and the 409 message ends with a full stop. The structured `conflict` keeps ISO values.
+- **Fix B:** `seed-req-a1-confirmed-past` (organiser-a1, Seed Coordinator, 1 Oct 2026, both sign-offs approved, no venue entries) so **Mark as completed** can be demonstrated. Seed Coordinator's workload is now 5 (coordinator-3 is still next).
+- **Fix C:** `docs/testing/end-to-end-walkthrough.md`, updated for the conflict wording, the rejection path and the past event.
+- **Existing tests changed:**
+  - `tests/spm-56/unit/equipmentApproval.test.js`, `tests/spm-56/unit/seedEquipmentApproval.test.js`, `tests/spm-17/integration/equipmentRequestService.test.js`: the assignee's actions on a Pending Review request are now `['approve', 'reject']`.
+  - `tests/spm-56/unit/equipmentApproval.test.js`, `tests/spm-56/integration/equipmentApprovalService.test.js`, `tests/spm-56/integration/equipmentApprovalApi.test.js`: the unknown action is now `'not_an_action'` (was `'reject'`).
+  - `tests/spm-56/integration/equipmentApprovalPages.test.jsx`: queue event titles are read at heading level 3 under the new groups.
+  - `tests/spm-16/integration/tentativeHoldConflicts.test.js`: the new conflict wording (fix A).
+  - `backend/scripts/seedData.test.js`: workloads 5, 2 and 1 (fix B).
+  - No Playwright spec needed a change.
+- **Evidence:** `tests/spm-36/` (unit, service, API and page tests); the new fix A case in `tests/spm-16/integration/tentativeHoldConflicts.test.js`; `tests/spm-27/unit/seedPastConfirmedEvent.test.js`.
+- **Local verification (macOS, 18 Oct 2026, on top of `main` at `01e0f8b`):**
+  - Lint passed. `test:spm36`: 30 passed.
+  - Vitest suites: SPM-56 51, SPM-17 76, SPM-18 26, SPM-16 43 (1 live test skipped), SPM-14 28 (4 emulator tests skipped), SPM-9 18, SPM-10 147, SPM-48 96 passed.
+  - Root Vitest 1635 passed, 35 opt-in live and emulator tests skipped. 128 Node and 99 frontend tests passed.
+  - Playwright Chromium 87/87 passed. The production build passed with the existing bundle-size warning.
+  - Seed dry run against `connectsphere-6546c`: `seed-req-a1-confirmed-past` to create, no blockers, nothing written.
+- **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check (the walkthrough has not been run). `firestore.rules` is unchanged, and no backlog status change is claimed.
 
 ## Documentation Boundaries
 

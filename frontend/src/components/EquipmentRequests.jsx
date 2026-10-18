@@ -243,7 +243,7 @@ function EquipmentRequests({ user, eventId, organiserEquipment, busy = false, on
     load()
   }, [load])
 
-  // SPM-56: the queue links to /requests/:id#equipment-requests; scroll there once the card has loaded.
+  // SPM-56: the queue opens the Equipment Required tab and scrolls here once the card has loaded.
   const shown = Boolean(data && !data.hidden)
   useEffect(() => {
     if (shown && window.location.hash === '#equipment-requests') document.getElementById('equipment-requests')?.scrollIntoView?.()

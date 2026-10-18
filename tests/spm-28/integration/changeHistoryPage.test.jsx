@@ -42,7 +42,7 @@ function showRequest(body, roles = ['coordinator']) {
   getRequest.mockResolvedValue(body)
   render(
     <AuthContext.Provider value={{ user: { uid: 'u-1' }, userProfile: { name: 'User' }, roles, loading: false }}>
-      <MemoryRouter initialEntries={['/requests/req-1']}>
+      <MemoryRouter initialEntries={['/requests/req-1?tab=change-log']}>
         <Routes>
           <Route path="/requests/:id" element={<RequestDetailPage />} />
         </Routes>
@@ -103,10 +103,12 @@ describe('SPM-28 — the Change history panel', () => {
     getRequestHistory.mockResolvedValueOnce({
       entries: [{ id: 'n1', field: 'core.title', oldValue: 'Partner summit', newValue: 'Summit 2', actor: { type: 'user', name: 'User', role: 'coordinator' }, at: '2026-10-04T10:00:00.000Z' }],
     })
+    await user.click(screen.getByRole('tab', { name: 'Event Status' }))
     const title = screen.getByLabelText('Title')
     await user.clear(title)
     await user.type(title, 'Summit 2')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await user.click(screen.getByRole('tab', { name: 'Change Log' }))
 
     await waitFor(() => expect(getRequestHistory).toHaveBeenCalledTimes(2))
     const row = await within(panel()).findByRole('listitem', { name: 'Event details · Title' })

@@ -144,9 +144,11 @@ describe('SPM-10 — refused saves', () => {
   it('AC7 on a mixed edit: significant fields go back to their saved values, the ordinary edit is kept, nothing is sent again', async () => {
     const user = showRequest(response('confirmed'))
     await setAttendees(user, '120')
+    await user.click(screen.getByRole('tab', { name: 'Venue Details' }))
     const layout = screen.getByLabelText('Layout preference')
     await user.clear(layout)
     await user.type(layout, 'banquet')
+    await user.click(screen.getByRole('tab', { name: 'Event Status' }))
     const title = screen.getByLabelText('Title')
     await user.clear(title)
     await user.type(title, 'Partner summit (renamed)')
@@ -162,7 +164,9 @@ describe('SPM-10 — refused saves', () => {
       venue: { layoutPreference: 'banquet' },
     })
     expect(screen.getByLabelText('Expected attendees').value).toBe('80')
+    await user.click(screen.getByRole('tab', { name: 'Venue Details' }))
     expect(screen.getByLabelText('Layout preference').value).toBe('theatre')
+    await user.click(screen.getByRole('tab', { name: 'Event Status' }))
     expect(screen.getByLabelText('Title').value).toBe('Partner summit (renamed)')
     expect(screen.queryByText(/changed while you were editing/)).toBeNull()
     expect(screen.getByText('Confirmed', { selector: '.status-pill' })).toBeTruthy()
@@ -232,7 +236,8 @@ describe('SPM-10 — the "Significant" label in the change history', () => {
         { id: 'e1', field: 'core.title', oldValue: 'A', newValue: 'B', actor: { type: 'user', name: 'Seed Coordinator 3', role: 'coordinator' }, at: '2026-10-08T10:00:00.000Z' },
       ],
     })
-    showRequest(response('planning', { canViewChangeHistory: true }))
+    const user = showRequest(response('planning', { canViewChangeHistory: true }))
+    await user.click(await screen.findByRole('tab', { name: 'Change Log' }))
     const rows = await screen.findAllByRole('listitem', { name: /Event details/ })
     const attendance = rows.find((row) => row.getAttribute('aria-label') === 'Event details · Expected attendees')
     const title = rows.find((row) => row.getAttribute('aria-label') === 'Event details · Title')

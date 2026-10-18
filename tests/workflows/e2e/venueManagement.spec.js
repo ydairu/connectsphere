@@ -25,6 +25,18 @@ const labels = {
   operatingHours: 'Operating hours',
 }
 const block = { startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', reason: 'maintenance' }
+// Success and loading are separate live regions and may coexist after a write.
+const statusMessage = (page, text) => page.getByRole('status').filter({ hasText: text })
+async function pauseRead(page, pattern) {
+  let release
+  const gate = new Promise((resolve) => { release = resolve })
+  await page.route(pattern, async (route) => {
+    if (route.request().method() === 'GET') await gate
+    await route.continue()
+  })
+  return release
+}
+
 const headers = (user) => ({ Authorization: `Bearer test-token:${user.uid}` })
 
 async function signIn(page, user = ROLE_USERS.venueStaff) {
@@ -59,8 +71,6 @@ async function calendar(page, from = '2027-03-01T08:00', to = '2027-03-01T18:00'
   await expect(page.getByRole('list', { name: 'Availability slots' })).toBeVisible()
 }
 const slots = (page) => page.getByRole('list', { name: 'Availability slots' }).getByRole('listitem')
-const venueNotice = (page) => page.locator('.alert[role="status"]')
-const maintenanceStatus = (page) => page.locator('.maintenance-block-panel').getByRole('status')
 async function search(page, from = '2027-03-01T10:00', to = '2027-03-01T12:00') {
   await page.goto('/venues')
   await page.getByLabel('Available from').fill(from)
@@ -80,8 +90,13 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
     await page.getByRole('main').getByRole('link', { name: 'Add venue', exact: true }).click()
     await page.getByLabel('Venue name').fill('East Wing Conference Room')
     await fillDetails(page)
-    await page.getByRole('button', { name: 'Add venue', exact: true }).click()
-    await expect(venueNotice(page)).toHaveText('Venue added to the catalogue.')
+    const release = await pauseRead(page, '**/api/venues/*')
+    try {
+      await page.getByRole('button', { name: 'Add venue', exact: true }).click()
+      await expect(statusMessage(page, 'Venue added to the catalogue.')).toHaveText('Venue added to the catalogue.')
+      await expect(statusMessage(page, 'Loading venue')).toBeVisible()
+    } finally { release() }
+    await expectDetails(page)
     const savedPath = new URL(page.url()).pathname
     await page.reload()
     await expectDetails(page)
@@ -111,11 +126,11 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
     await page.getByRole('button', { name: 'Add venue', exact: true }).click()
     for (const label of Object.values(labels)) await expect(page.getByLabel(label, { exact: true })).toHaveAttribute('aria-invalid', 'true')
     await expect(page.getByLabel('Venue name')).toHaveValue('Retained room name')
-    await expect(venueNotice(page)).toContainText('Fix the highlighted fields')
+    await expect(statusMessage(page, 'Fix the highlighted fields')).toContainText('Fix the highlighted fields')
     expect(await snapshot(request)).toEqual(before)
     await fillDetails(page)
     await page.getByRole('button', { name: 'Add venue', exact: true }).click()
-    await expect(venueNotice(page)).toContainText('Venue added')
+    await expect(statusMessage(page, 'Venue added')).toContainText('Venue added')
   })
 
   test('SPM-29 SPM-49 edit all catalogue fields without duplicating or changing arrangements', async ({ page, request }) => {
@@ -131,7 +146,7 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
     await fillDetails(page)
     await page.getByRole('button', { name: 'Save changes' }).click()
     await expect(page).toHaveURL(new RegExp(`${roomPath}$`))
-    await expect(venueNotice(page)).toHaveText('Venue details updated.')
+    await expect(statusMessage(page, 'Venue details updated.')).toHaveText('Venue details updated.')
     await page.reload()
     await expectDetails(page)
     const after = await snapshot(request)
@@ -183,12 +198,12 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
         : route.continue())
       const button = page.getByRole('button', { name: operation === 'create' ? 'Add venue' : 'Save changes', exact: true })
       await button.click()
-      await expect(venueNotice(page)).toContainText(operation === 'create' ? 'Could not add' : 'Could not update')
+      await expect(statusMessage(page, operation === 'create' ? 'Could not add' : 'Could not update')).toContainText(operation === 'create' ? 'Could not add' : 'Could not update')
       for (const [key, value] of Object.entries(fields)) await expect(page.getByLabel(labels[key], { exact: true })).toHaveValue(Array.isArray(value) ? value.join('\n') : String(value))
       expect(await snapshot(request)).toEqual(before)
       await page.unroute(pattern)
       await button.click()
-      await expect(venueNotice(page)).toContainText(operation === 'create' ? 'Venue added' : 'Venue details updated')
+      await expect(statusMessage(page, operation === 'create' ? 'Venue added' : 'Venue details updated')).toContainText(operation === 'create' ? 'Venue added' : 'Venue details updated')
       await page.reload()
       await expectDetails(page)
     })
@@ -260,14 +275,14 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
     await page.getByLabel('End date').fill('2027-03-01T12:00')
     await page.getByLabel('Reason').selectOption('safety')
     await page.getByRole('button', { name: 'Create maintenance block' }).click()
-    await expect(maintenanceStatus(page)).toHaveText('Maintenance block created.')
+    await expect(statusMessage(page, 'Maintenance block created.')).toHaveText('Maintenance block created.')
     await expect(slots(page).filter({ hasText: 'Reason: Safety' })).toHaveCount(1)
     await page.getByRole('button', { name: 'Amend', exact: true }).click()
     await expect(page.getByLabel('Start date')).toHaveValue('2027-03-01T10:00')
     await page.getByLabel('End date').fill('2027-03-01T13:00')
     await page.getByLabel('Reason').selectOption('renovation')
     await page.getByRole('button', { name: 'Save changes' }).click()
-    await expect(maintenanceStatus(page)).toHaveText('Maintenance block updated.')
+    await expect(statusMessage(page, 'Maintenance block updated.')).toHaveText('Maintenance block updated.')
     await expect(slots(page).filter({ hasText: 'Reason: Renovation' })).toContainText('13:00')
     const saved = await snapshot(request)
     await page.getByRole('button', { name: 'Amend', exact: true }).click()
@@ -286,7 +301,7 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
     await signIn(page)
     await calendar(page)
     await page.getByRole('button', { name: 'Remove', exact: true }).click()
-    await expect(maintenanceStatus(page)).toHaveText('Maintenance block removed.')
+    await expect(statusMessage(page, 'Maintenance block removed.')).toHaveText('Maintenance block removed.')
     await expect(slots(page).locator('strong')).toHaveText(['Available'])
     await logout(page)
     await signIn(page, ROLE_USERS.coordinator)
@@ -314,8 +329,12 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
     await expect(page.getByLabel('Start date')).toHaveValue('2027-03-01T10:00')
     expect(await snapshot(request)).toEqual(before)
     await page.unroute(pattern)
-    await page.getByRole('button', { name: 'Create maintenance block' }).click()
-    await expect(maintenanceStatus(page)).toContainText('created')
+    const release = await pauseRead(page, '**/api/venues/*/availability?*')
+    try {
+      await page.getByRole('button', { name: 'Create maintenance block' }).click()
+      await expect(statusMessage(page, 'Maintenance block created.')).toHaveText('Maintenance block created.')
+      await expect(statusMessage(page, 'Loading availability')).toBeVisible()
+    } finally { release() }
     await expect(page.getByRole('button', { name: 'Remove', exact: true })).toBeVisible()
     const saved = await snapshot(request)
     await page.route(`${pattern}/*`, (route) => route.fulfill({ status: 503, body: '{}' }))
@@ -329,25 +348,29 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
       headers: headers(ROLE_USERS.venueStaff), data: { ...block, startsAt: '2020-01-01T10:00:00Z', endsAt: '2020-01-01T12:00:00Z' },
     })
     expect(response.status()).toBe(201)
+    for (const [eventId, actor] of [['seed-req-a1-planning', ROLE_USERS.coordinator], ['seed-req-b1-planning', EXTRA_USERS.secondCoordinator]]) {
+      const changed = await request.patch(`${DOUBLE_ORIGIN}/api/requests/${eventId}`, {
+        headers: headers(actor), data: { core: { preferredDateTime: '2027-03-01T10:00:00.000Z', durationHours: 2 } },
+      })
+      expect(changed.status()).toBe(200)
+    }
     await signIn(page, ROLE_USERS.coordinator)
     await search(page)
     await expect(page.getByRole('heading', { name: roomName })).toBeVisible()
     await page.goto('/requests/seed-req-a1-planning/venue-bookings')
     await page.getByLabel('Venue', { exact: true }).selectOption(roomId)
-    await page.getByLabel('Start', { exact: true }).fill('2027-03-01T10:00')
-    await page.getByLabel('End', { exact: true }).fill('2027-03-01T12:00')
     await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre')
     await page.getByRole('button', { name: 'Submit booking request', exact: true }).click()
-    await expect(venueNotice(page)).toContainText('tentatively held')
+    await expect(statusMessage(page, 'tentatively held')).toContainText('tentatively held')
     await logout(page)
     await signIn(page, EXTRA_USERS.secondCoordinator)
     await page.goto('/requests/seed-req-b1-planning/venue-bookings')
-    await page.getByLabel('Venue', { exact: true }).selectOption(roomId)
-    await page.getByLabel('Start', { exact: true }).fill('2027-03-01T10:00')
-    await page.getByLabel('End', { exact: true }).fill('2027-03-01T12:00')
-    await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre')
-    await page.getByRole('button', { name: 'Submit booking request', exact: true }).click()
-    await expect(page.getByRole('alert')).toContainText('not available')
+    await expect(page.getByLabel('Venue', { exact: true }).locator(`option[value="${roomId}"]`)).toHaveCount(0)
+    const conflict = await request.post(`${DOUBLE_ORIGIN}/api/requests/seed-req-b1-planning/venue-bookings`, {
+      headers: headers(EXTRA_USERS.secondCoordinator),
+      data: { venueId: roomId, startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', requirements: 'Theatre', submissionKey: 'competing-event' },
+    })
+    expect(conflict.status()).toBe(409)
     expect(Object.values((await snapshot(request)).availability).filter((entry) => entry.venueId === roomId && entry.status === AVAILABILITY_STATUS.TENTATIVE_HOLD)).toHaveLength(1)
     for (const [user, action] of [
       [ROLE_USERS.venueStaff, APPROVE_VENUE],

@@ -57,7 +57,7 @@ function eventPage({ roles = [TECHNICAL_STAFF], requests = [pending], availabili
   api.getRequest.mockResolvedValue({ request: { id: 'event', status: PLANNING, core: { title: 'Partner summit' } }, editableSections: [], availableActions: [] })
   api.listEquipmentRequests.mockResolvedValue({ canSubmit: false, requests })
   api.checkEquipmentAvailability.mockResolvedValue({ availability })
-  return show('/requests/event', roles)
+  return show('/requests/event?tab=equipment-required', roles)
 }
 
 async function card() {
@@ -81,7 +81,7 @@ describe('SPM-56 Technical Support queue page', () => {
     expect(screen.getByText('Pending Review')).toBeTruthy()
     expect(screen.getByText('Approved')).toBeTruthy()
     expect(screen.getAllByRole('link', { name: 'Review on event' }).map((link) => link.getAttribute('href'))).toEqual([
-      '/requests/event-a#equipment-requests', '/requests/event-b#equipment-requests',
+      '/requests/event-a?tab=equipment-required#equipment-requests', '/requests/event-b?tab=equipment-required#equipment-requests',
     ])
   })
 

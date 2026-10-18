@@ -1,0 +1,16 @@
+# SPM-34 acceptance traceability
+
+Source: `docs/requirements/Product Backlog (1).xlsx`, SPM-34. The workbook currently says **In Progress**, Sprint 3. It remains In Progress while manual acceptance and deployed-project verification are outstanding.
+
+| Acceptance criterion | Implementation | Verification |
+|---|---|---|
+| Rejection requires a reason; suggestion optional; no partial approval | Shared validation accepts only the `reject` action and the two text fields. The API acts on one whole booking. | `tests/spm-34/unit/venueBookingRejection.test.js`; `tests/spm-34/integration/venueBookingRejectionApi.test.js` |
+| Pending request prompts staff for a reason | Booking details show the action and required form only when the API says the signed-in user can reject it. | `tests/spm-34/integration/venueBookingRejectionPage.test.jsx`; `tests/spm-34/e2e/spm34.rejectVenueBooking.spec.js` |
+| Confirmation saves Rejected and the reason | The booking decision transaction saves status, reason, optional suggestion, actor and time; releases its hold, clears stale venue sign-off, writes activity and notification. | `tests/spm-34/integration/venueBookingRejection.test.js`; `tests/spm-34/integration/venueBookingRejectionApi.test.js` |
+| Coordinator sees the reason beside request details | The assigned Coordinator's existing booking list includes the rejection fields, and the booking page displays them. | `tests/spm-34/integration/venueBookingRejection.test.js`; `tests/spm-34/e2e/spm34.rejectVenueBooking.spec.js` |
+| Staff can suggest an alternative | The optional free-text suggestion is saved with the rejected booking and shown to the Coordinator. It creates no booking. | `tests/spm-34/unit/venueBookingRejection.test.js`; `tests/spm-34/e2e/spm34.rejectVenueBooking.spec.js` |
+| Assigned Coordinator is notified with the reason | The transaction addresses the current assigned Coordinator and includes the reason and booking ID. The notification links to booking details. | `tests/spm-34/unit/venueBookingRejection.test.js`; `tests/spm-34/integration/venueBookingRejection.test.js`; `frontend/src/pages/notifications.test.jsx`; `tests/spm-34/e2e/spm34.rejectVenueBooking.spec.js` |
+
+Backend decisions are restricted to the booking's assigned Venue Staff member; another staff member receives 404, and another role receives 403. A repeated decision receives 409. These are exercised by the service and HTTP tests. Replacement after hold release is covered by the service test and browser journey. Separate bookings retain separate holds and statuses.
+
+Verification: `npm test` passed 128 Node tests, 100 frontend tests, 1,611 root Vitest tests (35 opt-in live/emulator tests skipped), and 88 Chromium tests. After two extra service cases and a UI state adjustment, `npm run test:spm34` passed 13 Vitest and one Chromium test. Targeted SPM-14/SPM-53 regressions, lint and production build passed; the build retained its existing bundle-size warning. HTTP tests use mocked token verification and in-memory persistence; Playwright uses a local Firebase double. No Firestore rules were changed or deployed. No live Firebase test or human manual acceptance is claimed. The full all-venues confirmation gate is still dependent on SPM-54/SPM-81.

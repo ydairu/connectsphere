@@ -27,11 +27,11 @@ const CORE = { title: 'Partner summit', purpose: 'Partners', expectedAttendees: 
 const VENUE = { layoutPreference: 'theatre', accessibilityRequired: true }
 const EQUIPMENT = { requirements: ['projector'], technicalSupportNeeded: true }
 
-function showRequest(body, roles) {
+function showRequest(body, roles, tab = roles.includes('technical_staff') ? 'equipment-required' : 'venue-details') {
   getRequest.mockResolvedValue({ availableActions: [], canViewChangeHistory: false, ...body })
   render(
     <AuthContext.Provider value={{ user: { uid: 'u-1' }, userProfile: { name: 'User' }, roles, loading: false }}>
-      <MemoryRouter initialEntries={['/requests/req-1']}>
+      <MemoryRouter initialEntries={[`/requests/req-1?tab=${tab}`]}>
         <Routes>
           <Route path="/requests/:id" element={<RequestDetailPage />} />
         </Routes>
@@ -143,7 +143,7 @@ describe('SPM-48 — Technical Support Staff', () => {
 
 describe('SPM-48 — the assigned Coordinator', () => {
   it('sees both preparation statuses and notes, read-only, with no staff reason', async () => {
-    showRequest(
+    const user = showRequest(
       {
         request: {
           id: 'req-1',
@@ -162,14 +162,15 @@ describe('SPM-48 — the assigned Coordinator', () => {
     )
     await screen.findByRole('heading', { name: 'Venue preparation' })
     const venuePreparation = card('Venue preparation')
-    const equipmentPreparation = card('Equipment preparation')
     expect(within(venuePreparation).getByText('Read only')).toBeTruthy()
     expect(within(venuePreparation).getByText('In Progress')).toBeTruthy()
     expect(within(venuePreparation).getByText('Chairs ordered')).toBeTruthy()
+    expect(screen.queryByLabelText('Venue preparation status')).toBeNull()
+    await user.click(screen.getByRole('tab', { name: 'Equipment Required' }))
+    const equipmentPreparation = card('Equipment preparation')
     expect(within(equipmentPreparation).getByText('Read only')).toBeTruthy()
     expect(within(equipmentPreparation).getByText('Ready')).toBeTruthy()
     expect(within(equipmentPreparation).getByText('Projector tested')).toBeTruthy()
-    expect(screen.queryByLabelText('Venue preparation status')).toBeNull()
     expect(screen.queryByLabelText('Equipment preparation notes')).toBeNull()
     expect(screen.queryByText(/sign-off is approved/)).toBeNull()
   })
@@ -208,6 +209,7 @@ describe('SPM-48 — preparation in the change history panel', () => {
         canViewChangeHistory: true,
       },
       ['coordinator'],
+      'change-log',
     )
     const history = (await screen.findByRole('heading', { name: 'Change history' })).closest('.request-form-section')
     expect(await within(history).findByText('Venue preparation · Status')).toBeTruthy()

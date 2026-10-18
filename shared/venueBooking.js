@@ -2,8 +2,10 @@ import { COORDINATOR, VENUE_STAFF, isAssignedCoordinator, rolesOf } from './perm
 import { PLANNING } from './status.js'
 import { chooseStaff } from './staffAssignment.js'
 import { validateAvailabilityRange } from './venueAvailability.js'
+import { checkVenueSuitability, LAYOUT } from './venueSuitability.js'
 
 export const BOOKING_PENDING = 'pending'
+export const BOOKING_APPROVED = 'approved'
 export const BOOKING_REJECTED = 'rejected'
 export const BOOKING_REPLACED = 'replaced'
 export const BOOKING_CANCELLED = 'cancelled'
@@ -21,6 +23,54 @@ export function canRequestVenue(user, event) {
 export function canReadVenueBooking(user, event, booking) {
   return (rolesOf(user).includes(COORDINATOR) && isAssignedCoordinator(user, event)) ||
     (rolesOf(user).includes(VENUE_STAFF) && booking.assignedVenueStaffUid === user.uid)
+}
+
+export function canRejectVenueBooking(user, event, booking) {
+  return rolesOf(user).includes(VENUE_STAFF) && booking.assignedVenueStaffUid === user.uid &&
+    event.status === PLANNING && booking.status === BOOKING_PENDING
+}
+
+export function canApproveVenueBooking(user, event, booking) {
+  return canRejectVenueBooking(user, event, booking)
+}
+
+export function venueBookingApprovalErrors(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { request: 'An approval action is required.' }
+  const errors = {}
+  for (const key of Object.keys(input)) if (key !== 'action') errors[key] = 'This field cannot be set.'
+  if (input.action !== 'approve') errors.action = 'Choose Approve.'
+  return errors
+}
+
+// Layout review uses the submitted booking requirements, not the event's original preference.
+// Current event attendance and structured facility/accessibility requirements still apply.
+// Availability is checked separately under the venue lock, excluding only the verified own hold.
+export function venueBookingSuitability(event, booking, venue) {
+  const requirements = typeof booking.requirements === 'string' ? booking.requirements.trim() : ''
+  const result = checkVenueSuitability({ ...event, core: { ...event.core,
+    preferredDateTime: booking.startsAt,
+    durationHours: (Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 3600000,
+  }, venue: { ...event.venue, layoutPreference: requirements || event.venue?.layoutPreference } }, venue)
+  // Requirements are free text: do not claim to have parsed extra instructions as a layout.
+  if (requirements) result.warnings = result.warnings.map((warning) => warning.check === LAYOUT
+    ? { ...warning, message: `Booking requirements "${requirements}" do not exactly match a supported layout (${venue.supportedLayouts?.join(', ') || 'none recorded'}). Venue Staff must review the requested layout and any additional instructions.` }
+    : warning)
+  return result
+}
+
+export function normaliseVenueBookingRejection(input) {
+  const errors = {}
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { value: {}, errors: { request: 'A rejection is required.' } }
+  for (const key of Object.keys(input)) if (!['action', 'reason', 'suggestedAlternative'].includes(key)) errors[key] = 'This field cannot be set.'
+  if (input.action !== 'reject') errors.action = 'Choose Reject.'
+  const text = (key, required) => {
+    if (input[key] != null && typeof input[key] !== 'string') errors[key] = 'Enter text for this field.'
+    const value = typeof input[key] === 'string' ? input[key].trim() : ''
+    if (required && !value) errors[key] = 'Enter a reason.'
+    if (value.length > 4000) errors[key] = 'Use at most 4000 characters.'
+    return value
+  }
+  return { value: { reason: text('reason', true), suggestedAlternative: text('suggestedAlternative', false) }, errors }
 }
 
 export function normaliseVenueBooking(input = {}) {

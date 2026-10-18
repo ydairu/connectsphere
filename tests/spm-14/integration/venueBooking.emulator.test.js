@@ -30,8 +30,19 @@ describe.skipIf(!enabled)('SPM-14 real Firestore emulator concurrency', () => {
     expect((await db.collection('venueAvailability').get()).size).toBe(1)
   }, 60000)
   it('simultaneous non-conflicting submissions balance workload', async () => {
-    const results = await Promise.all(Array.from({ length: 4 }, (_, i) => submitVenueBooking('event', {
-      ...input, submissionKey: `balanced-${i}`, startsAt: `2027-03-0${i + 1}T10:00:00Z`, endsAt: `2027-03-0${i + 1}T12:00:00Z`,
+    const event = (await db.collection('eventRequests').doc('event').get()).data()
+    const batch = db.batch()
+    const periods = Array.from({ length: 4 }, (_, i) => ({
+      eventId: `balanced-event-${i}`,
+      startsAt: new Date(Date.UTC(2027, 2, i + 1, 10)).toISOString(),
+      endsAt: new Date(Date.UTC(2027, 2, i + 1, 12)).toISOString(),
+    }))
+    for (const period of periods) batch.set(db.collection('eventRequests').doc(period.eventId), {
+      ...event, core: { ...event.core, preferredDateTime: period.startsAt },
+    })
+    await batch.commit()
+    const results = await Promise.all(periods.map(({ eventId, startsAt, endsAt }, i) => submitVenueBooking(eventId, {
+      ...input, submissionKey: `balanced-${i}`, startsAt, endsAt,
     }, coordinator, db, now)))
     expect(results.filter((r) => r.assignedVenueStaffName === 'Venue One')).toHaveLength(2)
     expect(results.filter((r) => r.assignedVenueStaffName === 'Venue Two')).toHaveLength(2)

@@ -6,6 +6,16 @@ export function getVenueBookings(user, eventId) {
 export function submitVenueBooking(user, eventId, input) {
   return authenticatedRequest(user, `/api/requests/${eventId}/venue-bookings`, { method: 'POST', body: JSON.stringify(input) })
 }
+export function rejectVenueBooking(user, eventId, bookingId, reason, suggestedAlternative) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/venue-bookings/${bookingId}/actions`, {
+    method: 'POST', body: JSON.stringify({ action: 'reject', reason, suggestedAlternative }),
+  })
+}
+export function approveVenueBooking(user, eventId, bookingId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/venue-bookings/${bookingId}/actions`, {
+    method: 'POST', body: JSON.stringify({ action: 'approve' }),
+  })
+}
 export function getVenueBookingQueue(user) {
   return authenticatedRequest(user, '/api/venues/booking-requests')
 }

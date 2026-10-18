@@ -154,7 +154,15 @@ function CompletionNotice({ completion }) {
 
 // SPM-9 — the actions this user may take now. `actions` comes from the API (availableActions), so the
 // page shows only what the backend will accept; the backend checks again on every action.
-function StatusActions({ status, actions, arrangements, cancellationRequest, cancellation, rejection, completion, busy, onAction }) {
+export function StatusNotices({ cancellation, rejection, completion }) {
+  return <>
+    <CancellationNotice cancellation={cancellation} />
+    <RejectionNotice rejection={rejection} />
+    <CompletionNotice completion={completion} />
+  </>
+}
+
+function StatusActions({ status, actions, arrangements, cancellationRequest, busy, onAction }) {
   const [pending, setPending] = useState(null)
   const [reason, setReason] = useState('')
 
@@ -176,9 +184,6 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, can
 
   return (
     <>
-      <CancellationNotice cancellation={cancellation} />
-      <RejectionNotice rejection={rejection} />
-      <CompletionNotice completion={completion} />
       <StatusDetails status={status} arrangements={arrangements} cancellationRequest={cancellationRequest} />
 
       {actions.length > 0 && (

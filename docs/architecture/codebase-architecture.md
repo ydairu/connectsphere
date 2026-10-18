@@ -5,7 +5,7 @@ Source snapshot: **`2d02a855192f016c6a88a873033388afa4c369e0`**, reviewed **4 Oc
 ## Code dependencies
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"darkMode":false,"background":"#f3f4f6","primaryColor":"#dbeafe","primaryTextColor":"#000000","primaryBorderColor":"#000000","secondaryColor":"#dbeafe","secondaryTextColor":"#000000","secondaryBorderColor":"#000000","tertiaryColor":"#f3f4f6","tertiaryTextColor":"#000000","tertiaryBorderColor":"#000000","clusterBkg":"#f3f4f6","clusterBorder":"#000000","lineColor":"#000000","textColor":"#000000","edgeLabelBackground":"#f3f4f6","titleColor":"#000000"},"themeCSS":"& { background-color: #f3f4f6; }"}}%%
+%%{init: {"theme":"base","themeVariables":{"darkMode":false,"background":"#f3f4f6","primaryColor":"#dbeafe","primaryTextColor":"#000000","primaryBorderColor":"#000000","secondaryColor":"#dbeafe","secondaryTextColor":"#000000","secondaryBorderColor":"#000000","tertiaryColor":"#f3f4f6","tertiaryTextColor":"#000000","tertiaryBorderColor":"#000000","clusterBkg":"#f3f4f6","clusterBorder":"#000000","lineColor":"#000000","textColor":"#000000","edgeLabelBackground":"#f3f4f6","titleColor":"#000000"},"themeCSS":"& { background-color: #f3f4f6 !important; }"}}%%
 flowchart TB
   subgraph frontend["frontend/src — browser bundle"]
     entry["main.jsx / App.jsx"]
@@ -34,6 +34,9 @@ flowchart TB
   api ==>|"Runtime fetch to mounted API routes"| routes
   classDef component fill:#dbeafe,stroke:#000000,color:#000000;
   class entry,pages,context,api,client,boot,routes,middleware,services,admin,shared component;
+  style frontend fill:#f3f4f6,stroke:#000000,color:#000000;
+  style backend fill:#f3f4f6,stroke:#000000,color:#000000;
+  linkStyle default stroke:#000000,color:#000000;
 ```
 
 Thin arrows denote source dependencies, the thick arrow is the network boundary, and dotted `imports` arrows emphasise shared code. Directory nodes group modules; they do not imply every file imports every target. [Root workspaces](../../package.json) contain [frontend](../../frontend/package.json), [backend](../../backend/package.json) and [shared](../../shared/package.json). The [frontend entry](../../frontend/src/main.jsx), [router](../../frontend/src/App.jsx), [API wrappers](../../frontend/src/services/api.js), [backend composition](../../backend/src/app.js), [controllers](../../backend/src/controllers/), [middleware](../../backend/src/middleware/) and [services](../../backend/src/services/) establish these links. [Shared modules](../../shared/) are bundled/imported into those processes; there is no shared-service HTTP hop.

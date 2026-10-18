@@ -64,7 +64,7 @@ function show({ roles = [COORDINATOR], list = { canSubmit: true, requests: [] } 
   })
   render(
     <AuthContext.Provider value={{ user, userProfile: { name: 'Seed' }, roles, loading: false }}>
-      <MemoryRouter initialEntries={['/requests/req-1']}>
+      <MemoryRouter initialEntries={['/requests/req-1?tab=equipment-required']}>
         <Routes><Route path="/requests/:id" element={<RequestDetailPage />} /></Routes>
       </MemoryRouter>
     </AuthContext.Provider>,

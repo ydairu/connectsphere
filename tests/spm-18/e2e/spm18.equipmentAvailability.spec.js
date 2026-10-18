@@ -52,6 +52,7 @@ test.describe('SPM-18 — Check equipment availability for an event (E2E)', () =
     // SPM-17: the assigned Coordinator requests two projectors; they get no availability check.
     await signIn(page, ROLE_USERS.coordinator)
     await page.goto(`/requests/${planning.id}`)
+    await page.getByRole('tab', { name: 'Equipment Required' }).click()
     const coordinatorCard = equipmentCard(page)
     await coordinatorCard.getByLabel('Equipment type').selectOption({ label: 'Portable projector (1 available)' })
     await coordinatorCard.getByLabel('Quantity').fill('2')
@@ -63,6 +64,7 @@ test.describe('SPM-18 — Check equipment availability for an event (E2E)', () =
     // SPM-18: the assigned Technical Support Staff member checks it.
     await signIn(page, ROLE_USERS.technicalStaff)
     await page.goto(`/requests/${planning.id}`)
+    await page.getByRole('tab', { name: 'Equipment Required' }).click()
     const staffCard = equipmentCard(page)
     // SPM-56 (AC2): for the assignee who may approve, the check runs as soon as the card loads.
     await expect(staffCard.getByText('Shortfall: this request cannot be fulfilled.')).toBeVisible()
@@ -72,6 +74,7 @@ test.describe('SPM-18 — Check equipment availability for an event (E2E)', () =
     await page.goto(equipmentUrl)
     await setStatus(page, 'PRJ-001', 'Available')
     await page.goto(`/requests/${planning.id}`)
+    await page.getByRole('tab', { name: 'Equipment Required' }).click()
     // SPM-56: reloading the event page runs the check again automatically.
     await expect(equipmentCard(page).getByText('Can be fulfilled: every equipment type has enough available units.')).toBeVisible()
     await expect(equipmentCard(page).getByText(/2 available, 2 requested — enough/)).toBeVisible()

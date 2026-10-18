@@ -25,6 +25,7 @@ test.describe('SPM-42 — View and edit information according to my role’s per
   test('spm42_venue_staff_edit_venue_and_never_see_equipment', async ({ page }) => {
     await signIn(page, ROLE_USERS.venueStaff)
     await page.goto(`/requests/${A1_PLANNING}`)
+    await page.getByRole('tab', { name: 'Venue Details' }).click()
 
     await expect(page.getByRole('heading', { name: 'Venue', exact: true })).toBeVisible()
     // SPM-48: the requested venue is read-only to Venue Staff; their section is venue preparation, which
@@ -35,6 +36,7 @@ test.describe('SPM-42 — View and edit information according to my role’s per
     await expect(page.getByRole('heading', { name: 'Equipment and technical support' })).toHaveCount(0)
     await expect(page.getByText('projector')).toHaveCount(0)
     // Main details are viewable but not theirs to change.
+    await page.getByRole('tab', { name: 'Event Status' }).click()
     await expect(page.getByRole('heading', { name: 'Event details' })).toBeVisible()
     await expect(page.getByLabel('Title')).toHaveCount(0)
   })
@@ -42,6 +44,7 @@ test.describe('SPM-42 — View and edit information according to my role’s per
   test('spm42_technical_staff_edit_equipment_and_never_see_venue', async ({ page }) => {
     await signIn(page, ROLE_USERS.technicalStaff)
     await page.goto(`/requests/${A1_PLANNING}`)
+    await page.getByRole('tab', { name: 'Equipment Required' }).click()
 
     await expect(page.getByRole('heading', { name: 'Equipment and technical support' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Venue' })).toHaveCount(0)
@@ -54,13 +57,17 @@ test.describe('SPM-42 — View and edit information according to my role’s per
     // SPM-48: the combined roles edit venue and equipment preparation, on the event whose sign-offs are approved.
     await page.goto(`/requests/${A1_CONFIRMED}`)
 
+    await page.getByRole('tab', { name: 'Venue Details' }).click()
     await page.getByLabel('Venue preparation status').selectOption('in_progress')
+    await page.getByRole('tab', { name: 'Equipment Required' }).click()
     await page.getByLabel('Equipment preparation notes').fill('Projector tested')
     await page.getByRole('button', { name: 'Save changes' }).click()
 
     await expect(page.getByRole('alert')).toHaveText('Changes saved.')
     await page.reload()
+    await page.getByRole('tab', { name: 'Venue Details' }).click()
     await expect(page.getByLabel('Venue preparation status')).toHaveValue('in_progress')
+    await page.getByRole('tab', { name: 'Equipment Required' }).click()
     await expect(page.getByLabel('Equipment preparation notes')).toHaveValue('Projector tested')
   })
 
@@ -68,9 +75,12 @@ test.describe('SPM-42 — View and edit information according to my role’s per
     await signIn(page, ROLE_USERS.coordinator)
     await page.goto(`/requests/${A1_SUBMITTED}`)
 
-    for (const section of ['Event details', 'Venue', 'Equipment and technical support', 'Registration', 'Internal planning']) {
-      await expect(page.getByRole('heading', { name: section })).toBeVisible()
-    }
+    for (const section of ['Event details', 'Internal planning']) await expect(page.getByRole('heading', { name: section })).toBeVisible()
+    await page.getByRole('tab', { name: 'Venue Details' }).click()
+    await expect(page.getByRole('heading', { name: 'Venue', exact: true })).toBeVisible()
+    await page.getByRole('tab', { name: 'Equipment Required' }).click()
+    for (const section of ['Equipment and technical support', 'Registration']) await expect(page.getByRole('heading', { name: section })).toBeVisible()
+    await page.getByRole('tab', { name: 'Event Status' }).click()
     await page.getByLabel('Planning notes').fill('Coordinator note from E2E')
     await page.getByRole('button', { name: 'Save changes' }).click()
     await expect(page.getByRole('alert')).toHaveText('Changes saved.')

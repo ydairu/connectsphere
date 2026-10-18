@@ -239,7 +239,7 @@ export function venueBookingLockPath(venueId) {
 }
 
 // Read-only transaction phase shared by SPM-14 and the standalone SPM-16 hold service.
-// Only a caller that has verified a replacement's association may pass excludeId.
+// Only a caller that has verified the replacement/approval hold's association may pass excludeId.
 export async function checkVenueHoldInTransaction(tx, db, commitment, now, excludeId = null) {
   const venueSnapshot = await tx.get(db.collection('venues').doc(commitment.venueId))
   if (!venueSnapshot.exists) throw new VenueNotFoundError(commitment.venueId)

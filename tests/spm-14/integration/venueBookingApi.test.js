@@ -41,6 +41,9 @@ describe('SPM-14 real HTTP routes with mocked identity and in-memory persistence
   it('rejects forged values, forbidden actors, and unknown or unassigned events', async () => {
     expect((await post({ ...input, ownerUid: 'forged' })).status).toBe(400)
     expect((await post({ ...input, endsAt: input.startsAt })).status).toBe(400)
+    const alteredPeriod = await post({ ...input, startsAt: '2027-03-01T11:00:00Z', endsAt: '2027-03-01T13:00:00Z' })
+    expect(alteredPeriod.status).toBe(400)
+    expect(alteredPeriod.body.errors).toMatchObject({ startsAt: 'Use the event start time.', endsAt: 'Use the event end time.' })
     expect((await post(input, organiser)).status).toBe(403)
     expect((await post(input, coordinator, 'other')).status).toBe(404)
     expect((await post(input, coordinator, 'missing')).status).toBe(404)

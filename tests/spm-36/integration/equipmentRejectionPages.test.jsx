@@ -49,7 +49,7 @@ const rejected = {
   rejectionReason: 'Only 3 projectors are available.', suggestedAlternative: 'Three projectors and the LED wall',
 }
 
-function show({ roles = [TECHNICAL_STAFF], requests = [pending], availability = short, canSubmit = false, path = '/requests/event' } = {}) {
+function show({ roles = [TECHNICAL_STAFF], requests = [pending], availability = short, canSubmit = false, path = '/requests/event?tab=equipment-required' } = {}) {
   api.getRequest.mockResolvedValue({ request: { id: 'event', status: PLANNING, core: { title: 'Partner summit' }, equipment: { requirements: [] } }, editableSections: [], availableActions: [] })
   api.listEquipmentRequests.mockResolvedValue({ canSubmit, requests })
   api.checkEquipmentAvailability.mockResolvedValue({ availability })
