@@ -604,6 +604,32 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - Seed dry run against `connectsphere-6546c`: no blockers, nothing written.
     - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
+34. **SPM-36 Technical Support Staff reject an equipment request, and three walkthrough fixes (18 Oct 2026, branch `feature/SPM-36-reject-equipment`, four commits):**
+    - **SPM-36 built:**
+      - **Action:** `reject` on `POST /api/requests/:id/equipment-requests/:requestId/actions`, with `reason` (required, 1–1000 characters) and `suggestedAlternative` (optional, up to 1000). Same permission checks as approval (403 / 404 / 409), then field errors (400, nothing written).
+      - **Writes, in one transaction:** the request Rejected with who, when, reason and alternative; `arrangementApprovals.technical` rejected; the event summary Rejected; `equipment_request_rejected` and `arrangement_decided` activity entries; a notice to the assigned Coordinator with the reason. The event stays in Planning; nothing is reserved; no availability check is run or recorded.
+      - **After a rejection:** Confirm stays blocked and the manual technical sign-off stays refused until a revised request is approved. A revised request replaces the rejected one (`replacesId`), clears its sign-off and goes to the same Technical Support member (SPM-17 / SPM-56 rules, now tested for a rejection).
+      - **Page:** **Reject request** beside Approve (not gated on fulfilment) opens **Reason for rejection (required)**, prefilled from a shortfall (`shortfallSummary`), and **Suggested alternative (optional)**, with **Confirm rejection** / **Cancel**. The Coordinator sees **Rejected by**, the reason and alternative, and a form headed **Submit a revised request**. The queue groups requests under **Waiting for review** and **Reviewed**.
+      - **Organisers** see no equipment request, but the existing SPM-9 summary shows them "Technical arrangement: Rejected", without a reason.
+    - **Fix A:** the SPM-16 conflict message names the occupied period in Singapore time ("on Fri 20 Nov 2026, 08:30–13:45 SGT", both dates across midnight) and the 409 message ends with a full stop. The structured `conflict` keeps ISO values.
+    - **Fix B:** `seed-req-a1-confirmed-past` (organiser-a1, Seed Coordinator, 1 Oct 2026, both sign-offs approved, no venue entries) so **Mark as completed** can be demonstrated. Seed Coordinator's workload is now 5 (coordinator-3 is still next).
+    - **Fix C:** `docs/testing/end-to-end-walkthrough.md`, updated for the conflict wording, the rejection path and the past event.
+    - **Existing tests changed:**
+      - `tests/spm-56/unit/equipmentApproval.test.js`, `tests/spm-56/unit/seedEquipmentApproval.test.js`, `tests/spm-17/integration/equipmentRequestService.test.js`: the assignee's actions on a Pending Review request are now `['approve', 'reject']`.
+      - `tests/spm-56/unit/equipmentApproval.test.js`, `tests/spm-56/integration/equipmentApprovalService.test.js`, `tests/spm-56/integration/equipmentApprovalApi.test.js`: the unknown action is now `'not_an_action'` (was `'reject'`).
+      - `tests/spm-56/integration/equipmentApprovalPages.test.jsx`: queue event titles are read at heading level 3 under the new groups.
+      - `tests/spm-16/integration/tentativeHoldConflicts.test.js`: the new conflict wording (fix A).
+      - `backend/scripts/seedData.test.js`: workloads 5, 2 and 1 (fix B).
+      - No Playwright spec needed a change.
+    - **Evidence:** `tests/spm-36/` (unit, service, API and page tests); the new fix A case in `tests/spm-16/integration/tentativeHoldConflicts.test.js`; `tests/spm-27/unit/seedPastConfirmedEvent.test.js`.
+    - **Local verification (macOS, 18 Oct 2026, on top of `main` at `01e0f8b`):**
+      - Lint passed. `test:spm36`: 30 passed.
+      - Vitest suites: SPM-56 51, SPM-17 76, SPM-18 26, SPM-16 43 (1 live test skipped), SPM-14 28 (4 emulator tests skipped), SPM-9 18, SPM-10 147, SPM-48 96 passed.
+      - Root Vitest 1635 passed, 35 opt-in live and emulator tests skipped. 128 Node and 99 frontend tests passed.
+      - Playwright Chromium 87/87 passed. The production build passed with the existing bundle-size warning.
+      - Seed dry run against `connectsphere-6546c`: `seed-req-a1-confirmed-past` to create, no blockers, nothing written.
+    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check (the walkthrough has not been run). `firestore.rules` is unchanged, and no backlog status change is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.

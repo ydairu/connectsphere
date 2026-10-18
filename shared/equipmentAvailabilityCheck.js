@@ -68,3 +68,14 @@ export function checkRequestAvailability(items, unitsByType) {
   })
   return { fulfillable: results.every((result) => result.sufficient), items: results }
 }
+
+/**
+ * SPM-36 — a short, editable summary of a shortfall to prefill a rejection reason, e.g.
+ * "Not enough available units: Projector (5 requested, 3 available)." Null when nothing is short.
+ */
+export function shortfallSummary(availability) {
+  const short = (availability?.items ?? []).filter((item) => !item.sufficient)
+  if (short.length === 0) return null
+  const parts = short.map((item) => `${item.equipmentTypeName ?? item.equipmentTypeId} (${item.requestedQuantity} requested, ${item.availableQuantity} available)`)
+  return `Not enough available units: ${parts.join('; ')}.`
+}

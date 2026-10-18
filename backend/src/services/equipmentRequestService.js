@@ -14,10 +14,12 @@ import {
   EQUIPMENT_REQUESTS_COLLECTION,
   EQUIPMENT_REQUEST_APPROVAL_RECONFIRMED,
   EQUIPMENT_REQUEST_APPROVED,
+  EQUIPMENT_REQUEST_REJECTED,
   EQUIPMENT_REQUEST_STATUS,
   EVENT_NOT_AT_PLANNING,
   NOT_REQUEST_ASSIGNEE,
   NOT_TECHNICAL_STAFF,
+  REJECT_EQUIPMENT_REQUEST,
   REQUEST_NOT_APPROVED,
   REQUEST_NOT_PENDING_REVIEW,
   SIGN_OFF_ALREADY_APPROVED,
@@ -28,12 +30,13 @@ import {
   equipmentRequestActions,
   equipmentRequestSummary,
   normaliseEquipmentRequest,
+  normaliseRejection,
   rejectedRequestToReplace,
   technicalStaffToReuse,
 } from '../../../shared/equipmentRequest.js'
 import { checkRequestAvailability, validateRequestedQuantities } from '../../../shared/equipmentAvailabilityCheck.js'
-import { ARRANGEMENT_APPROVED, TECHNICAL_ARRANGEMENT } from '../../../shared/arrangementDecisions.js'
-import { equipmentRequestApprovedNotifications } from '../../../shared/notifications.js'
+import { ARRANGEMENT_APPROVED, ARRANGEMENT_REJECTED, TECHNICAL_ARRANGEMENT } from '../../../shared/arrangementDecisions.js'
+import { equipmentRequestApprovedNotifications, equipmentRequestRejectedNotifications } from '../../../shared/notifications.js'
 import { STAFF_ASSIGNMENT_LOCKS, chooseStaff } from '../../../shared/staffAssignment.js'
 import { eventPeriod } from '../../../shared/venueSuitability.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
@@ -184,6 +187,7 @@ const PRESENTED_FIELDS = Object.freeze([
   'id', 'eventRequestId', 'eventTitle', 'items', 'requiredPeriod', 'status', 'assignedTechnicalStaffName',
   'replacesId', 'replacedById', 'createdAt', 'closedReason', 'closedAt',
   'approvedByName', 'approvedAt', 'reconfirmedByName', 'reconfirmedAt',
+  'rejectedByName', 'rejectedAt', 'rejectionReason', 'suggestedAlternative',
 ])
 
 function presentEquipmentRequest(request) {
@@ -245,20 +249,23 @@ const REFUSAL_MESSAGES = Object.freeze({
   [UNKNOWN_EQUIPMENT_ACTION]: 'Unknown action.',
   [NOT_TECHNICAL_STAFF]: 'Only Technical Support Staff can review equipment requests.',
   [NOT_REQUEST_ASSIGNEE]: 'Equipment request not found.',
-  [EVENT_NOT_AT_PLANNING]: 'Equipment requests can only be approved while the event is in Planning.',
-  [REQUEST_NOT_PENDING_REVIEW]: 'Only a request waiting for review can be approved.',
+  [EVENT_NOT_AT_PLANNING]: 'Equipment requests can only be reviewed while the event is in Planning.',
+  [REQUEST_NOT_PENDING_REVIEW]: 'Only a request waiting for review can be approved or rejected.',
   [REQUEST_NOT_APPROVED]: 'Only an approved request can be re-confirmed.',
   [SIGN_OFF_ALREADY_APPROVED]: 'The technical arrangement is already approved; there is nothing to re-confirm.',
 })
 
 /**
- * SPM-56 — `action` ('approve' or 'reconfirm_approval') on an equipment request, by its assigned Technical
- * Support Staff member, in one transaction. The request's availability is checked again inside the
- * transaction (SPM-18's checkRequestAvailability); a request that cannot be fulfilled is refused with
- * EquipmentRequestShortfallError and nothing is written. Approving does not reserve units (SPM-62).
- * SPM-36 is expected to add 'reject' here.
+ * SPM-56 / SPM-36 — `action` ('approve', 'reconfirm_approval' or 'reject') on an equipment request, by its
+ * assigned Technical Support Staff member, in one transaction.
+ * - Approve and re-confirm check availability again inside the transaction (SPM-18's checkRequestAvailability);
+ *   a request that cannot be fulfilled is refused with EquipmentRequestShortfallError and nothing is written.
+ *   Approving does not reserve units (SPM-62).
+ * - Reject takes `details.reason` (required) and `details.suggestedAlternative` (optional), validated after the
+ *   action itself is allowed. It does not need a shortfall, checks no availability, reserves nothing and leaves
+ *   the event's status as it is.
  */
-export async function decideEquipmentRequest(eventId, equipmentRequestId, action, user, db = getAdminDb(), now = new Date()) {
+export async function decideEquipmentRequest(eventId, equipmentRequestId, action, user, db = getAdminDb(), now = new Date(), details = {}) {
   return db.runTransaction(async (tx) => {
     const eventRef = db.collection('eventRequests').doc(eventId)
     const requestRef = db.collection(EQUIPMENT_REQUESTS_COLLECTION).doc(equipmentRequestId)
@@ -270,6 +277,7 @@ export async function decideEquipmentRequest(eventId, equipmentRequestId, action
     const request = { ...requestSnapshot.data(), id: equipmentRequestId }
     const decision = equipmentDecision(user, event, request, action)
     if (!decision.allowed) throw refusal(decision.reason)
+    if (action === REJECT_EQUIPMENT_REQUEST) return rejectInTransaction(tx, { db, eventRef, requestRef, event, request, user, now, details })
 
     const items = Array.isArray(request.items) ? request.items : []
     const quantityErrors = validateRequestedQuantities(items)
@@ -308,6 +316,45 @@ export async function decideEquipmentRequest(eventId, equipmentRequestId, action
 
     return { equipmentRequest: presentEquipmentRequest({ ...request, ...requestUpdate }), availability }
   })
+}
+
+// SPM-36: everything a rejection writes, after the reads and checks in decideEquipmentRequest.
+function rejectInTransaction(tx, { db, eventRef, requestRef, event, request, user, now, details }) {
+  const { value, errors } = normaliseRejection(details)
+  if (Object.keys(errors).length) throw new EquipmentRequestValidationError(errors)
+
+  const at = now.toISOString()
+  const actor = userActor(user)
+  const requestUpdate = {
+    status: EQUIPMENT_REQUEST_STATUS.REJECTED,
+    rejectedByUid: user.uid,
+    rejectedByName: user.name ?? null,
+    rejectedAt: at,
+    rejectionReason: value.reason,
+    suggestedAlternative: value.suggestedAlternative,
+    updatedAt: at,
+  }
+  tx.update(requestRef, requestUpdate)
+  // The event's status is not changed: it stays in Planning (SPM-36 AC).
+  tx.update(eventRef, {
+    arrangementApprovals: { ...event.arrangementApprovals, [TECHNICAL_ARRANGEMENT]: { decision: ARRANGEMENT_REJECTED, byUid: user.uid, at } },
+    currentEquipmentRequest: equipmentRequestSummary(request.id, EQUIPMENT_REQUEST_STATUS.REJECTED),
+    updatedAt: at,
+  })
+  const activity = eventRef.collection(ACTIVITY_SUBCOLLECTION)
+  tx.set(activity.doc(), {
+    type: EQUIPMENT_REQUEST_REJECTED,
+    equipmentRequestId: request.id,
+    actor: { ...actor, role: TECHNICAL_STAFF },
+    at,
+    reason: value.reason,
+    suggestedAlternative: value.suggestedAlternative,
+  })
+  tx.set(activity.doc(), { type: ARRANGEMENT_DECIDED, arrangement: TECHNICAL_ARRANGEMENT, decision: ARRANGEMENT_REJECTED, actor, at })
+  addNotifications(tx, db, equipmentRequestRejectedNotifications(event, user, {
+    equipmentRequestId: request.id, reason: value.reason, suggestedAlternative: value.suggestedAlternative, at,
+  }))
+  return { equipmentRequest: presentEquipmentRequest({ ...request, ...requestUpdate }) }
 }
 
 function refusal(reason) {

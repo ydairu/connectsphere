@@ -73,7 +73,9 @@ describe('SPM-56 Technical Support queue page', () => {
     show('/equipment/requests', [TECHNICAL_STAFF])
 
     expect(await screen.findByRole('heading', { name: 'Equipment requests', level: 1 })).toBeTruthy()
-    const headings = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
+    // SPM-36 grouped the queue under "Waiting for review" and "Reviewed"; event titles moved to level 3.
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Waiting for review', 'Reviewed'])
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
     expect(headings).toEqual(['Partner summit', 'Launch'])
     expect(screen.getByText('2 × Projector')).toBeTruthy()
     expect(screen.getByText('Pending Review')).toBeTruthy()

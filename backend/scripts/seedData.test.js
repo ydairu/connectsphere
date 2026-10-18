@@ -21,9 +21,10 @@ describe('Seed data — SPM-8 coordinator workload demonstration', () => {
     assert.deepEqual(coordinatorUids.sort(), ['seed-coordinator', 'seed-coordinator-2', 'seed-coordinator-3'])
   })
 
-  test('Seeded active workloads are 4, 2 and 1', () => {
+  // Walkthrough fix B added a past Confirmed event for Seed Coordinator (was 4).
+  test('Seeded active workloads are 5, 2 and 1', () => {
     const counts = countActiveAssignments(SEED_REQUESTS)
-    assert.equal(counts.get('seed-coordinator'), 4)
+    assert.equal(counts.get('seed-coordinator'), 5)
     assert.equal(counts.get('seed-coordinator-2'), 2)
     assert.equal(counts.get('seed-coordinator-3'), 1)
   })

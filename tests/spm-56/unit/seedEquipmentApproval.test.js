@@ -25,7 +25,8 @@ describe('Seed data — SPM-56 approval paths', () => {
     for (const request of pending) {
       const event = events[request.eventRequestId]
       expect(request.assignedTechnicalStaffUid).toBe(SEED_ACCOUNTS.technicalStaff.uid)
-      expect(equipmentRequestActions(SEED_ACCOUNTS.technicalStaff, event, request)).toEqual([APPROVE_EQUIPMENT_REQUEST])
+      // SPM-36 added 'reject'.
+      expect(equipmentRequestActions(SEED_ACCOUNTS.technicalStaff, event, request)).toEqual([APPROVE_EQUIPMENT_REQUEST, 'reject'])
     }
     expect(pending).toHaveLength(2)
     // B1 carries the SPM-56 summary. A1 is left without one so SPM-9 / SPM-10 can demonstrate the manual

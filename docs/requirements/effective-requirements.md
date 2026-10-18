@@ -599,6 +599,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - **Maintenance blocks do not take the venue lock** (SPM-30 never refuses them, Change #2). A block created at the same moment as a hold may not be seen by that hold's check.
 - **Expiry applies only to conflict checks.** The calendar and search still treat every hold as blocking until SPM-78.
 
+**[Implemented — walkthrough fix, 18 Oct 2026]** The conflict message names the occupied period in Singapore time, e.g. "This venue has a confirmed booking occupying it on Fri 20 Nov 2026, 08:30–13:45 SGT." (SPM-13's `formatSingaporePeriod`, both dates when the period crosses midnight), and the 409 message ends with a full stop so the two sentences read apart. The structured `conflict` object keeps its ISO values.
+
 ### 4.15 Equipment Request Management
 
 **[Customer-confirmed]** Organisers record preliminary equipment needs. Coordinators and Technical Support Staff review/refine them. Technical staff approve or reject according to requested staff/equipment availability.
@@ -652,6 +654,16 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - **Preparation unlocks before reservation.** Equipment preparation (SPM-48) unlocks when the technical sign-off is approved, which now happens on approval, before any units are reserved, until SPM-62 / SPM-88.
 - **Requests made before SPM-56** have no event summary, so the manual technical sign-off still applies to them until they are approved, closed or replaced.
 - **Seed.** A1's Planning event is left without a summary on purpose, because SPM-9 and SPM-10 demonstrate the manual technical sign-off on it; its Pending Review request behaves as one made before SPM-56. B1's Planning event carries the summary.
+
+**[Team decisions, 18 Oct 2026 — SPM-36, pending PO confirmation]** Where SPM-36's acceptance criteria leave room:
+
+- **Same route as approval.** The client sends `{ action: 'reject', reason, suggestedAlternative }` to `POST /api/requests/:id/equipment-requests/:requestId/actions`. The reason is required, trimmed, 1–1000 characters; the suggested alternative (other equipment or another date) is optional, up to 1000. Field errors get 400 and nothing is written. The permission checks run first and are the same as approval's (403 / 404 / 409).
+- **What a rejection writes**, in one transaction: the request becomes Rejected with who, when, the reason and any alternative; `arrangementApprovals.technical` becomes `{ decision: 'rejected', byUid, at }`; the event's summary becomes Rejected; activity entries `equipment_request_rejected` (with the reason and alternative) and `arrangement_decided` (rejected); and an in-app notice to the assigned Coordinator with the reason. **The event's status is not changed:** it stays in Planning. Nothing is reserved, and there is no partial fulfilment.
+- **No shortfall is needed to reject,** and no availability check is run or recorded on rejection: staff may reject for other reasons, such as technical requirements that cannot be met. When the page's check found a shortfall, the reason is prefilled with a short summary of it that staff can edit.
+- **Confirm stays blocked** after a rejection: the rejected request is still the event's current request, so technical sign-off stays required and rejected, and the manual technical sign-off stays refused, until a revised request is approved. A revised request replaces the rejected one (`replacesId`), clears the rejected sign-off (SPM-56's rule for a new request), and goes to the same Technical Support Staff member.
+- **What each role sees.** The Coordinator's card shows "Rejected by" (name and time), the reason and any alternative, and the form, headed "Submit a revised request". The Technical Support queue groups requests under "Waiting for review" and "Reviewed". **Organisers** still never see equipment requests, but the existing SPM-9 arrangements summary shows them "Technical arrangement: Rejected", as it does after a manual technical rejection; no reason or equipment details are shown.
+
+**[Implemented — SPM-36, 18 Oct 2026 — historical record]** `normaliseRejection` and the `reject` action in `shared/equipmentRequest.js`; `shortfallSummary` in `shared/equipmentAvailabilityCheck.js`; `equipmentRequestRejectedNotifications` in `shared/notifications.js`; the reject branch of `decideEquipmentRequest`; the Reject form on the Equipment requests card. The rejection is recorded in the event's activity, which is not displayed yet (the card shows who rejected it and when).
 
 ### 4.16 Equipment Availability Checking
 
