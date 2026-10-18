@@ -599,6 +599,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - **Maintenance blocks do not take the venue lock** (SPM-30 never refuses them, Change #2). A block created at the same moment as a hold may not be seen by that hold's check.
 - **Expiry applies only to conflict checks.** The calendar and search still treat every hold as blocking until SPM-78.
 
+**[Implemented — walkthrough fix, 18 Oct 2026]** The conflict message names the occupied period in Singapore time, e.g. "This venue has a confirmed booking occupying it on Fri 20 Nov 2026, 08:30–13:45 SGT." (SPM-13's `formatSingaporePeriod`, both dates when the period crosses midnight), and the 409 message ends with a full stop so the two sentences read apart. The structured `conflict` object keeps its ISO values.
+
 ### 4.15 Equipment Request Management
 
 **[Customer-confirmed]** Organisers record preliminary equipment needs. Coordinators and Technical Support Staff review/refine them. Technical staff approve or reject according to requested staff/equipment availability.

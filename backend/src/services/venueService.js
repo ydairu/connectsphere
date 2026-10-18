@@ -7,6 +7,7 @@ import {
   validateAvailabilityRange,
 } from '../../../shared/venueAvailability.js'
 import { findVenueConflict } from '../../../shared/venueConflicts.js'
+import { formatSingaporePeriod } from '../../../shared/operatingHours.js'
 import { buildVenueFilterOptions, normaliseVenueSearchQuery, venueAvailableFor, venueMatchesFilters } from '../../../shared/venueSearch.js'
 import { hasConfirmedBooking, venueBufferMinutes } from '../../../shared/venueOccupancy.js'
 import { buildVenueCalendar } from '../../../shared/venueCalendar.js'
@@ -77,7 +78,8 @@ export class VenueConflictError extends Error {
       occupiedEndsAt: conflict.occupiedEndsAt,
     }
     this.errors = {
-      time: `This venue has ${CONFLICT_LABELS[conflict.status]} occupying it from ${conflict.occupiedStartsAt} to ${conflict.occupiedEndsAt}.`,
+      // Shown to people, so in Singapore time; the structured `conflict` above keeps the ISO values.
+      time: `This venue has ${CONFLICT_LABELS[conflict.status]} occupying it on ${formatSingaporePeriod(conflict.occupiedStartsAt, conflict.occupiedEndsAt)} SGT.`,
     }
   }
 }

@@ -167,6 +167,17 @@ describe('SPM-16 createTentativeVenueHold — conflicts', () => {
   })
 })
 
+describe('SPM-16 conflict message in Singapore time (walkthrough fix A)', () => {
+  it('spm16_a_conflict_crossing_midnight_in_singapore_names_both_dates', async () => {
+    // 15:00–16:30 UTC is 23:00–00:30 SGT; with the hall's 30/45 minutes it occupies 22:30–01:15 SGT.
+    seed({ late: entry({ startsAt: at('15:00:00'), endsAt: at('16:30:00') }) })
+    const error = await hold('16:00:00', '17:00:00').catch((caught) => caught)
+    expect(error).toBeInstanceOf(VenueConflictError)
+    expect(error.errors.time).toBe('This venue has a confirmed booking occupying it on Fri 20 Nov 2026, 22:30 – Sat 21 Nov 2026, 01:15 SGT.')
+    expect(error.conflict).toMatchObject({ occupiedStartsAt: at('14:30:00'), occupiedEndsAt: at('17:15:00') })
+  })
+})
+
 describe('SPM-16 createTentativeVenueHold — record, lock and validation', () => {
   it('spm16_new_hold_is_active_and_expires_seven_days_after_the_injected_now', async () => {
     seed()
@@ -240,7 +251,9 @@ describe('SPM-16 createTentativeVenueHold — record, lock and validation', () =
       occupiedStartsAt: at('09:30:00'),
       occupiedEndsAt: at('12:45:00'),
     })
-    expect(res.body.errors.time).toBe(`This venue has a confirmed booking occupying it from ${at('09:30:00')} to ${at('12:45:00')}.`)
+    // Walkthrough fix A: the message names the occupied period in Singapore time; `conflict` keeps ISO values.
+    expect(res.body.message).toBe('The venue is not available for that period.')
+    expect(res.body.errors.time).toBe('This venue has a confirmed booking occupying it on Fri 20 Nov 2026, 17:30–20:45 SGT.')
     // Neither the other entry's title, event, nor id is returned.
     expect(JSON.stringify(res.body)).not.toContain('Existing')
     expect(JSON.stringify(res.body)).not.toContain('request-existing')
