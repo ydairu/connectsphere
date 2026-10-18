@@ -20,6 +20,7 @@
 //   equipment request approved, or   the assigned Coordinator                    (SPM-56)
 //   its approval re-confirmed
 //   venue booking rejected           the assigned Coordinator                    (SPM-34)
+//   equipment request rejected       the assigned Coordinator, with the reason    (SPM-36)
 // The user who acted is never notified of their own action.
 
 import { REFUSE_CANCELLATION, REQUEST_CANCELLATION, RESUBMIT_CANCELLATION, RETURN_CANCELLATION } from './requestActions.js'
@@ -38,6 +39,8 @@ export const SIGNIFICANT_CHANGE_NOTICE = 'significant_change'
 export const EQUIPMENT_REQUEST_APPROVED_NOTICE = 'equipment_request_approved'
 export const VENUE_BOOKING_REJECTED_NOTICE = 'venue_booking_rejected'
 export const VENUE_BOOKING_APPROVED_NOTICE = 'venue_booking_approved'
+// SPM-36: the assigned Technical Support Staff member rejected the event's equipment request.
+export const EQUIPMENT_REQUEST_REJECTED_NOTICE = 'equipment_request_rejected'
 
 function titleOf(request) {
   const title = request.core?.title
@@ -147,4 +150,15 @@ export function venueBookingApprovedNotifications(event, booking, actor, { at })
     reason: null,
     bookingRequestId: booking.id,
   }], event, actor, title, at)
+}
+
+/**
+ * SPM-36 — the notice for the assigned Coordinator when `actor` rejects the event's equipment request. The
+ * reason is shown with it; a suggested alternative, when given, is added to the message.
+ */
+export function equipmentRequestRejectedNotifications(event, actor, { equipmentRequestId, reason, suggestedAlternative = null, at }) {
+  const title = titleOf(event)
+  const message = `The equipment request for “${title}” was rejected. Submit a revised request.${suggestedAlternative ? ` Suggested alternative: ${suggestedAlternative}` : ''}`
+  const notices = [{ recipientUid: event.assignedCoordinatorUid, type: EQUIPMENT_REQUEST_REJECTED_NOTICE, message, reason, equipmentRequestId }]
+  return addressed(notices, event, actor, title, at)
 }

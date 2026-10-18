@@ -54,7 +54,8 @@ describe('SPM-56 approval API', () => {
 
   it('spm56_api_refusals_400_403_404_409', async () => {
     const created = await submitAs(db)
-    expect((await act(created.id, 'reject')).status).toBe(400)
+    // SPM-36 made 'reject' a real action; an obviously fake one stays unknown.
+    expect((await act(created.id, 'not_an_action')).status).toBe(400)
     expect((await act(created.id, undefined)).status).toBe(400)
     expect((await act(created.id, 'approve', coordinator)).status).toBe(403)
     expect((await act(created.id, 'approve', organiser)).status).toBe(403)

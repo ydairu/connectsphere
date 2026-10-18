@@ -153,7 +153,8 @@ describe('SPM-56 approve an equipment request', () => {
 
   it('spm56_an_unknown_action_is_400', async () => {
     const created = await submitAs(db)
-    await expectRefused(approve(created.id, tech, 'reject'), 400)
+    // SPM-36 made 'reject' a real action; an obviously fake one stays unknown.
+    await expectRefused(approve(created.id, tech, 'not_an_action'), 400)
   })
 
   it('spm56_the_coordinator_sees_approved_with_who_and_when', async () => {

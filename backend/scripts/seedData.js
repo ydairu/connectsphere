@@ -68,7 +68,7 @@ export const SEED_ACCOUNTS = Object.freeze({
   // SPM-8: a second coordinator, so workload-based assignment has more than one candidate to choose from.
   coordinator2: account('coordinator-2', 'Seed Coordinator 2', [COORDINATOR]),
   // SPM-8: a third coordinator, so the seed spreads active work across three different workloads and the
-  // next submission visibly goes to the one with the fewest. Seeded workloads: 4, 2 and 1 (see SEED_REQUESTS).
+  // next submission visibly goes to the one with the fewest. Seeded workloads: 5, 2 and 1 (see SEED_REQUESTS).
   coordinator3: account('coordinator-3', 'Seed Coordinator 3', [COORDINATOR]),
   venueStaff: account('venue-staff', 'Seed Venue Staff', [VENUE_STAFF]),
   technicalStaff: account('technical-staff', 'Seed Technical Staff', [TECHNICAL_STAFF]),
@@ -139,7 +139,7 @@ const bothArrangementsApproved = {
 
 export const SEED_REQUESTS = Object.freeze([
   // Organisation A, organiser A1 — one request in every status.
-  // SPM-8 workloads (active = Submitted, Under Review, Returned, Planning, Confirmed): coordinator 4,
+  // SPM-8 workloads (active = Submitted, Under Review, Returned, Planning, Confirmed): coordinator 5,
   // coordinator-2 2, coordinator-3 1. Finished requests are assigned too, but do not count.
   eventRequest({ slug: 'a1-draft', status: DRAFT, owner: organiserA1, title: 'A1 draft (private to A1)', draft: true, createdAt: '2026-09-01T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-submitted', coordinator, status: SUBMITTED, owner: organiserA1, title: 'A1 submitted', createdAt: '2026-09-02T10:00:00+08:00' }),
@@ -147,6 +147,10 @@ export const SEED_REQUESTS = Object.freeze([
   eventRequest({ slug: 'a1-returned', coordinator, status: RETURNED, owner: organiserA1, title: 'A1 returned for clarification', createdAt: '2026-09-04T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-planning', coordinator, status: PLANNING, owner: organiserA1, title: 'A1 planning (all staff assigned)', assigned: bothStaffTeams, createdAt: '2026-09-05T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, approvals: bothArrangementsApproved, createdAt: '2026-09-06T10:00:00+08:00' }),
+  // SPM-27 demo: a Confirmed event that has already taken place (1 Oct 2026), so its Coordinator can mark it
+  // completed. No venue booking or hold, so it clashes with nothing seeded. Counts towards Seed Coordinator's
+  // workload (5), which keeps coordinator-3 the next to be assigned.
+  eventRequest({ slug: 'a1-confirmed-past', coordinator, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (event held, ready to complete)', assigned: bothStaffTeams, approvals: bothArrangementsApproved, preferredDateTime: '2026-10-01T09:00:00+08:00', createdAt: '2026-09-06T11:00:00+08:00' }),
   eventRequest({ slug: 'a1-completed', coordinator, status: COMPLETED, owner: organiserA1, title: 'A1 completed', assigned: bothStaffTeams, createdAt: '2026-09-07T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-cancelled', coordinator: coordinator2, status: CANCELLED, owner: organiserA1, title: 'A1 cancelled', assigned: bothStaffTeams, createdAt: '2026-09-08T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-rejected', coordinator, status: REJECTED, owner: organiserA1, title: 'A1 rejected', createdAt: '2026-09-09T10:00:00+08:00' }),

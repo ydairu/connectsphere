@@ -10,7 +10,7 @@ import {
 import { checkEquipmentRequestAvailability } from '../services/equipmentAvailabilityService.js'
 
 // SPM-17 — GET and POST /api/requests/:id/equipment-requests; SPM-18 — GET .../:requestId/availability;
-// SPM-56 — POST .../:requestId/actions and GET /api/equipment/requests/assigned.
+// SPM-56 / SPM-36 — POST .../:requestId/actions and GET /api/equipment/requests/assigned.
 export function createEquipmentRequestController(getDb) {
   const handle = (operation, status = 200) => async (req, res, next) => {
     try {
@@ -25,7 +25,7 @@ export function createEquipmentRequestController(getDb) {
   return {
     submit: handle(async (req) => ({ equipmentRequest: await submitEquipmentRequest(req.params.id, req.body, req.user, getDb()) }), 201),
     list: handle((req) => listEventEquipmentRequests(req.params.id, req.user, getDb())),
-    decide: handle((req) => decideEquipmentRequest(req.params.id, req.params.requestId, req.body?.action, req.user, getDb())),
+    decide: handle((req) => decideEquipmentRequest(req.params.id, req.params.requestId, req.body?.action, req.user, getDb(), new Date(), req.body ?? {})),
     assigned: handle((req) => listAssignedEquipmentRequests(req.user, getDb())),
     checkAvailability: handle(async (req) => ({
       availability: await checkEquipmentRequestAvailability(req.params.id, req.params.requestId, req.user, getDb()),

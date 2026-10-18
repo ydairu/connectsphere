@@ -31,10 +31,11 @@ export function checkEquipmentAvailability(user, eventId, equipmentRequestId) {
   return authenticatedRequest(user, `/api/requests/${eventId}/equipment-requests/${equipmentRequestId}/availability`)
 }
 // SPM-56: approve or re-confirm an equipment request (SPM-36 adds 'reject'), and the Technical Support queue.
-export function decideEquipmentRequest(user, eventId, equipmentRequestId, action) {
+// SPM-36: `details` carries a rejection's reason and suggested alternative.
+export function decideEquipmentRequest(user, eventId, equipmentRequestId, action, details = {}) {
   return authenticatedRequest(user, `/api/requests/${eventId}/equipment-requests/${equipmentRequestId}/actions`, {
     method: 'POST',
-    body: JSON.stringify({ action }),
+    body: JSON.stringify({ ...details, action }),
   })
 }
 export function listAssignedEquipmentRequests(user) {

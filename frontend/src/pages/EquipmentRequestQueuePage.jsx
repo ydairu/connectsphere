@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { EQUIPMENT_REQUEST_STATUS_LABELS } from '../../../shared/equipmentRequest.js'
+import { EQUIPMENT_REQUEST_STATUS, EQUIPMENT_REQUEST_STATUS_LABELS } from '../../../shared/equipmentRequest.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { listAssignedEquipmentRequests } from '../services/api.js'
 import Button from '../components/Button.jsx'
@@ -8,7 +8,7 @@ import Card from '../components/Card.jsx'
 import Navbar from '../components/Navbar.jsx'
 
 // SPM-56 — the equipment requests assigned to the signed-in Technical Support Staff member, waiting for review
-// first, oldest first. Follows SPM-53's Venue Staff queue. Each request is reviewed on its event's page
+// first, oldest first, under "Waiting for review" and "Reviewed" (SPM-36). Follows SPM-53's Venue Staff queue. Each request is reviewed on its event's page
 // (Equipment requests card), so approving — and SPM-36's rejecting — happens in one place.
 
 const displayTime = (value) =>
@@ -16,6 +16,24 @@ const displayTime = (value) =>
 
 function Row({ label, children }) {
   return <div className="profile-row booking-row"><span>{label}</span><strong>{children}</strong></div>
+}
+
+function QueueCard({ request }) {
+  return (
+    <Card className="request-form-section booking-card">
+      <div className="section-heading"><h3>{request.eventTitle || 'Untitled event'}</h3></div>
+      <Row label="Status">{EQUIPMENT_REQUEST_STATUS_LABELS[request.status] ?? request.status}</Row>
+      <Row label="Required from">{displayTime(request.requiredPeriod?.startsAt)}</Row>
+      <Row label="Required until">{displayTime(request.requiredPeriod?.endsAt)}</Row>
+      <Row label="Equipment">{request.items.map((item) => `${item.quantity} × ${item.equipmentTypeName}`).join(', ')}</Row>
+      <Row label="Submitted">{displayTime(request.createdAt)}</Row>
+      {request.approvedAt && <Row label="Approved on">{displayTime(request.approvedAt)}</Row>}
+      {request.rejectedAt && <Row label="Rejected on">{displayTime(request.rejectedAt)}</Row>}
+      <div className="booking-actions">
+        <Link className="button button-secondary button-small" to={`/requests/${request.eventRequestId}?tab=equipment-required#equipment-requests`}>Review on event</Link>
+      </div>
+    </Card>
+  )
 }
 
 export default function EquipmentRequestQueuePage() {
@@ -59,19 +77,15 @@ export default function EquipmentRequestQueuePage() {
         )}
         {loading && <p role="status">Loading equipment requests...</p>}
         {requests?.length === 0 && <Card className="request-form-section"><p>No equipment requests are assigned to you.</p></Card>}
-        {requests?.map((request) => (
-          <Card className="request-form-section booking-card" key={request.id}>
-            <div className="section-heading"><h2>{request.eventTitle || 'Untitled event'}</h2></div>
-            <Row label="Status">{EQUIPMENT_REQUEST_STATUS_LABELS[request.status] ?? request.status}</Row>
-            <Row label="Required from">{displayTime(request.requiredPeriod?.startsAt)}</Row>
-            <Row label="Required until">{displayTime(request.requiredPeriod?.endsAt)}</Row>
-            <Row label="Equipment">{request.items.map((item) => `${item.quantity} × ${item.equipmentTypeName}`).join(', ')}</Row>
-            <Row label="Submitted">{displayTime(request.createdAt)}</Row>
-            {request.approvedAt && <Row label="Approved on">{displayTime(request.approvedAt)}</Row>}
-            <div className="booking-actions">
-              <Link className="button button-secondary button-small" to={`/requests/${request.eventRequestId}?tab=equipment-required#equipment-requests`}>Review on event</Link>
-            </div>
-          </Card>
+        {/* SPM-36: once approved or rejected, a request leaves the group waiting for review. */}
+        {requests?.length > 0 && [
+          ['Waiting for review', requests.filter((request) => request.status === EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW), 'Nothing is waiting for your review.'],
+          ['Reviewed', requests.filter((request) => request.status !== EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW), 'No reviewed requests yet.'],
+        ].map(([heading, group, empty]) => (
+          <section key={heading} aria-label={heading}>
+            <h2>{heading}</h2>
+            {group.length === 0 ? <p className="form-note">{empty}</p> : group.map((request) => <QueueCard key={request.id} request={request} />)}
+          </section>
         ))}
       </main>
     </div>

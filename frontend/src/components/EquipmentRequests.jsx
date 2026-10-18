@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   APPROVE_EQUIPMENT_REQUEST,
   EQUIPMENT_REQUEST_STATUS_LABELS,
+  EQUIPMENT_REQUEST_STATUS,
+  MAX_REJECTION_TEXT_LENGTH,
   RECONFIRM_EQUIPMENT_APPROVAL,
+  REJECT_EQUIPMENT_REQUEST,
   MAX_EQUIPMENT_REQUEST_ITEMS,
   MAX_TECHNICAL_REQUIREMENTS_LENGTH,
   normaliseEquipmentRequest,
 } from '../../../shared/equipmentRequest.js'
-import { CHECKABLE_REQUEST_STATUSES } from '../../../shared/equipmentAvailabilityCheck.js'
+import { CHECKABLE_REQUEST_STATUSES, shortfallSummary } from '../../../shared/equipmentAvailabilityCheck.js'
 import { TECHNICAL_STAFF } from '../../../shared/permissions.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { checkEquipmentAvailability, decideEquipmentRequest, listEquipment, listEquipmentRequests, submitEquipmentRequest } from '../services/api.js'
@@ -105,29 +108,74 @@ function AvailabilityCheck({ user, eventId, request, autoCheck = false, result: 
   )
 }
 
-// SPM-56 — what the user may do with this request now comes from the API (`actions`). Approve and Re-confirm
-// sit here next to the availability check; SPM-36 is expected to add Reject to the same action area.
+// SPM-56 / SPM-36 — what the user may do with this request now comes from the API (`actions`). Approve and
+// Re-confirm need a check showing the request can be fulfilled; Reject does not (a request may be rejected for
+// other reasons, such as technical requirements that cannot be met) and opens a form for the reason.
 const ACTION_LABELS = Object.freeze({
   [APPROVE_EQUIPMENT_REQUEST]: 'Approve request',
   [RECONFIRM_EQUIPMENT_APPROVAL]: 'Re-confirm approval',
 })
 
+const DECIDED_MESSAGES = Object.freeze({
+  [APPROVE_EQUIPMENT_REQUEST]: 'Approved. The technical arrangement is approved.',
+  [RECONFIRM_EQUIPMENT_APPROVAL]: 'Approval re-confirmed. The technical arrangement is approved again.',
+  [REJECT_EQUIPMENT_REQUEST]: 'Rejected. The Coordinator has been notified.',
+})
+
+function RejectForm({ request, initialReason, busy, errors, onConfirm, onCancel }) {
+  const [reason, setReason] = useState(initialReason ?? '')
+  const [alternative, setAlternative] = useState('')
+  const reasonId = `reject-reason-${request.id}`
+  const alternativeId = `reject-alternative-${request.id}`
+  const blank = reason.trim() === ''
+
+  return (
+    <div className="equipment-reject" role="group" aria-label={`Reject equipment request ${request.id}`}>
+      <div className="field">
+        <label htmlFor={reasonId}>Reason for rejection (required)</label>
+        <textarea id={reasonId} rows={3} maxLength={MAX_REJECTION_TEXT_LENGTH} value={reason} onChange={(event) => setReason(event.target.value)}
+          aria-invalid={Boolean(errors.reason)} aria-describedby={errors.reason ? `${reasonId}-error` : undefined} />
+        <FieldError id={`${reasonId}-error`} message={errors.reason} />
+        {blank && <p className="form-note">Enter a reason to continue.</p>}
+      </div>
+      <div className="field">
+        <label htmlFor={alternativeId}>Suggested alternative (optional)</label>
+        <textarea id={alternativeId} rows={2} maxLength={MAX_REJECTION_TEXT_LENGTH} value={alternative} onChange={(event) => setAlternative(event.target.value)}
+          aria-invalid={Boolean(errors.suggestedAlternative)} aria-describedby={errors.suggestedAlternative ? `${alternativeId}-error` : undefined} />
+        <FieldError id={`${alternativeId}-error`} message={errors.suggestedAlternative} />
+      </div>
+      <div className="form-actions">
+        <Button type="button" variant="secondary" disabled={busy} onClick={onCancel}>Cancel</Button>
+        <Button type="button" disabled={busy || blank} onClick={() => onConfirm({ reason, suggestedAlternative: alternative })}>Confirm rejection</Button>
+      </div>
+    </div>
+  )
+}
+
 function ReviewPanel({ user, eventId, request, busy, onDecided }) {
   const [result, setResult] = useState(null)
   const [deciding, setDeciding] = useState(false)
   const [message, setMessage] = useState(null)
+  const [rejecting, setRejecting] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({})
   const actions = request.actions ?? []
+  const approveActions = actions.filter((action) => action !== REJECT_EQUIPMENT_REQUEST)
+  const canReject = actions.includes(REJECT_EQUIPMENT_REQUEST)
 
-  async function decide(action) {
+  async function decide(action, details) {
     setDeciding(true)
     setMessage(null)
+    setFieldErrors({})
     try {
-      await decideEquipmentRequest(user, eventId, request.id, action)
-      await onDecided(action === APPROVE_EQUIPMENT_REQUEST ? 'Approved. The technical arrangement is approved.' : 'Approval re-confirmed. The technical arrangement is approved again.')
+      if (details) await decideEquipmentRequest(user, eventId, request.id, action, details)
+      else await decideEquipmentRequest(user, eventId, request.id, action)
+      setRejecting(false)
+      await onDecided(DECIDED_MESSAGES[action])
     } catch (failure) {
       // A shortfall found by the server's own check replaces the result shown, so the reason is visible.
       if (failure?.details?.availability) setResult(failure.details.availability)
-      setMessage(failure?.details?.message ?? 'The request could not be updated. Please try again.')
+      if (failure?.details?.errors) setFieldErrors(failure.details.errors)
+      setMessage(failure?.details?.errors ? 'Check the highlighted fields.' : failure?.details?.message ?? 'The request could not be updated. Please try again.')
     } finally {
       setDeciding(false)
     }
@@ -138,15 +186,30 @@ function ReviewPanel({ user, eventId, request, busy, onDecided }) {
       <AvailabilityCheck user={user} eventId={eventId} request={request} autoCheck={actions.length > 0} result={result} onResult={setResult} />
       {actions.length > 0 && (
         <div className="equipment-actions" role="group" aria-label={`Review equipment request ${request.id}`}>
-          {actions.map((action) => (
-            <Button key={action} type="button" disabled={busy || deciding || result?.fulfillable !== true} onClick={() => decide(action)}>
+          {approveActions.map((action) => (
+            <Button key={action} type="button" disabled={busy || deciding || rejecting || result?.fulfillable !== true} onClick={() => decide(action)}>
               {deciding ? 'Saving…' : ACTION_LABELS[action] ?? action}
             </Button>
           ))}
-          {result?.fulfillable === false && <p className="form-note">A request with a shortfall cannot be approved.</p>}
-          {result === null && <p className="form-note">Approval is available once availability has been checked.</p>}
+          {canReject && !rejecting && (
+            <Button type="button" variant="secondary" disabled={busy || deciding} onClick={() => { setFieldErrors({}); setRejecting(true) }}>
+              Reject request
+            </Button>
+          )}
+          {approveActions.length > 0 && result?.fulfillable === false && <p className="form-note">A request with a shortfall cannot be approved.</p>}
+          {approveActions.length > 0 && result === null && <p className="form-note">Approval is available once availability has been checked.</p>}
           {actions.includes(RECONFIRM_EQUIPMENT_APPROVAL) && (
             <p className="form-note">A significant change to the event cleared the technical sign-off. Re-confirm to approve it again (until SPM-87 removes the automatic reset).</p>
+          )}
+          {rejecting && (
+            <RejectForm
+              request={request}
+              initialReason={shortfallSummary(result)}
+              busy={busy || deciding}
+              errors={fieldErrors}
+              onConfirm={(details) => decide(REJECT_EQUIPMENT_REQUEST, details)}
+              onCancel={() => { setRejecting(false); setFieldErrors({}); setMessage(null) }}
+            />
           )}
           {message && <p className="field-error" role="alert">{message}</p>}
         </div>
@@ -228,6 +291,8 @@ function EquipmentRequests({ user, eventId, organiserEquipment, busy = false, on
   }
 
   const disabled = busy || submitting
+  // SPM-36: after a rejection the form submits the revision (the server links it with replacesId).
+  const revising = (data.requests ?? []).some((request) => request.status === EQUIPMENT_REQUEST_STATUS.REJECTED && !request.replacedById)
 
   async function handleDecided(text) {
     setMessage({ type: 'success', text })
@@ -257,6 +322,9 @@ function EquipmentRequests({ user, eventId, organiserEquipment, busy = false, on
           {request.replacesId && <Row label="Replaces">The rejected request {request.replacesId}</Row>}
           {request.approvedAt && <Row label="Approved by">{`${request.approvedByName ?? 'Technical Support Staff'}, ${displayTime(request.approvedAt)}`}</Row>}
           {request.reconfirmedAt && <Row label="Re-confirmed by">{`${request.reconfirmedByName ?? 'Technical Support Staff'}, ${displayTime(request.reconfirmedAt)}`}</Row>}
+          {request.rejectedAt && <Row label="Rejected by">{`${request.rejectedByName ?? 'Technical Support Staff'}, ${displayTime(request.rejectedAt)}`}</Row>}
+          {request.rejectionReason && <Row label="Reason for rejection">{request.rejectionReason}</Row>}
+          {request.suggestedAlternative && <Row label="Suggested alternative">{request.suggestedAlternative}</Row>}
           <ul className="equipment-items">
             {request.items.map((item) => (
               <li key={item.equipmentTypeId}>
@@ -274,7 +342,8 @@ function EquipmentRequests({ user, eventId, organiserEquipment, busy = false, on
       {data.canSubmit && (
         <div className="equipment-request-form" role="group" aria-label="Request equipment">
           <OrganiserEquipment equipment={organiserEquipment} />
-          <h3>Request equipment</h3>
+          <h3>{revising ? 'Submit a revised request' : 'Request equipment'}</h3>
+          {revising && <p className="form-note">This replaces the rejected request.</p>}
           <p className="form-note">Choose equipment types and quantities. Technical Support Staff choose the units when they reserve them.</p>
           {errors.items && <p className="field-error" role="alert">{errors.items}</p>}
           {rows.map((row, index) => {

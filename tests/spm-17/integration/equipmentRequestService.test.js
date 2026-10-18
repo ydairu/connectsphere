@@ -204,8 +204,8 @@ describe('SPM-17 reading equipment requests', () => {
 
   it('spm17_the_assigned_technical_staff_member_can_read_it', async () => {
     const created = await submit()
-    // SPM-56 added `actions`: the assignee may approve a Pending Review request at Planning.
-    expect((await listEventEquipmentRequests('event', tech, db))).toEqual({ canSubmit: false, requests: [{ ...created, actions: ['approve'] }] })
+    // SPM-56 added `actions`: the assignee may approve (and, since SPM-36, reject) a Pending Review request.
+    expect((await listEventEquipmentRequests('event', tech, db))).toEqual({ canSubmit: false, requests: [{ ...created, actions: ['approve', 'reject'] }] })
   })
 
   it('spm17_organisers_venue_staff_attendees_and_other_staff_cannot', async () => {
