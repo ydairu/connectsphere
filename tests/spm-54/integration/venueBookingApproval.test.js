@@ -65,8 +65,8 @@ describe('SPM-54 atomic approval with in-memory persistence', () => {
     expect(snapshot()).toEqual(before)
   })
   it('allows warning-only suitability and saves the warnings', async () => {
-    const booking = await submit()
-    db.store.get('event').venue.layoutPreference = 'Banquet'
+    const booking = await submit({ requirements: 'Banquet' })
+    db.store.get('event').venue.layoutPreference = 'Theatre'
     expect((await approve(booking.id)).approvalWarnings).toEqual([expect.objectContaining({ check: 'layout' })])
   })
   it.each([A.CONFIRMED_BOOKING, A.TENTATIVE_HOLD, A.MAINTENANCE_BLOCK])('refuses a fresh %s conflict, even one linked to the same event', async (status) => {
@@ -149,3 +149,34 @@ describe('SPM-54 atomic approval with in-memory persistence', () => {
     expect(stored(booking.id).status).toBe('approved')
   })
 })
+
+ it('previews submitted requirements without writes and rechecks current capacity after preview', async () => {
+   const booking = await submit({ requirements: 'Breakout Room' })
+   db.store.get('event').venue.layoutPreference = 'Breakkout Room'
+   const before = snapshot()
+   const preview = await listEventVenueBookings('event', staff, db)
+   expect(preview.bookings[0].suitability.warnings[0].message).toContain('Breakout Room')
+   expect(snapshot()).toEqual(before)
+   db.store.get('event').venue.layoutPreference = 'Breakout Room'
+   expect((await listEventVenueBookings('event', staff, db)).bookings[0].suitability.warnings[0].message).toContain('"Breakout Room"')
+   await expect(listEventVenueBookings('event', secondStaff, db)).rejects.toMatchObject({ status: 404 })
+   db.store.get('event').core.expectedAttendees = 201
+   const changed = snapshot()
+   await expect(approve(booking.id)).rejects.toMatchObject({ status: 409 })
+   expect(snapshot()).toEqual(changed)
+   db.store.get('event').core.expectedAttendees = 100
+   expect((await approve(booking.id)).approvalWarnings[0].message).toContain('"Breakout Room"')
+ })
+
+ it('uses reviewed replacement text for preview and approval without rewriting event or rejected history', async () => {
+   db.store.get('event').venue.layoutPreference = 'Breakkout Room'
+   db.collectionData('venues').get('hall').supportedLayouts = ['Classroom']
+   const original = await submit({ requirements: 'Breakkout Room' })
+   await rejectVenueBooking('event', original.id, { action: 'reject', reason: 'Revise layout' }, staff, db, now)
+   const replacement = await submit({ requirements: 'classroom', replacesId: original.id, submissionKey: 'classroom-replacement' })
+   const preview = (await listEventVenueBookings('event', staff, db)).bookings.find((b) => b.id === replacement.id)
+   expect(preview.suitability.warnings).toEqual([])
+   expect((await approve(replacement.id)).approvalWarnings).toEqual([])
+   expect(stored(original.id)).toMatchObject({ status: 'rejected', requirements: 'Breakkout Room', rejectionReason: 'Revise layout' })
+   expect(db.store.get('event').venue.layoutPreference).toBe('Breakkout Room')
+ })

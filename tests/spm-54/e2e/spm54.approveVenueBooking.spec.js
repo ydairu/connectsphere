@@ -76,6 +76,7 @@ test('SPM-54 stale staff page reloads after a decision from another tab', async 
   await signIn(page, ROLE_USERS.venueStaff)
   await page.goto(`${path}?bookingId=${booking.id}`)
   await page.getByRole('button', { name: 'Approve booking' }).click()
+  await expect(page.getByRole('button', { name: 'Confirm approval' })).toBeVisible()
   const response = await request.post(`${DOUBLE_ORIGIN}/api/requests/${eventId}/venue-bookings/${booking.id}/actions`, {
     headers: { Authorization: `Bearer test-token:${ROLE_USERS.venueStaff.uid}` }, data: { action: 'approve' },
   })
@@ -94,8 +95,81 @@ test('SPM-54 capacity overflow is refused and the booking remains pending', asyn
   await signIn(page, ROLE_USERS.venueStaff)
   await page.goto(`${path}?bookingId=${booking.id}`)
   await page.getByRole('button', { name: 'Approve booking' }).click()
-  await page.getByRole('button', { name: 'Confirm approval' }).click()
-  await expect(page.getByRole('alert')).toContainText("above this venue's capacity")
-  await page.getByRole('button', { name: 'Reload booking' }).click()
+  await expect(page.getByRole('button', { name: 'Confirm approval' })).toBeDisabled()
+  await expect(page.getByRole('region', { name: 'Approval blocked' })).toContainText("above this venue's capacity")
   await expect(page.getByText('pending', { exact: true })).toBeVisible()
+})
+
+
+test('SPM-54 rejected replacement refreshes corrected requirements and previews warnings', async ({ page, request }) => {
+  const headers = { Authorization: `Bearer test-token:${ROLE_USERS.coordinator.uid}` }
+  const edit = async (layoutPreference) => {
+    const result = await request.patch(`${DOUBLE_ORIGIN}/api/requests/${eventId}`, { headers, data: { venue: { layoutPreference } } })
+    expect(result.status()).toBe(200)
+  }
+  await edit('Breakkout Room')
+  const originalResponse = await request.post(`${DOUBLE_ORIGIN}/api/requests/${eventId}/venue-bookings`, { headers, data: {
+    venueId: 'seed-venue-hall', startsAt: '2027-03-01T10:00:00Z', endsAt: '2027-03-01T12:00:00Z',
+    requirements: 'Breakkout Room', specialRequests: 'Wheelchair', submissionKey: 'typo-regression',
+  } })
+  expect(originalResponse.status()).toBe(201)
+  const original = (await originalResponse.json()).booking
+  expect((await request.post(`${DOUBLE_ORIGIN}/api/requests/${eventId}/venue-bookings/${original.id}/actions`, {
+    headers: { Authorization: `Bearer test-token:${ROLE_USERS.venueStaff.uid}` }, data: { action: 'reject', reason: 'Review layout' },
+  })).status()).toBe(200)
+  await signIn(page, ROLE_USERS.coordinator)
+  await page.goto(path)
+  await expect(page.getByText('Breakkout Room', { exact: true })).toBeVisible()
+  await edit('Breakout Room')
+  await page.getByRole('button', { name: 'Replace request for Seed Hall' }).click()
+  await expect(page.getByLabel('Venue requirements', { exact: true })).toHaveValue(/Breakout Room/)
+  await expect(page.getByLabel('Special requests')).toHaveValue('Wheelchair')
+  const saved = page.waitForResponse((r) => r.url().endsWith(`/api/requests/${eventId}/venue-bookings`) && r.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Submit replacement' }).click()
+  const replacement = (await (await saved).json()).booking
+  await expect(page.getByRole('status')).toContainText('tentatively held')
+  await expect(page.getByText('Breakkout Room', { exact: true })).toBeVisible()
+  await logout(page)
+  await signIn(page, ROLE_USERS.venueStaff)
+  await page.goto(`${path}?bookingId=${replacement.id}`)
+  await expect(page.getByRole('region', { name: 'Suitability warnings' })).toContainText('Booking requirements "Breakout Room')
+  await page.getByRole('button', { name: 'Approve booking' }).click()
+  await expect(page.getByRole('form', { name: 'Approve venue booking' })).toContainText('Booking requirements "Breakout Room')
+  await page.getByRole('button', { name: 'Confirm approval' }).click()
+  await expect(page.getByText('Approved — venue confirmed')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Warnings recorded at approval' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('Approved — venue confirmed')).toBeVisible()
+})
+
+
+test('SPM-54 staff warnings follow classroom entered in the booking form, not the unchanged event', async ({ page, request }) => {
+  const headers = { Authorization: `Bearer test-token:${ROLE_USERS.coordinator.uid}` }
+  expect((await request.patch(`${DOUBLE_ORIGIN}/api/requests/${eventId}`, { headers, data: { core: { expectedAttendees: 20 }, venue: { layoutPreference: 'Breakkout Room' } } })).status()).toBe(200)
+  await signIn(page, ROLE_USERS.coordinator)
+  const original = await submit(page, 'seed-venue-room')
+  expect((await request.post(`${DOUBLE_ORIGIN}/api/requests/${eventId}/venue-bookings/${original.id}/actions`, {
+    headers: { Authorization: `Bearer test-token:${ROLE_USERS.venueStaff.uid}` }, data: { action: 'reject', reason: 'Revise layout' },
+  })).status()).toBe(200)
+  await page.reload()
+  await page.getByRole('button', { name: /Replace request for Seed Breakout/ }).click()
+  await expect(page.getByRole('button', { name: 'Submit replacement' })).toBeVisible()
+  await page.getByLabel('Venue requirements', { exact: true }).fill('classroom')
+  const saved = page.waitForResponse((r) => r.url().endsWith(`/api/requests/${eventId}/venue-bookings`) && r.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Submit replacement' }).click()
+  const replacement = (await (await saved).json()).booking
+  await expect(page.getByRole('status')).toContainText('tentatively held')
+  await logout(page)
+  await signIn(page, ROLE_USERS.venueStaff)
+  await page.goto(`${path}?bookingId=${replacement.id}`)
+  await expect(page.getByText('classroom', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Breakkout/)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Approve booking' }).click()
+  await expect(page.getByRole('button', { name: 'Confirm approval' })).toBeEnabled()
+  await expect(page.getByRole('form', { name: 'Approve venue booking' })).not.toContainText('Breakkout')
+  await expect(page.getByRole('form', { name: 'Approve venue booking' })).not.toContainText('do not exactly match')
+  await page.getByRole('button', { name: 'Confirm approval' }).click()
+  await expect(page.getByText('Approved — venue confirmed')).toBeVisible()
+  await page.reload()
+  await expect(page.getByText(/Breakkout/)).toHaveCount(0)
 })

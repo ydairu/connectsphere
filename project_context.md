@@ -620,6 +620,21 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
 - **Progress:** remains **In Progress, Sprint 3**, not Done. Human acceptance and independent peer review remain outstanding. Preparation integration (SPM-67/88, SPM-48/89), required-venue readiness/per-venue attendance (SPM-79/81) and Coordinator-controlled reapproval (SPM-87) remain separate dependencies. Existing maintenance-write concurrency risk remains documented.
 - **Evidence:** `docs/evidence/spm-54-traceability.md`; human acceptance and implementation checklist: `docs/testing/spm-54-manual-testing.md`. Delivery is local only by user instruction: no commit, push or pull request.
 
+## SPM-54 warning preview and replacement corrections — 18 October 2026
+
+- Pending booking GET now returns read-only suitability problems/warnings using current event/venue data and the booking interval. Staff see warnings before approval; confirmation refreshes them, blocks on problems and offers Retry on failure. Saved approval warnings are explicitly historical. The approval transaction still rechecks all conditions.
+- Starting a pending/rejected replacement fetches the current event's layout/accessibility defaults; venue, interval and special requests remain for review. Requirements stay editable and survive failed submission; the original booking remains historical.
+- Verification: final SPM-54/SPM-14/SPM-34 targeted run passed 93 tests (eight emulator cases skipped). Full `npm test` passed 128 Node, 100 frontend, 1,664 root Vitest (39 opt-in cases skipped) and 92 Chromium tests. One additional replacement-refresh failure component case was added afterward and passed in the final targeted run. Final lint/build passed, retaining the existing bundle-size warning.
+- Manual checks M1/M2/M8 were updated; M16–M18 cover corrected replacement text, preserved history/notes and refresh failure. Human results remain Not run. In-memory API and Firebase-double browser tests are not live Firebase evidence; emulator was not rerun for this correction. Story stays In Progress with existing dependency and peer-review gaps. All changes remain local.
+
+## Booking-form requirement overrides — later correction, 18 October 2026
+
+The previous correction covered changing the event before replacement but missed changing only the booking form. `venueBookingSuitability` now uses the submitted booking requirements for layout review in both pending GET and transactional approval. Current event attendance and structured facilities/accessibility still apply. Unmatched free text explicitly asks staff to review the requested layout/additional instructions; it is not parsed as structured facilities or accessibility. Existing records without requirements retain the legacy event-layout fallback. Historical booking and approved-warning snapshots are not rewritten.
+
+Regression evidence: unit tests cover case-insensitive classroom matching against an unchanged Breakkout Room event and free-text review; service tests cover rejected replacement, preview, approval and preservation of event/history; the new browser case edits only the replacement form and checks pending, confirmation and reloaded approval. Manual check M19 covers the reported flow and remains Not run.
+
+Verification: `npm run test:spm54` passed 54 unit/service/API/component tests and five Chromium tests; four opt-in emulator cases skipped. Lint, production build and whitespace checks passed (existing bundle-size warning). API tests use in-memory persistence and browser tests use the Firebase double. Full regression results above precede this follow-up; the full suite, emulator and live project were not rerun for this narrowly scoped helper change. No deployment or Git publication. SPM-54 remains In Progress; human acceptance, peer review and dependent workflows remain outstanding.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.

@@ -2,7 +2,7 @@ import { COORDINATOR, VENUE_STAFF, isAssignedCoordinator, rolesOf } from './perm
 import { PLANNING } from './status.js'
 import { chooseStaff } from './staffAssignment.js'
 import { validateAvailabilityRange } from './venueAvailability.js'
-import { checkVenueSuitability } from './venueSuitability.js'
+import { checkVenueSuitability, LAYOUT } from './venueSuitability.js'
 
 export const BOOKING_PENDING = 'pending'
 export const BOOKING_APPROVED = 'approved'
@@ -42,13 +42,20 @@ export function venueBookingApprovalErrors(input) {
   return errors
 }
 
-// Suitability uses current event requirements and attendance, but this booking's actual interval.
+// Layout review uses the submitted booking requirements, not the event's original preference.
+// Current event attendance and structured facility/accessibility requirements still apply.
 // Availability is checked separately under the venue lock, excluding only the verified own hold.
 export function venueBookingSuitability(event, booking, venue) {
-  return checkVenueSuitability({ ...event, core: { ...event.core,
+  const requirements = typeof booking.requirements === 'string' ? booking.requirements.trim() : ''
+  const result = checkVenueSuitability({ ...event, core: { ...event.core,
     preferredDateTime: booking.startsAt,
     durationHours: (Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 3600000,
-  } }, venue)
+  }, venue: { ...event.venue, layoutPreference: requirements || event.venue?.layoutPreference } }, venue)
+  // Requirements are free text: do not claim to have parsed extra instructions as a layout.
+  if (requirements) result.warnings = result.warnings.map((warning) => warning.check === LAYOUT
+    ? { ...warning, message: `Booking requirements "${requirements}" do not exactly match a supported layout (${venue.supportedLayouts?.join(', ') || 'none recorded'}). Venue Staff must review the requested layout and any additional instructions.` }
+    : warning)
+  return result
 }
 
 export function normaliseVenueBookingRejection(input) {

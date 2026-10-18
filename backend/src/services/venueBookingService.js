@@ -197,7 +197,16 @@ export async function listEventVenueBookings(eventId, user, db = getAdminDb()) {
   const visible = bookings.filter((b) => canReadVenueBooking(user, event, b))
   if (!coordinator && !visible.length) throw new VenueBookingError(404, 'Event not found.')
   return { event: projectRequest(user, event), canSubmit: canRequestVenue(user, event),
-    bookings: visible.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((b) => presentBooking(b, canRejectVenueBooking(user, event, b), canApproveVenueBooking(user, event, b))) }
+    bookings: await Promise.all(visible.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(async (b) => {
+      const presented = presentBooking(b, canRejectVenueBooking(user, event, b), canApproveVenueBooking(user, event, b))
+      if (b.status === BOOKING_PENDING) {
+        const venue = await db.collection('venues').doc(b.venueId).get()
+        const { problems, warnings } = venue.exists ? venueBookingSuitability(event, b, venue.data())
+          : { problems: [{ check: 'venue', message: 'This venue is unavailable. Ask the Coordinator to replace the request.' }], warnings: [] }
+        presented.suitability = { problems, warnings }
+      }
+      return presented
+    })) }
 }
 
 export async function listVenueBookingQueue(user, db = getAdminDb()) {

@@ -14,14 +14,14 @@ Status: implementation available; human acceptance is **Not run**. Automated bro
 
 | ID | Action and expected result | Human result |
 |---|---|---|
-| M1 | Coordinator submits a suitable venue request. Its assigned Venue Staff member opens it and selects **Approve booking**. The confirmation names the venue and start/end. Cancel returns to the decision controls without approving. | Not run |
-| M2 | Select Approve again, then **Confirm approval**. Controls are disabled while saving. Success displays **Approved — venue confirmed**, approval time and the reserved period. Reload: approval persists and tentative expiry is absent. | Not run |
+| M1 | Coordinator submits a suitable venue request. Its assigned Venue Staff member opens it and selects **Approve booking**. Use unsupported-layout and operating-hours warnings: both appear in pending details and inside confirmation, which names the venue and start/end. Warnings permit approval. Cancel returns to decision controls without approving. | Not run |
+| M2 | Select Approve again, then **Confirm approval**. Controls are disabled while saving. Success displays **Approved — venue confirmed**, approval time and the reserved period. Reload: approval persists and tentative expiry is absent. Warning-only approval succeeds and saved warnings appear under **Warnings recorded at approval**. | Not run |
 | M3 | Return to the staff pending queue and refresh. The approved request is absent; any other pending requests remain. | Not run |
 | M4 | Coordinator opens the event's booking list and details. The correct venue, period and approved status appear. The event remains Planning; approval does not confirm the event or set its legacy venue sign-off. | Not run |
 | M5 | Coordinator opens Notifications. The approval notice's **View booking** link opens exactly the approved request. Reloading or retrying approval does not create a second notice. | Not run |
 | M6 | Open the venue calendar for the booked interval. It shows a confirmed booking instead of a tentative hold, with setup and turnaround still occupied. | Not run |
 | M7 | Search available venues over the booked period or its buffers. The venue is excluded. Attempt a conflicting request directly through the booking form: it is refused. | Not run |
-| M8 | Submit a request whose attendance exceeds capacity. Staff attempt approval: a clear capacity refusal appears and the booking remains pending. Repeat with a missing required facility configured in the event's structured venue requirements. | Not run |
+| M8 | Submit a request whose attendance exceeds capacity. Staff open confirmation: a clear capacity problem appears before approval, Confirm approval is disabled and the booking remains pending. A direct approval API call is also refused. Repeat with a missing required facility configured in the event's structured venue requirements. | Not run |
 | M9 | Submit two venue requests for one event and approve one. The other keeps its own pending status, assignee and hold. Event status stays Planning. | Not run |
 | M10 | Open the same booking in two staff tabs. Approve in the first, then approve from the stale second tab. It is refused; **Reload booking** reveals the saved approval. Try the URL and action as unassigned staff and another role: access/action is refused. | Not run |
 | M11 | Coordinator saves a significant change, such as moving the event start. The approved booking and its original reserved interval remain. Existing event-level sign-off reset behaviour is separate; Coordinator-controlled booking reapproval awaits SPM-87. | Not run |
@@ -29,6 +29,13 @@ Status: implementation available; human acceptance is **Not run**. Automated bro
 | M13 | On separate future Confirmed test events, test direct Coordinator cancellation and approval of the Organiser's cancellation request. Every venue reservation for that event is released; booking history is retained, and unrelated events remain booked. | Not run |
 | M14 | Reject a Planning event with an approved booking. The booking closes and the reservation is released. Recheck the calendar/search for the freed period, allowing for any unrelated commitment. | Not run |
 | M15 | In a controlled test fixture, expire a pending hold and attempt approval. It can approve only if still free. If another request acquired the period, approval is refused. A removed or mismatched hold requires replacement. | Not run |
+| M16 | Submit a booking with **Breakkout Room**, reject it, then correct the event to **Breakout Room**. From an already-open Coordinator booking page select Replace. The form refreshes to the corrected text. Submit, reload and verify the new booking text and staff preapproval warning use **Breakout Room**. An unsupported-layout warning can remain if the venue only supports Theatre/Classroom. | Not run |
+| M17 | Verify the rejected booking retains its original requirements and rejection reason. Special requests carry into the replacement form. Edit the refreshed requirements, interrupt submission, then retry: reviewed edits remain and the new booking saves them. | Not run |
+| M18 | Interrupt the GET refresh after selecting Approve. No confirmation is available while loading or after failure. Restore connectivity and select Retry refresh: warnings load before confirmation is available. Repeat for Replace: submission stays disabled until refresh succeeds. | Not run |
+
+| M19 | Leave the event layout as **Breakkout Room**. Reject its booking, select Replace and change only the booking form's Venue requirements to **classroom**, using a venue that supports Classroom and sufficient capacity. Submit and open the new booking as assigned staff. Details and confirmation must not show a Breakkout Room or unsupported-classroom warning. Approve and reload: no obsolete layout warning is saved. The event and old rejected record retain their original text. Repeat with unsupported free-text requirements: the warning quotes the new booking text and asks for staff review. | Not run |
+
+Record tester, date, environment, timezone, pass/fail and screenshot or other evidence for each check. Human results remain Not run until executed.
 
 M12–M13 require an event that reaches Confirmed through the existing status flow. Booking approval alone does not satisfy that flow's legacy arrangement sign-offs. Record a blocked setup if the environment cannot provide it; do not treat a fixture as evidence that later safety/readiness workflows exist.
 
@@ -59,6 +66,9 @@ Use an authenticated test session to call `POST /api/requests/:eventId/venue-boo
 - [x] Refuse duplicate/stale decisions and test concurrent decisions against the emulator.
 - [x] Add unit, service/API, component, browser and emulator tests.
 - [x] Record verification results and outstanding criteria in the project progress records.
+- [x] Return read-only pending suitability and refresh warnings before confirmation.
+- [x] Refresh replacement requirements from the latest event while preserving historical bookings and reviewed input.
+- [x] Base booking layout warnings on submitted booking requirements, including Coordinator overrides (M19).
 - [ ] Complete the human acceptance checks above and attach evidence.
 - [ ] Complete the dependent acceptance criteria before marking SPM-54 Done.
 - [ ] Complete independent peer code review.

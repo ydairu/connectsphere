@@ -50,3 +50,31 @@ Service/API tests use in-memory persistence and mocked token verification. Brows
 - Existing maintenance writes do not take the venue booking lock. Approval checks committed maintenance entries, but a simultaneous maintenance write can still introduce an unavailable period. This is a cross-story limitation; the approval increment does not implement affected-booking handling.
 - Independent peer review remains outstanding; self-review and automated tests are not peer approval.
 - Delivery is local only, as requested. No commit, push, pull request or deployment was performed.
+
+## Warning preview and replacement corrections — 18 October 2026
+
+User-authorised corrections following manual feedback:
+
+| Behaviour | Implementation | Regression coverage | Manual check |
+|---|---|---|---|
+| Pending warnings are visible before a decision | Booking GET computes read-only suitability from current event/venue and booking interval; confirmation refreshes GET | SPM-54 service/API and component tests; corrected replacement browser workflow | M1, M2 |
+| Problems block confirmation, warnings permit it | Confirmation displays separate problems and warnings; approval transaction still rechecks | Unit rules, preview-then-change service test, capacity browser test | M8 |
+| Replacement defaults use current requirements | Replacement refreshes event layout/accessibility; preserves venue, period and special requests for review | Formatter unit test, pending/rejected replacement component tests, rejection/correction/replacement browser test | M16, M17 |
+| Failed refresh cannot continue with stale data | Loading/failed refresh disables confirmation/submission; Retry refresh recovers | Component failure/retry tests | M18 |
+
+Saved requirements and approval warnings remain historical snapshots. GET diagnostics are not persisted and do not guarantee availability. The original rejected record remains unchanged apart from the existing replacement relationship. No migration or approval transaction change is needed. Manual checks remain Not run; dependent acceptance criteria and peer review remain outstanding.
+
+Verification of this correction (18 October 2026):
+
+- Final targeted SPM-54/SPM-14/SPM-34 run: 93 tests passed, eight opt-in emulator cases skipped. This includes the additional replacement-refresh failure test added after the full root Vitest run.
+- Full `npm test`: 128 Node tests, 100 frontend tests, 1,664 root Vitest tests (39 opt-in cases skipped), and 92 Chromium tests passed. All four SPM-54 browser scenarios passed.
+- Final page regression rerun: 15 component tests passed. Lint, production build and whitespace checks passed; the existing bundle-size warning remains.
+- API/service persistence is in-memory and browser tests use the local Firebase double. No emulator or live Firebase rerun, deployment, human acceptance or peer review is claimed for this correction. Earlier emulator results above remain historical evidence.
+
+## Booking-form requirement overrides — later correction, 18 October 2026
+
+The previous correction covered changing the event before replacement but missed changing only the booking form. `venueBookingSuitability` now uses the submitted booking requirements for layout review in both pending GET and transactional approval. Current event attendance and structured facilities/accessibility still apply. Unmatched free text explicitly asks staff to review the requested layout/additional instructions; it is not parsed as structured facilities or accessibility. Existing records without requirements retain the legacy event-layout fallback. Historical booking and approved-warning snapshots are not rewritten.
+
+Regression evidence: unit tests cover case-insensitive classroom matching against an unchanged Breakkout Room event and free-text review; service tests cover rejected replacement, preview, approval and preservation of event/history; the new browser case edits only the replacement form and checks pending, confirmation and reloaded approval. Manual check M19 covers the reported flow and remains Not run.
+
+Verification: `npm run test:spm54` passed 54 unit/service/API/component tests and five Chromium tests; four opt-in emulator cases skipped. Lint, production build and whitespace checks passed (existing bundle-size warning). API tests use in-memory persistence and browser tests use the Firebase double. Full regression results above precede this follow-up; the full suite, emulator and live project were not rerun for this narrowly scoped helper change. No deployment or Git publication. SPM-54 remains In Progress; human acceptance, peer review and dependent workflows remain outstanding.

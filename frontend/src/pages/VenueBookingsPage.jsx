@@ -4,6 +4,7 @@ import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_CANCELLED, BOOKING_REJECTED,
 import { COORDINATOR } from '../../../shared/permissions.js'
 import { approveVenueBooking, getVenueBookings, getVenueBookingQueue, listVenues, rejectVenueBooking, submitVenueBooking } from '../services/api.js'
 import { useAuth } from '../hooks/useAuth.js'
+import { venueBookingRequirements } from '../utils/venueBookingRequirements.js'
 import Navbar from '../components/Navbar.jsx'
 import Card from '../components/Card.jsx'
 
@@ -14,6 +15,13 @@ function localTime(value) {
 }
 const displayTime = (value) => !value || Number.isNaN(Date.parse(value)) ? 'Not set' : new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 const emptyForm = () => ({ venueId: '', startsAt: '', endsAt: '', requirements: '', specialRequests: '', replacesId: null, submissionKey: crypto.randomUUID() })
+
+function Suitability({ suitability }) {
+  return <>
+    {suitability?.problems.length > 0 && <section aria-label="Approval blocked"><h3>Approval blocked</h3>{suitability.problems.map((item, i) => <p key={i}>{item.message}</p>)}</section>}
+    {suitability?.warnings.length > 0 && <section aria-label="Suitability warnings"><h3>Suitability warnings</h3>{suitability.warnings.map((item, i) => <p key={i}>{item.message}</p>)}</section>}
+  </>
+}
 
 function BookingRow({ label, children }) {
   return <div className="profile-row booking-row"><span>{label}</span><strong>{children}</strong></div>
@@ -33,6 +41,8 @@ export default function VenueBookingsPage() {
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [reload, setReload] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshFailure, setRefreshFailure] = useState(null)
   const [rejectingId, setRejectingId] = useState(null)
   const [approvingId, setApprovingId] = useState(null)
   const [staleDecision, setStaleDecision] = useState(false)
@@ -47,6 +57,7 @@ export default function VenueBookingsPage() {
       setApprovingId(null)
       setRejectingId(null)
       setStaleDecision(false)
+      setRefreshFailure(null)
       try {
         const response = id ? await getVenueBookings(user, id) : await getVenueBookingQueue(user)
         const catalogue = response.canSubmit && !detailView ? await listVenues(user) : { venues: [] }
@@ -56,7 +67,7 @@ export default function VenueBookingsPage() {
         const core = response.event?.core
         if (core) setForm({ ...emptyForm(), startsAt: localTime(core.preferredDateTime),
           endsAt: core.preferredDateTime && core.durationHours ? localTime(new Date(Date.parse(core.preferredDateTime) + core.durationHours * 3600000).toISOString()) : '',
-          requirements: [response.event?.venue?.layoutPreference, response.event?.venue?.accessibilityNeeds].filter(Boolean).join('\n') })
+          requirements: venueBookingRequirements(response.event) })
       } catch (err) { if (active) setError(err.details?.message ?? 'Unable to load booking requests.') }
       finally { if (active) setLoading(false) }
     }
@@ -78,12 +89,30 @@ export default function VenueBookingsPage() {
       setError([err.details?.message ?? 'Unable to submit. You can retry safely.', ...Object.values(err.details?.errors ?? {})].join(' '))
     } finally { setBusy(false) }
   }
-  function replace(booking) {
-    setForm({ venueId: booking.venueId, startsAt: localTime(booking.startsAt), endsAt: localTime(booking.endsAt), requirements: booking.requirements,
-      specialRequests: booking.specialRequests, replacesId: booking.id, submissionKey: crypto.randomUUID() })
-    setNotice(booking.status === BOOKING_REJECTED
-      ? 'Choose a replacement venue or time below. The rejected booking remains in the history.'
-      : 'Choose the replacement venue or times below. The original hold stays until your changes succeed.')
+  async function refreshDecision(booking, purpose) {
+    setRefreshing(true); setRefreshFailure(null); setError(''); setNotice('')
+    if (purpose === 'approve') setApprovingId(null)
+    try {
+      const response = await getVenueBookings(user, id)
+      setData(response)
+      const current = response.bookings.find((item) => item.id === booking.id)
+      if (purpose === 'approve') {
+        if (!current?.canApprove) { setNotice('This booking can no longer be approved. Its current state is shown.'); return }
+        if (!current.suitability) throw new Error('Missing suitability preview')
+        setApprovingId(current.id)
+      } else {
+        if (!response.canSubmit || !current || current.replacedById || ![BOOKING_PENDING, BOOKING_REJECTED].includes(current.status)) {
+          setForm(emptyForm()); setNotice('This booking can no longer be replaced. Its current state is shown.'); return
+        }
+        setForm({ venueId: current.venueId, startsAt: localTime(current.startsAt), endsAt: localTime(current.endsAt),
+          requirements: venueBookingRequirements(response.event), specialRequests: current.specialRequests ?? '',
+          replacesId: current.id, submissionKey: crypto.randomUUID() })
+        setNotice('Requirements refreshed from the event. Review them and any special requests before submitting. The previous booking remains in history.')
+      }
+    } catch {
+      setError('Unable to refresh booking details. Retry before continuing.')
+      setRefreshFailure({ booking, purpose })
+    } finally { setRefreshing(false) }
   }
   async function reject(event) {
     event.preventDefault()
@@ -126,6 +155,8 @@ export default function VenueBookingsPage() {
     {error && <div className="alert alert-error" role="alert">{error}
       {!data && <button className="button button-secondary" type="button" onClick={() => setReload((value) => value + 1)}>Try again</button>}
     </div>}
+    {refreshFailure && <button type="button" disabled={refreshing} onClick={() => refreshDecision(refreshFailure.booking, refreshFailure.purpose)}>Retry refresh</button>}
+    {refreshing && <p role="status">Refreshing booking details…</p>}
     {notice && <p className="alert alert-success" role="status">{notice}</p>}
     {loading && <p role="status">Loading booking requests...</p>}
     {!detailView && data?.event && <h2>{data.event.core?.title}</h2>}
@@ -155,20 +186,23 @@ export default function VenueBookingsPage() {
         {booking.status === BOOKING_APPROVED ? <BookingRow label="Reservation">Confirmed for the booked period</BookingRow> :
           [BOOKING_REJECTED, BOOKING_CANCELLED, BOOKING_REPLACED].includes(booking.status) ? <BookingRow label="Reservation">Released</BookingRow> :
           <BookingRow label="Hold expiry">{displayTime(booking.holdExpiresAt)}{Date.parse(booking.holdExpiresAt) <= Date.now() ? ' (expired)' : ''}</BookingRow>}
-        {booking.capacityWarning && <p role="note">{booking.capacityWarning}</p>}
-        {booking.status === BOOKING_APPROVED && booking.approvalWarnings?.map((warning, index) => <p role="note" key={`${warning.check}-${index}`}>{warning.message}</p>)}
+        {booking.capacityWarning && !booking.suitability && <p role="note">{booking.capacityWarning}</p>}
+        {booking.status === BOOKING_PENDING && approvingId !== booking.id && <Suitability suitability={booking.suitability} />}
+        {booking.status === BOOKING_APPROVED && booking.approvalWarnings?.length > 0 && <section><h3>Warnings recorded at approval</h3>{booking.approvalWarnings.map((warning, index) => <p key={index}>{warning.message}</p>)}</section>}
         {detailView && booking.canApprove && rejectingId !== booking.id && <div className="booking-actions">
-          {approvingId !== booking.id ? <button className="button button-primary" type="button" disabled={busy || staleDecision} onClick={() => { setApprovingId(booking.id); setError('') }}>Approve booking</button> :
-            <form onSubmit={approve} aria-label="Approve venue booking"><fieldset disabled={busy || staleDecision}>
+          {approvingId !== booking.id ? <button className="button button-primary" type="button" disabled={busy || refreshing || !!refreshFailure || staleDecision} onClick={() => refreshDecision(booking, 'approve')}>Approve booking</button> :
+            <form onSubmit={approve} aria-label="Approve venue booking"><fieldset disabled={busy || refreshing || !!refreshFailure || staleDecision}>
               <p>Confirm the booking for {booking.venueName} from {displayTime(booking.startsAt)} to {displayTime(booking.endsAt)}.</p>
-              <button className="button button-primary" type="submit">{busy ? 'Approving…' : 'Confirm approval'}</button>
+              <Suitability suitability={booking.suitability} />
+              <p>Availability and requirements are checked again when you confirm.</p>
+              <button className="button button-primary" type="submit" disabled={!booking.suitability || booking.suitability.problems.length > 0}>{busy ? 'Approving…' : 'Confirm approval'}</button>
               <button type="button" onClick={() => setApprovingId(null)}>Cancel</button>
             </fieldset></form>}
         </div>}
         {detailView && staleDecision && <button className="button button-secondary" type="button" disabled={busy} onClick={() => setReload((value) => value + 1)}>Reload booking</button>}
         {detailView && booking.canReject && approvingId !== booking.id && <div className="booking-actions">
-          {rejectingId !== booking.id ? <button className="button button-secondary" type="button" disabled={busy || staleDecision} onClick={() => { setRejectingId(booking.id); setError('') }}>Reject booking</button> :
-            <form onSubmit={reject} aria-label="Reject venue booking"><fieldset disabled={busy || staleDecision}>
+          {rejectingId !== booking.id ? <button className="button button-secondary" type="button" disabled={busy || refreshing || !!refreshFailure || staleDecision} onClick={() => { setRejectingId(booking.id); setError('') }}>Reject booking</button> :
+            <form onSubmit={reject} aria-label="Reject venue booking"><fieldset disabled={busy || refreshing || !!refreshFailure || staleDecision}>
               <div className="field"><label htmlFor="rejection-reason">Rejection reason</label>
                 <textarea id="rejection-reason" required maxLength={4000} value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} /></div>
               <div className="field"><label htmlFor="suggested-alternative">Suggested alternative (optional)</label>
@@ -178,11 +212,11 @@ export default function VenueBookingsPage() {
             </fieldset></form>}
         </div>}
       </>}
-      {!detailView && data.canSubmit && !booking.replacedById && [BOOKING_PENDING, BOOKING_REJECTED].includes(booking.status) && <button type="button" disabled={busy} onClick={() => replace(booking)}>Replace request for {booking.venueName}</button>}
+      {!detailView && data.canSubmit && !booking.replacedById && [BOOKING_PENDING, BOOKING_REJECTED].includes(booking.status) && <button type="button" disabled={busy || refreshing || !!refreshFailure} onClick={() => refreshDecision(booking, 'replace')}>Replace request for {booking.venueName}</button>}
     </Card>)}
     {!detailView && data?.canSubmit && <Card className="request-form-section"><div className="section-heading"><h2>{form.replacesId ? 'Replace booking request' : 'Request a venue'}</h2></div>
       <form onSubmit={submit} aria-label="Venue booking request">
-        <fieldset disabled={busy}>
+        <fieldset disabled={busy || refreshing || !!refreshFailure}>
           <div className="field"><label htmlFor="booking-venue">Venue</label><select id="booking-venue" required value={form.venueId} onChange={(e) => setForm({ ...form, venueId: e.target.value })}>
             <option value="">Choose a venue</option>{venues.map((v) => <option key={v.id} value={v.id}>{v.name} (capacity {v.maximumCapacity})</option>)}
           </select></div>

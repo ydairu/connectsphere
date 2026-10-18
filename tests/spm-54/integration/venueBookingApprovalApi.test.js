@@ -39,6 +39,8 @@ describe('SPM-54 real HTTP, mocked tokens and in-memory persistence', () => {
     const path = '/api/requests/event/venue-bookings'
     const before = (await request(app).get(path).set(auth(staff))).body
     expect(before.bookings[0]).toMatchObject({ canApprove: true, canReject: true })
+    expect(before.bookings[0].suitability).toEqual({ problems: [], warnings: [] })
+    expect((await request(app).get(path).set(auth(secondStaff))).status).toBe(404)
     expect(before.event.internal).toBeUndefined()
     expect(before.event.equipment).toBeUndefined()
     expect((await request(app).get(path).set(auth(coordinator))).body.bookings[0].canApprove).toBe(false)

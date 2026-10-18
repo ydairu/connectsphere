@@ -1,3 +1,4 @@
+import { venueBookingRequirements } from '../../../frontend/src/utils/venueBookingRequirements.js'
 import { describe, expect, it } from 'vitest'
 import { BOOKING_PENDING, BOOKING_APPROVED, canApproveVenueBooking, venueBookingApprovalErrors, venueBookingSuitability } from '../../../shared/venueBooking.js'
 import { venueBookingApprovedNotifications } from '../../../shared/notifications.js'
@@ -32,7 +33,7 @@ describe('SPM-54 approval rules', () => {
     current.venue.requiredFacilities = ['Projector']
     current.venue.layoutPreference = 'Banquet'
     current.venue.requiredAccessibilityFeatures = ['Lift']
-    const result = venueBookingSuitability(current, booking, venue)
+    const result = venueBookingSuitability(current, { ...booking, requirements: 'Banquet' }, venue)
     expect(result.problems).toEqual([])
     expect(result.warnings.map((w) => w.check)).toEqual(['layout', 'accessibility'])
   })
@@ -50,3 +51,21 @@ describe('SPM-54 approval rules', () => {
     expect(venueBookingApprovedNotifications({ ...event, assignedCoordinatorUid: staff.uid }, booking, staff, { at: 'now' })).toEqual([])
   })
 })
+
+ it('formats current event requirements without empty separators', () => {
+   expect(venueBookingRequirements({ venue: { layoutPreference: 'Breakout Room', accessibilityNeeds: 'Wheelchair' } })).toBe('Breakout Room\nWheelchair')
+   expect(venueBookingRequirements({ venue: { layoutPreference: 'Breakout Room', accessibilityNeeds: '  ' } })).toBe('Breakout Room')
+   expect(venueBookingRequirements()).toBe('')
+ })
+
+ it('checks the submitted classroom request instead of the original event layout', () => {
+   const db = fixture(), current = db.store.get('event'), venue = db.collectionData('venues').get('hall')
+   current.venue.layoutPreference = 'Breakkout Room'
+   venue.supportedLayouts = ['Classroom']
+   expect(venueBookingSuitability(current, { ...booking, requirements: ' classroom ' }, venue).warnings).toEqual([])
+   const review = venueBookingSuitability(current, { ...booking, requirements: 'Cabaret with extra chairs' }, venue)
+   expect(review.warnings[0].message).toContain('Cabaret with extra chairs')
+   expect(review.warnings[0].message).not.toContain('Breakkout')
+   expect(review.warnings[0].message).toContain('must review')
+   expect(review.problems).toEqual([])
+ })
