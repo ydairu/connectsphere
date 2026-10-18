@@ -140,6 +140,7 @@ function RequestDetailPage() {
   const [editableSections, setEditableSections] = useState([])
   const [availableActions, setAvailableActions] = useState([])
   const [arrangements, setArrangements] = useState(null)
+  const [reservedEquipment, setReservedEquipment] = useState(null)
   const [cancellationRequest, setCancellationRequest] = useState(null)
   const [clarificationRequests, setClarificationRequests] = useState(null)
   const [canReassign, setCanReassign] = useState(false)
@@ -165,6 +166,7 @@ function RequestDetailPage() {
     setEditableSections(response.editableSections ?? [])
     setAvailableActions(response.availableActions ?? [])
     setArrangements(response.arrangements ?? null)
+    setReservedEquipment(response.reservedEquipment ?? null)
     setCancellationRequest(response.cancellationRequest ?? null)
     setClarificationRequests(response.clarificationRequests ?? null)
     setCanReassign(response.canReassignCoordinator === true)
@@ -406,7 +408,7 @@ function RequestDetailPage() {
             {renderSection('internal')}
             <StatusNotices cancellation={cancellation} rejection={rejection} completion={completion} />
             <AssignedCoordinator coordinator={assignedCoordinator} />
-            {roles?.includes(ORGANISER) && <ArrangementsSummary request={request} arrangements={arrangements} />}
+            {roles?.includes(ORGANISER) && <ArrangementsSummary request={request} arrangements={arrangements} reservedEquipment={reservedEquipment} />}
             <ClarificationRequests status={request.status} entries={clarificationRequests} />
             </>}
             {activeTab === 'venue-details' && <>

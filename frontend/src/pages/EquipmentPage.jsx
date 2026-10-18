@@ -110,7 +110,7 @@ function EquipmentPage() {
             <h1>Equipment availability</h1>
             <p>
               Available units for each equipment type. Damaged, Under Repair and Unavailable units are not counted as
-              available for any period.
+              available for any period. Check a period to also leave out units reserved for overlapping events.
             </p>
           </div>
         </div>
@@ -149,8 +149,8 @@ function EquipmentPage() {
           </form>
           {period && (
             <p className="request-meta">
-              Showing availability from {formatDateTime(period.from)} to {formatDateTime(period.to)}. Reservations are not
-              recorded yet, so units reserved for other events are not subtracted.
+              Showing availability from {formatDateTime(period.from)} to {formatDateTime(period.to)}. Units reserved for
+              events overlapping this period are not counted as available.
             </p>
           )}
         </Card>
@@ -182,7 +182,7 @@ function EquipmentPage() {
                         <dd>
                           {item.unavailableUnits === 0
                             ? 'None'
-                            : `${item.byStatus.damaged} damaged, ${item.byStatus.under_repair} under repair, ${item.byStatus.unavailable} unavailable`}
+                            : `${item.byStatus.damaged} damaged, ${item.byStatus.under_repair} under repair, ${item.byStatus.unavailable} unavailable${item.reservedUnits > 0 ? `, ${item.reservedUnits} reserved for overlapping events` : ''}`}
                         </dd>
                       </div>
                       {item.location && (

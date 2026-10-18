@@ -670,6 +670,51 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
   - Seed dry run against `connectsphere-6546c`: `seed-req-a1-confirmed-past` to create, no blockers, nothing written.
 - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check (the walkthrough has not been run). `firestore.rules` is unchanged, and no backlog status change is claimed.
 
+35. **SPM-62 reserve available equipment for an event, and SPM-57 reserved equipment is unavailable to overlapping events (18 Oct 2026, branch `feature/spm-62`):**
+    - **Built (SPM-62):**
+      - **Reserve:** `reserve` action on SPM-56's actions route, for the request's assignee, on an Approved request at Planning or Confirmed. One transaction reads a lock per equipment type (`systemLocks/equipmentReservation-{typeId}`), the units and overlapping reservations, re-runs the availability check, then writes:
+        - one `equipmentReservations` record per type (type, quantity, event, period, unit ids, who and when);
+        - the request as Reserved, with its reserved asset tags;
+        - the event's `currentEquipmentRequest` summary and `reservedEquipment` (types and quantities only);
+        - an `equipment_reserved` activity entry.
+      - **Refusals:** a shortfall refuses the whole reservation (409 with the per-type result), and nothing is written.
+      - **Unit choice:** the free Available units with the lowest asset tags (`chooseUnits`).
+      - **Organiser:** `presentRequest` sends `reservedEquipment` (`reservedEquipmentSummary`, for anyone who may view the equipment section). "Your event arrangements" shows "Reserved: 2 × Projector" in place of the requested list, with no unit ids.
+      - **Preparation:** `canUpdateEquipmentPreparation` now needs `reservedEquipment` instead of the technical sign-off. The new read-only reason is `equipment_not_reserved` ("Available once the equipment is reserved.").
+      - **Release:** event rejection or cancellation releases the event's active reservations, closes a Reserved request, removes `reservedEquipment` and records `equipment_reservation_released` (`prepareReservationRelease`, called from `prepareEquipmentRequestClose`). A significant change does not release them.
+      - **Page:** "Reserve equipment" beside Approve on the Equipment requests card; "Reserved by" and "Reserved units" for the Coordinator and assignee.
+      - **Seed:** A1 Confirmed has a Reserved request for one projector, its active reservation and `reservedEquipment`. Like A1 Planning, it has no `currentEquipmentRequest` summary, so the SPM-9 and SPM-10 manual sign-off demonstrations are unchanged.
+    - **Built (SPM-57):**
+      - `periodsOverlap` (strict, so back-to-back periods do not overlap; no venue buffers) and `reservedUnitIds` (active reservations of other events that are not Rejected, Cancelled or Completed) in `shared/equipmentReservation.js`, loaded by `loadReservedUnitIds`.
+      - Used by the SPM-18 check (not subtracting the event's own reservations), SPM-56 approval, reserving, and `/api/equipment` with a period. The last now returns `reservedUnits`, and the equipment page shows "N reserved for overlapping events".
+      - `loadUnitsByType` now returns each unit's `id`.
+    - **Decisions:** automatic unit choice, reserving at Planning or Confirmed, release on whole-event rejection or cancellation, and no equipment preparation without a reservation are team decisions of 18 Oct 2026, pending PO confirmation (effective-requirements.md §4.17).
+    - **Held:** re-confirming the equipment arrangement after a significant change conflicts with CL3 row 51 and is held until SPM-87. Until then, a Reserved event whose technical sign-off is cleared by a significant change cannot be confirmed again: Re-confirm only works on Approved requests, and the manual sign-off is refused while a current request exists.
+    - **Gaps:**
+      - A new request while one is Reserved is accepted (SPM-17's tests cover it) and does not release the earlier reservation.
+      - A reserved unit that breaks is not flagged (SPM-37 AC5).
+      - Reservation and release history is not displayed, and the Coordinator is not notified.
+      - The per-type lock is not verified under real concurrency.
+      - Technical requirements are still not matched (SPM-18).
+    - **Existing tests changed (expected effects, not regressions):**
+      - `tests/spm-56/unit/equipmentApproval.test.js`, `tests/spm-56/integration/equipmentApprovalService.test.js` and `tests/spm-36/unit/equipmentRejection.test.js`: an Approved request's actions now include `reserve`.
+      - `tests/spm-48/unit/preparation.test.js`, `tests/spm-48/integration/preparationApi.test.js` and `tests/spm-48/e2e/spm48.preparation.spec.js`: equipment preparation now needs a reservation; the reason is `equipment_not_reserved` ("Available once the equipment is reserved."). The venue-only copy of A1 Confirmed has nothing reserved.
+      - `tests/spm-28/unit/changeHistory.test.js` and `tests/spm-42/unit/permissions.test.js`: fixtures that edit equipment preparation now carry `reservedEquipment`.
+      - `tests/spm-37/unit/equipmentAvailability.test.js`: the summary has `reservedUnits`.
+    - **Evidence:**
+      - `tests/spm-57/unit/reservedOverlap.test.js`
+      - `tests/spm-62/unit/equipmentReservation.test.js`
+      - `tests/spm-62/integration/equipmentReservationApi.test.js` (SPM-62 and SPM-57 through the real routes)
+      - `tests/spm-62/integration/equipmentReservationPages.test.jsx`
+      - `tests/spm-62/e2e/spm62.equipmentReservation.spec.js`
+    - **Merged with SPM-36 (18 Oct 2026):** Reject and Reserve sit side by side in the action list (`approve`, `reject`, `reconfirm_approval`, `reserve`), the presented request fields and the page. SPM-36's past Confirmed seed event is kept beside A1 Confirmed's reservation.
+    - **Merged with SPM-34 / SPM-54 (18 Oct 2026):** the request page now uses tabs. The Organiser's arrangements card (with `reservedEquipment`) stays on Event Status; the Equipment requests card, with Reserve, is on Equipment Required. SPM-62's page and E2E tests open that tab. SPM-53's tests pass unchanged.
+    - **Local verification (Windows, 18 Oct 2026, on top of `main` at `858ea60`):**
+      - Lint passed. 128 Node and 101 frontend tests passed. The production build passed with the existing bundle-size warning.
+      - Root Vitest 1740 passed, 39 opt-in live and emulator tests skipped. On the first full run, `tests/spm-18/integration/availabilityCheckPage.test.jsx` failed once. It passed 3/3 on its own and in the full rerun, so it appears timing-sensitive under load.
+      - Playwright Chromium 94/94 passed, including SPM-53's and SPM-62's specs.
+    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. The seed was not run against the real project. `firestore.rules` is unchanged, and no backlog status change is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.

@@ -33,6 +33,7 @@ describe('SPM-37 — available quantity (unit)', () => {
       totalUnits: 10,
       availableUnits: 8,
       unavailableUnits: 2,
+      reservedUnits: 0,
       byStatus: { [AVAILABLE]: 8, [DAMAGED]: 1, [UNDER_REPAIR]: 1, [UNAVAILABLE]: 0 },
     })
   })

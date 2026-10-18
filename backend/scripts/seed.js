@@ -24,7 +24,7 @@
 //
 // SPM-16: it also writes SEED_VENUES and SEED_VENUE_AVAILABILITY (a venue with setup and turnaround times
 // holding a confirmed booking, an active tentative hold and an expired one), with the same tag checks.
-// SPM-17: and SEED_EQUIPMENT_TYPES, SEED_EQUIPMENT_UNITS and SEED_EQUIPMENT_REQUESTS.
+// SPM-17: and SEED_EQUIPMENT_TYPES, SEED_EQUIPMENT_UNITS and SEED_EQUIPMENT_REQUESTS; SPM-62: SEED_EQUIPMENT_RESERVATIONS.
 
 import { parseArgs } from 'node:util'
 import { Timestamp } from 'firebase-admin/firestore'
@@ -40,11 +40,13 @@ import {
   SEED_REQUESTS,
   SEED_TAG,
   SEED_EQUIPMENT_REQUESTS,
+  SEED_EQUIPMENT_RESERVATIONS,
   SEED_EQUIPMENT_TYPES,
   SEED_EQUIPMENT_UNITS,
   SEED_VENUE_AVAILABILITY,
   SEED_VENUES,
   EQUIPMENT_REQUESTS_COLLECTION,
+  EQUIPMENT_RESERVATIONS_COLLECTION,
   EQUIPMENT_TYPES_COLLECTION,
   EQUIPMENT_UNITS_COLLECTION,
   VENUE_AVAILABILITY_COLLECTION,
@@ -121,6 +123,7 @@ async function preflight(auth, db) {
     [EQUIPMENT_TYPES_COLLECTION, SEED_EQUIPMENT_TYPES],
     [EQUIPMENT_UNITS_COLLECTION, SEED_EQUIPMENT_UNITS],
     [EQUIPMENT_REQUESTS_COLLECTION, SEED_EQUIPMENT_REQUESTS],
+    [EQUIPMENT_RESERVATIONS_COLLECTION, SEED_EQUIPMENT_RESERVATIONS],
   ]) {
     for (const document of documents) {
       const snapshot = await db.collection(collection).doc(document.id).get()

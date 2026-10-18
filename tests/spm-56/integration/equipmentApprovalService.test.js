@@ -25,6 +25,7 @@ import {
   EQUIPMENT_REQUEST_APPROVED,
   EQUIPMENT_REQUEST_STATUS,
   RECONFIRM_EQUIPMENT_APPROVAL,
+  RESERVE_EQUIPMENT,
 } from '../../../shared/equipmentRequest.js'
 import { EQUIPMENT_REQUEST_APPROVED_NOTICE } from '../../../shared/notifications.js'
 import { APPROVE_TECHNICAL, REJECT_TECHNICAL } from '../../../shared/requestActions.js'
@@ -187,7 +188,8 @@ describe('SPM-56 re-confirm after a significant change cleared the sign-off', ()
     expect(patched.status).toBe(200)
     expect(theEvent().arrangementApprovals).toEqual({})
     expect(stored(created.id).status).toBe('approved')
-    expect((await listEventEquipmentRequests('event', tech, db)).requests[0].actions).toEqual([RECONFIRM_EQUIPMENT_APPROVAL])
+    // SPM-62 adds Reserve, which an Approved request also offers.
+    expect((await listEventEquipmentRequests('event', tech, db)).requests[0].actions).toEqual([RECONFIRM_EQUIPMENT_APPROVAL, RESERVE_EQUIPMENT])
 
     // The venue sign-off is re-approved by Venue Staff (SPM-9, outside this story); set directly here.
     theEvent().arrangementApprovals.venue = { decision: 'approved', byUid: 'v1', at: 'again' }

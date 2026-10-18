@@ -40,12 +40,13 @@ function text(value) {
 
 /**
  * SPM-64 AC5 — the rows of "Your event arrangements": date and time, venue and equipment, each as the
- * Organiser requested it, with the sign-off state where one applies. Venue bookings and equipment
- * reservations do not exist yet, so every value is what was requested, never what was booked.
+ * Organiser requested it, with the sign-off state where one applies. Venue bookings are not shown yet, so the
+ * venue is what was requested. SPM-62: once equipment is reserved, the reserved types and quantities
+ * (`reservedEquipment` from the API, never unit ids) are shown in place of the requested list.
  *
- * @returns {{ label: string, requested: string, signOff: string | null }[]}
+ * @returns {{ label: string, requested: string, reserved?: string, signOff: string | null }[]}
  */
-export function arrangementRows(request, arrangements) {
+export function arrangementRows(request, arrangements, reservedEquipment = null) {
   const core = request.core ?? {}
   const venue = request.venue ?? {}
   const equipment = request.equipment ?? {}
@@ -64,6 +65,12 @@ export function arrangementRows(request, arrangements) {
   return [
     { label: 'Date and time', requested: when || 'Not set', signOff: null },
     { label: 'Venue', requested: venueText || 'Not set', signOff: signOff(arrangements?.venue) },
-    { label: 'Equipment', requested: equipmentText || 'None', signOff: signOff(arrangements?.technical) },
+    { label: 'Equipment', requested: equipmentText || 'None', ...reservedText(reservedEquipment), signOff: signOff(arrangements?.technical) },
   ]
+}
+
+function reservedText(reservedEquipment) {
+  const items = Array.isArray(reservedEquipment?.items) ? reservedEquipment.items : []
+  if (!items.length) return {}
+  return { reserved: items.map((item) => `${item.quantity} × ${item.equipmentTypeName}`).join(', ') }
 }

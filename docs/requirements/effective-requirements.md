@@ -718,11 +718,44 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - **Reserved units:** "excludes units reserved for overlapping events (SPM-57)" and "an event's own reserved units are not subtracted on a re-check" need equipment reservations, which do not exist (§4.17, SPM-57 / SPM-62). Nothing is subtracted yet.
 - **Technical requirements:** "only units matching the requested type and technical requirements are counted" needs units with technical attributes and structured requirements. SPM-17 stores requirements as free text, and SPM-37 units have only an asset tag and status. Units are matched by type only; the requirements are shown to the staff member to judge. Matching needs a team decision on the unit model.
 
+**[Implemented — SPM-57, 18 Oct 2026]** This unblocks SPM-18's reserved-units criteria above; the technical requirements criterion stays blocked. Rules in `shared/equipmentReservation.js` (`periodsOverlap`, `reservedUnitIds`), loaded by `loadReservedUnitIds` in `backend/src/services/equipmentReservationService.js`:
+
+- a unit reserved for another event is not available for any period that overlaps the reservation's period, which is the event's own date, start and end time;
+- back-to-back periods (one ends exactly when the other starts) do not overlap; venue setup and turnaround do not apply to equipment, and equipment buffers are zero (CL1 §6, CL3 row 29);
+- only active reservations of events that are not Rejected, Cancelled or Completed count. Reservations do not expire, and a reservation whose event status cannot be read still counts;
+- the event's own reservations are not subtracted when its request is re-checked (SPM-18);
+- this applies to the SPM-18 check, SPM-56's approval, SPM-62's reservation, and `/api/equipment` when a period is given (SPM-37). The equipment page then shows the units reserved for overlapping events, which closes the SPM-37 gap above.
+
 ### 4.17 Equipment Reservation
 
 **[Customer-confirmed]** Fulfilment is all-or-nothing. Conflicts or breakdowns are flagged for manual resolution; automatic substitutes are not required. Transit/setup buffers may be zero.
 
 > **Week 7 note.** Change #1 is a **venue** buffering rule. Equipment transit/setup/teardown buffers remain "may be zero" (unchanged from CL1); do not conflate venue occupancy buffering with equipment buffering.
+
+**[Implemented — SPM-62, 18 Oct 2026]** (`shared/equipmentReservation.js`, `reserve` on `POST /api/requests/:id/equipment-requests/:requestId/actions`, `backend/src/services/equipmentRequestService.js`):
+
+- the request's assigned Technical Support Staff member reserves an **Approved** request (SPM-56); any other role gets 403, and other Technical Support Staff get 404. The request moves to Reserved;
+- availability is checked again inside the transaction, including other events' overlapping reservations (SPM-57). If any type is short, the whole reservation is refused with the shortfall (409) and nothing is written: no partial reservation;
+- each reserved type gets one `equipmentReservations` record: equipment type, quantity, the event, the reserved period (start and end), the chosen unit ids, and who reserved it and when. It belongs to the event, never to a venue booking;
+- the event records `reservedEquipment` (types and quantities). The owning Organiser's "Your event arrangements" card shows "Reserved: …" in place of the requested list, with no unit ids;
+- equipment preparation (SPM-48) opens on the reservation, replacing the temporary technical sign-off condition;
+- a significant change (SPM-10) does not release the reservation.
+
+**[Team decisions, 18 Oct 2026 — SPM-62, pending PO confirmation]**
+
+- Units are chosen automatically: the free Available units with the lowest asset tags.
+- A request can be reserved while the event is at Planning or Confirmed, because SPM-56's approval sets the technical sign-off and the event may be confirmed before reservation.
+- Rejecting or cancelling the whole event releases its reservations, in the same transaction as the status change (CL1 §8; §5 whole-event release).
+- An event with nothing reserved cannot have its equipment preparation updated.
+- Reservations of one equipment type are serialised by `systemLocks/equipmentReservation-{typeId}`, as SPM-16's venue lock. The in-memory double does not model transaction retries, so this is not verified under real concurrency.
+
+**[Held — SPM-62, team decision 18 Oct 2026]** "Technical Support Staff must re-confirm the equipment arrangement before the event can be confirmed again" after a significant change is not built. It conflicts with CL3 row 51 (no automatic reset of sign-offs; the Coordinator decides), and is held until SPM-87 settles the reset. **Consequence until then:** SPM-10 still clears the technical sign-off on a significant change. SPM-56's Re-confirm works only on Approved requests, and the manual sign-off is refused while a current request exists, so a Reserved event whose sign-off has been cleared cannot be confirmed again.
+
+**[Known gaps — SPM-62]**
+
+- SPM-17 still accepts a new request while one is Reserved (its tests cover that path). The earlier request's reservation is not released or replaced. This needs a PO decision.
+- A reserved unit that later becomes Damaged, Under Repair or Unavailable is not flagged (SPM-37 AC5, now buildable).
+- Reservation and release activity entries are recorded but not displayed. The Coordinator is not notified of a reservation.
 
 ### 4.18 Attendee Registration
 

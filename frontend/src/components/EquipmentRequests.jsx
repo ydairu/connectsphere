@@ -6,6 +6,7 @@ import {
   MAX_REJECTION_TEXT_LENGTH,
   RECONFIRM_EQUIPMENT_APPROVAL,
   REJECT_EQUIPMENT_REQUEST,
+  RESERVE_EQUIPMENT,
   MAX_EQUIPMENT_REQUEST_ITEMS,
   MAX_TECHNICAL_REQUIREMENTS_LENGTH,
   normaliseEquipmentRequest,
@@ -100,7 +101,7 @@ function AvailabilityCheck({ user, eventId, request, autoCheck = false, result: 
           </ul>
           <p className="form-note">
             Counts Available units of each type for {displayTime(result.requiredPeriod?.startsAt)} to {displayTime(result.requiredPeriod?.endsAt)}.
-            Equipment reservations are not recorded yet, so units reserved for other events are not subtracted.
+            Units reserved for other events at overlapping times are not counted; this event's own reservation is.
           </p>
         </>
       )}
@@ -114,12 +115,14 @@ function AvailabilityCheck({ user, eventId, request, autoCheck = false, result: 
 const ACTION_LABELS = Object.freeze({
   [APPROVE_EQUIPMENT_REQUEST]: 'Approve request',
   [RECONFIRM_EQUIPMENT_APPROVAL]: 'Re-confirm approval',
+  [RESERVE_EQUIPMENT]: 'Reserve equipment',
 })
 
 const DECIDED_MESSAGES = Object.freeze({
   [APPROVE_EQUIPMENT_REQUEST]: 'Approved. The technical arrangement is approved.',
   [RECONFIRM_EQUIPMENT_APPROVAL]: 'Approval re-confirmed. The technical arrangement is approved again.',
   [REJECT_EQUIPMENT_REQUEST]: 'Rejected. The Coordinator has been notified.',
+  [RESERVE_EQUIPMENT]: 'Reserved. The equipment is now held for this event.',
 })
 
 function RejectForm({ request, initialReason, busy, errors, onConfirm, onCancel }) {
@@ -325,6 +328,12 @@ function EquipmentRequests({ user, eventId, organiserEquipment, busy = false, on
           {request.rejectedAt && <Row label="Rejected by">{`${request.rejectedByName ?? 'Technical Support Staff'}, ${displayTime(request.rejectedAt)}`}</Row>}
           {request.rejectionReason && <Row label="Reason for rejection">{request.rejectionReason}</Row>}
           {request.suggestedAlternative && <Row label="Suggested alternative">{request.suggestedAlternative}</Row>}
+          {request.reservedAt && <Row label="Reserved by">{`${request.reservedByName ?? 'Technical Support Staff'}, ${displayTime(request.reservedAt)}`}</Row>}
+          {request.reservedUnits?.length > 0 && (
+            <Row label="Reserved units">
+              {request.reservedUnits.map((item) => `${item.equipmentTypeName}: ${item.assetTags.join(', ')}`).join('; ')}
+            </Row>
+          )}
           <ul className="equipment-items">
             {request.items.map((item) => (
               <li key={item.equipmentTypeId}>

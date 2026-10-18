@@ -43,7 +43,11 @@ function request(overrides = {}) {
 }
 
 // SPM-48: staff edit their preparation section only once the matching sign-off is approved.
-const signOffsApproved = { arrangementApprovals: { venue: { decision: 'approved' }, technical: { decision: 'approved' } } }
+// SPM-62: equipment preparation also needs the event's equipment reserved.
+const signOffsApproved = {
+  arrangementApprovals: { venue: { decision: 'approved' }, technical: { decision: 'approved' } },
+  reservedEquipment: { equipmentRequestId: 'eq-1', items: [{ equipmentTypeId: 'projector', equipmentTypeName: 'Projector', quantity: 1 }] },
+}
 
 const withSection = (base, section, fields) => ({ ...base, [section]: { ...base[section], ...fields } })
 

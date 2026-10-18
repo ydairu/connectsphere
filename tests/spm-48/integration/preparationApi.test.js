@@ -14,6 +14,7 @@ import { FIELD_CHANGED } from '../../../shared/changeHistory.js'
 import { TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
 import {
   PREPARATION_EVENT_CLOSED,
+  PREPARATION_EQUIPMENT_NOT_RESERVED,
   PREPARATION_NOTES_MAX_LENGTH,
   PREPARATION_SIGN_OFF_PENDING,
 } from '../../../shared/preparation.js'
@@ -31,10 +32,14 @@ const approvals = (venue, technical) => ({
   ...(technical ? { technical: { decision: 'approved', byUid: SEED_ACCOUNTS.technicalStaff.uid, at: '2026-09-06T12:30:00+08:00' } } : {}),
 })
 
-// Copies of A1 confirmed: same assignments, coordinator and owner.
-const extra = (id, status, arrangementApprovals) => ({ ...structuredClone(confirmed), id, status, arrangementApprovals })
+// Copies of A1 confirmed: same assignments, coordinator and owner. SPM-62: equipment preparation opens on the
+// reservation A1 confirmed carries, so the venue-only copy has nothing reserved.
+const extra = (id, status, arrangementApprovals, { reserved = true } = {}) => {
+  const { reservedEquipment, ...copy } = structuredClone(confirmed)
+  return { ...copy, ...(reserved ? { reservedEquipment } : {}), id, status, arrangementApprovals }
+}
 const EXTRA_REQUESTS = [
-  extra(VENUE_ONLY_ID, PLANNING, approvals(true, false)),
+  extra(VENUE_ONLY_ID, PLANNING, approvals(true, false), { reserved: false }),
   extra('test-req-completed', COMPLETED, approvals(true, true)),
   extra('test-req-cancelled', CANCELLED, approvals(true, true)),
   extra('test-req-rejected', REJECTED, approvals(true, true)),
@@ -102,7 +107,8 @@ describe('SPM-48 AC5 — read-only before sign-off and on closed events', () => 
   it('before sign-off: 403 naming the field, nothing written, with the reason in the response', async () => {
     for (const [account, section, reason] of [
       ['venueStaff', 'venuePreparation', PREPARATION_SIGN_OFF_PENDING],
-      ['technicalStaff', 'equipmentPreparation', PREPARATION_SIGN_OFF_PENDING],
+      // SPM-62: equipment preparation waits for the reservation, not the technical sign-off.
+      ['technicalStaff', 'equipmentPreparation', PREPARATION_EQUIPMENT_NOT_RESERVED],
     ]) {
       const response = await patch(account, PLANNING_ID, { [section]: { status: 'ready' } })
       expect(response.status, account).toBe(403)

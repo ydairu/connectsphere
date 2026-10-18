@@ -52,7 +52,11 @@ const dualStaff = { uid: 'u-dual', roles: [VENUE_STAFF, TECHNICAL_STAFF] }
 const attendee = { uid: 'u-attendee', roles: [ATTENDEE] }
 
 // SPM-48: staff edit only their preparation section, and only once the matching sign-off is approved.
-const bothSignOffsApproved = { arrangementApprovals: { venue: { decision: 'approved' }, technical: { decision: 'approved' } } }
+// SPM-62: equipment preparation also needs the event's equipment reserved.
+const bothSignOffsApproved = {
+  arrangementApprovals: { venue: { decision: 'approved' }, technical: { decision: 'approved' } },
+  reservedEquipment: { equipmentRequestId: 'eq-1', items: [{ equipmentTypeId: 'projector', equipmentTypeName: 'Projector', quantity: 1 }] },
+}
 
 function request(overrides = {}) {
   return {
