@@ -92,14 +92,14 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
     delete hold.holdExpiresAt
     await expect(submit({ submissionKey: 'legacy' })).rejects.toMatchObject({ name: 'VenueConflictError' })
   })
-  it.each([REJECT, CANCEL, APPROVE_CANCELLATION])('releases tentative holds on %s but preserves confirmed bookings', async (action) => {
+  it.each([REJECT, CANCEL, APPROVE_CANCELLATION])('releases tentative holds and confirmed bookings on %s (SPM-54)', async (action) => {
     await submit()
     await db.collection('venueAvailability').doc('confirmed').set({ venueId: 'room', eventRequestId: 'event', status: AVAILABILITY_STATUS.CONFIRMED_BOOKING, lifecycleStatus: 'active' })
     if (action !== REJECT) db.store.get('event').status = CONFIRMED
     if (action === APPROVE_CANCELLATION) await transitionEventRequest('event', REQUEST_CANCELLATION, organiser, db, now, { reason: 'Cancel please' })
     await transitionEventRequest('event', action, coordinator, db, now, { reason: 'Unable to proceed' })
     expect(values('venueAvailability')[0].lifecycleStatus).toBe('removed')
-    expect(db.collectionData('venueAvailability').get('confirmed').lifecycleStatus).toBe('active')
+    expect(db.collectionData('venueAvailability').get('confirmed').lifecycleStatus).toBe('removed')
     expect((await listVenueBookingQueue(staff, db)).bookings).toEqual([])
   })
   it('does not release a hold merely because cancellation was requested', async () => {

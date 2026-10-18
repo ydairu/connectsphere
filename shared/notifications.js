@@ -37,6 +37,7 @@ export const SIGNIFICANT_CHANGE_NOTICE = 'significant_change'
 // SPM-56: the assigned Technical Support Staff member approved the event's equipment request (or re-confirmed it).
 export const EQUIPMENT_REQUEST_APPROVED_NOTICE = 'equipment_request_approved'
 export const VENUE_BOOKING_REJECTED_NOTICE = 'venue_booking_rejected'
+export const VENUE_BOOKING_APPROVED_NOTICE = 'venue_booking_approved'
 
 function titleOf(request) {
   const title = request.core?.title
@@ -133,6 +134,17 @@ export function venueBookingRejectedNotifications(event, booking, actor, { reaso
     type: VENUE_BOOKING_REJECTED_NOTICE,
     message: `The venue booking for “${title}” at ${booking.venueName} was rejected.`,
     reason,
+    bookingRequestId: booking.id,
+  }], event, actor, title, at)
+}
+
+export function venueBookingApprovedNotifications(event, booking, actor, { at }) {
+  const title = titleOf(event)
+  return addressed([{
+    recipientUid: event.assignedCoordinatorUid,
+    type: VENUE_BOOKING_APPROVED_NOTICE,
+    message: `The venue booking for “${title}” at ${booking.venueName} was approved. The venue is confirmed for the booked period.`,
+    reason: null,
     bookingRequestId: booking.id,
   }], event, actor, title, at)
 }

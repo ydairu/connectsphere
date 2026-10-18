@@ -1,4 +1,4 @@
-import { listEventVenueBookings, listVenueBookingQueue, rejectVenueBooking, submitVenueBooking, VenueBookingError } from '../services/venueBookingService.js'
+import { approveVenueBooking, listEventVenueBookings, listVenueBookingQueue, rejectVenueBooking, submitVenueBooking, VenueBookingError } from '../services/venueBookingService.js'
 import { sendVenueError } from './venueController.js'
 
 export function createVenueBookingController(getDb) {
@@ -11,7 +11,7 @@ export function createVenueBookingController(getDb) {
   }
   return {
     submit: handle(async (req) => ({ booking: await submitVenueBooking(req.params.id, req.body, req.user, getDb()) }), 201),
-    decide: handle(async (req) => ({ booking: await rejectVenueBooking(req.params.id, req.params.bookingId, req.body, req.user, getDb()) })),
+    decide: handle(async (req) => ({ booking: await (req.body?.action === 'approve' ? approveVenueBooking : rejectVenueBooking)(req.params.id, req.params.bookingId, req.body, req.user, getDb()) })),
     list: handle((req) => listEventVenueBookings(req.params.id, req.user, getDb())),
     queue: handle((req) => listVenueBookingQueue(req.user, getDb())),
   }

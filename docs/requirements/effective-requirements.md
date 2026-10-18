@@ -576,6 +576,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Customer-confirmed]** Venue Staff approve, reject, or suggest alternatives; no partial approval. Rejection keeps/returns the event to Planning. There is no fixed SLA.
 
+**[Implemented locally — SPM-54, 18 Oct 2026; implementation choices authorised by the user-approved plan]** The booking's assigned Venue Staff member approves a pending request while the event remains in Planning. The action rechecks current event attendance, required facilities and the booking's occupied interval, excluding only its verified own hold. It converts that hold to a confirmed booking and writes approval, activity and the current assigned Coordinator's in-app notice atomically. The existing calendar/search consume the confirmed commitment. Whole-event cancellation or rejection releases confirmed reservations; a significant edit preserves their approval and original reserved interval. This increment does not set event-level venue sign-off or implement safety, Preparation, aggregate venue readiness or Coordinator-selected reapproval. Those dependent criteria and human acceptance remain open; SPM-54 remains In Progress. See `docs/evidence/spm-54-traceability.md` and `docs/testing/spm-54-manual-testing.md`.
+
 ### 4.14 Booking Conflict Detection
 
 **[Customer-confirmed]** Any overlap, even one second, is incompatible and blocked. There is no override. Simultaneous conflicts are first-come, first-served.

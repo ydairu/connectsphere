@@ -2,8 +2,10 @@ import { COORDINATOR, VENUE_STAFF, isAssignedCoordinator, rolesOf } from './perm
 import { PLANNING } from './status.js'
 import { chooseStaff } from './staffAssignment.js'
 import { validateAvailabilityRange } from './venueAvailability.js'
+import { checkVenueSuitability } from './venueSuitability.js'
 
 export const BOOKING_PENDING = 'pending'
+export const BOOKING_APPROVED = 'approved'
 export const BOOKING_REJECTED = 'rejected'
 export const BOOKING_REPLACED = 'replaced'
 export const BOOKING_CANCELLED = 'cancelled'
@@ -26,6 +28,27 @@ export function canReadVenueBooking(user, event, booking) {
 export function canRejectVenueBooking(user, event, booking) {
   return rolesOf(user).includes(VENUE_STAFF) && booking.assignedVenueStaffUid === user.uid &&
     event.status === PLANNING && booking.status === BOOKING_PENDING
+}
+
+export function canApproveVenueBooking(user, event, booking) {
+  return canRejectVenueBooking(user, event, booking)
+}
+
+export function venueBookingApprovalErrors(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { request: 'An approval action is required.' }
+  const errors = {}
+  for (const key of Object.keys(input)) if (key !== 'action') errors[key] = 'This field cannot be set.'
+  if (input.action !== 'approve') errors.action = 'Choose Approve.'
+  return errors
+}
+
+// Suitability uses current event requirements and attendance, but this booking's actual interval.
+// Availability is checked separately under the venue lock, excluding only the verified own hold.
+export function venueBookingSuitability(event, booking, venue) {
+  return checkVenueSuitability({ ...event, core: { ...event.core,
+    preferredDateTime: booking.startsAt,
+    durationHours: (Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 3600000,
+  } }, venue)
 }
 
 export function normaliseVenueBookingRejection(input) {
