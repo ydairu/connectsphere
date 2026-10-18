@@ -266,6 +266,8 @@ a { color: inherit; }
 .booking-row { align-items: start; }
 .booking-row strong { min-width: 0; white-space: pre-wrap; }
 .booking-actions { display: flex; justify-content: flex-end; padding-top: 20px; }
+.booking-actions form { width: 100%; }
+.booking-actions fieldset { display: grid; gap: 12px; border: 0; margin: 0; padding: 0; }
 .booking-page .alert button { margin-left: 16px; }
 @media (max-width: 600px) {
   .booking-shell .navbar { flex-wrap: wrap; padding: 16px 0; gap: 16px; }

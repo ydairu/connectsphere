@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { BOOKINGS, listEventVenueBookings, listVenueBookingQueue, submitVenueBooking } from '../../../backend/src/services/venueBookingService.js'
+import { BOOKINGS, listEventVenueBookings, listVenueBookingQueue, rejectVenueBooking, submitVenueBooking } from '../../../backend/src/services/venueBookingService.js'
 import { transitionEventRequest } from '../../../backend/src/services/statusTransitionService.js'
 import { AVAILABILITY_STATUS } from '../../../shared/venueAvailability.js'
 import { BOOKING_REJECTED } from '../../../shared/venueBooking.js'
@@ -110,7 +110,7 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
   })
   it('supports a rejected-booking fixture without inventing the approval workflow', async () => {
     const first = await submit()
-    db.collectionData(BOOKINGS).get(first.id).status = BOOKING_REJECTED
+    await rejectVenueBooking('event', first.id, { action: 'reject', reason: 'Unable to host' }, staff, db, now)
     const next = await submit({ replacesId: first.id, venueId: 'room', submissionKey: 'retry-rejected' })
     expect(next.assignedVenueStaffName).toBe(first.assignedVenueStaffName)
     expect(db.collectionData(BOOKINGS).get(first.id).status).toBe(BOOKING_REJECTED)

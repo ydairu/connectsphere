@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { BOOKING_PENDING, BOOKING_REJECTED, capacityWarning } from '../../../shared/venueBooking.js'
-import { getVenueBookings, getVenueBookingQueue, listVenues, submitVenueBooking } from '../services/api.js'
+import { COORDINATOR } from '../../../shared/permissions.js'
+import { getVenueBookings, getVenueBookingQueue, listVenues, rejectVenueBooking, submitVenueBooking } from '../services/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 import Navbar from '../components/Navbar.jsx'
 import Card from '../components/Card.jsx'
@@ -23,7 +24,7 @@ export default function VenueBookingsPage() {
   const [searchParams] = useSearchParams()
   const bookingId = id && searchParams.has('bookingId') ? searchParams.get('bookingId') : null
   const detailView = bookingId !== null
-  const { user } = useAuth()
+  const { user, roles } = useAuth()
   const [data, setData] = useState(null)
   const [venues, setVenues] = useState([])
   const [form, setForm] = useState(emptyForm)
@@ -32,6 +33,9 @@ export default function VenueBookingsPage() {
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [reload, setReload] = useState(0)
+  const [rejectingId, setRejectingId] = useState(null)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [suggestedAlternative, setSuggestedAlternative] = useState('')
   useEffect(() => {
     let active = true
     async function load() {
@@ -72,7 +76,23 @@ export default function VenueBookingsPage() {
   function replace(booking) {
     setForm({ venueId: booking.venueId, startsAt: localTime(booking.startsAt), endsAt: localTime(booking.endsAt), requirements: booking.requirements,
       specialRequests: booking.specialRequests, replacesId: booking.id, submissionKey: crypto.randomUUID() })
-    setNotice('Choose the replacement venue or times below. The original hold stays until your changes succeed.')
+    setNotice(booking.status === BOOKING_REJECTED
+      ? 'Choose a replacement venue or time below. The rejected booking remains in the history.'
+      : 'Choose the replacement venue or times below. The original hold stays until your changes succeed.')
+  }
+  async function reject(event) {
+    event.preventDefault()
+    if (!rejectionReason.trim()) { setError('Enter a rejection reason.'); return }
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const { booking } = await rejectVenueBooking(user, id, rejectingId, rejectionReason, suggestedAlternative)
+      setData((current) => ({ ...current, bookings: current.bookings.map((item) => item.id === rejectingId
+        ? { ...item, ...booking, canReject: false } : item) }))
+      setRejectingId(null); setRejectionReason(''); setSuggestedAlternative('')
+      setNotice('Booking request rejected. The Coordinator has been notified.')
+    } catch (err) {
+      setError([err.details?.message ?? 'Unable to reject the booking. Please try again.', ...Object.values(err.details?.errors ?? {})].join(' '))
+    } finally { setBusy(false) }
   }
   const bookings = detailView ? data?.bookings.filter((booking) => booking.id === bookingId) : data?.bookings
   return <div className="booking-shell"><Navbar /><main className="container page-shell booking-page">
@@ -81,7 +101,8 @@ export default function VenueBookingsPage() {
         {!id && <p>Pending requests assigned to you, oldest first.</p>}</div>
       {!id && <button className="button button-secondary" type="button" disabled={loading} onClick={() => setReload((value) => value + 1)}>Refresh</button>}
     </div>
-    {detailView ? <Link className="booking-back" to="/venues/booking-requests">Back to pending bookings</Link> : id && <Link className="booking-back" to={`/requests/${id}`}>Back to event</Link>}
+    {detailView ? <Link className="booking-back" to={roles?.includes(COORDINATOR) ? `/requests/${id}` : '/venues/booking-requests'}>
+      {roles?.includes(COORDINATOR) ? 'Back to event' : 'Back to pending bookings'}</Link> : id && <Link className="booking-back" to={`/requests/${id}`}>Back to event</Link>}
     {error && <div className="alert alert-error" role="alert">{error}
       {!data && <button className="button button-secondary" type="button" onClick={() => setReload((value) => value + 1)}>Try again</button>}
     </div>}
@@ -105,9 +126,25 @@ export default function VenueBookingsPage() {
         <BookingRow label="Venue requirements">{booking.requirements}</BookingRow>
         <BookingRow label="Special requests">{booking.specialRequests || 'None'}</BookingRow>
         <BookingRow label="Status">{booking.status}</BookingRow>
+        {booking.status === BOOKING_REJECTED && <>
+          <BookingRow label="Rejection reason">{booking.rejectionReason}</BookingRow>
+          {booking.suggestedAlternative && <BookingRow label="Suggested alternative">{booking.suggestedAlternative}</BookingRow>}
+        </>}
         <BookingRow label="Assigned Venue Staff">{booking.assignedVenueStaffName}</BookingRow>
-        <BookingRow label="Hold expiry">{displayTime(booking.holdExpiresAt)}{Date.parse(booking.holdExpiresAt) <= Date.now() ? ' (expired)' : ''}</BookingRow>
+        {booking.status === BOOKING_REJECTED ? <BookingRow label="Tentative hold">Released</BookingRow> :
+          <BookingRow label="Hold expiry">{displayTime(booking.holdExpiresAt)}{Date.parse(booking.holdExpiresAt) <= Date.now() ? ' (expired)' : ''}</BookingRow>}
         {booking.capacityWarning && <p role="note">{booking.capacityWarning}</p>}
+        {detailView && booking.canReject && <div className="booking-actions">
+          {rejectingId !== booking.id ? <button className="button button-secondary" type="button" onClick={() => { setRejectingId(booking.id); setError('') }}>Reject booking</button> :
+            <form onSubmit={reject} aria-label="Reject venue booking"><fieldset disabled={busy}>
+              <div className="field"><label htmlFor="rejection-reason">Rejection reason</label>
+                <textarea id="rejection-reason" required maxLength={4000} value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} /></div>
+              <div className="field"><label htmlFor="suggested-alternative">Suggested alternative (optional)</label>
+                <textarea id="suggested-alternative" maxLength={4000} value={suggestedAlternative} onChange={(e) => setSuggestedAlternative(e.target.value)} /></div>
+              <button className="button button-primary" type="submit">{busy ? 'Rejecting…' : 'Confirm rejection'}</button>
+              <button type="button" onClick={() => { setRejectingId(null); setError('') }}>Cancel</button>
+            </fieldset></form>}
+        </div>}
       </>}
       {!detailView && data.canSubmit && !booking.replacedById && [BOOKING_PENDING, BOOKING_REJECTED].includes(booking.status) && <button type="button" disabled={busy} onClick={() => replace(booking)}>Replace request for {booking.venueName}</button>}
     </Card>)}

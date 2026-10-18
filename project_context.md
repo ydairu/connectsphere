@@ -604,6 +604,13 @@ See [`docs/requirements/effective-requirements.md`](docs/requirements/effective-
       - Seed dry run against `connectsphere-6546c`: no blockers, nothing written.
     - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
+## SPM-34 venue booking rejection — 18 October 2026
+
+- The assigned Venue Staff member can reject one pending booking while its event is in Planning. The API requires a reason and accepts an optional free-text suggested alternative. The booking decision, release of its tentative hold, activity entry, cleared legacy venue sign-off and in-app notice to the current assigned Coordinator are written together in one transaction. Other bookings on the event are unchanged.
+- The assigned Coordinator sees the rejection details beside the booking and receives a notice linking to it. A replacement request may use a rejected booking whose hold has already been released. Venue approval remains SPM-54; the full all-required-venues confirmation gate and per-venue sign-off remain SPM-54/SPM-81 work.
+- `docs/evidence/spm-34-traceability.md` maps the six backlog criteria to implementation and automated checks. `docs/testing/spm-34-manual-testing.md` is the pending human acceptance checklist. The untracked operational workbook still says **In Progress**; no Done or Sprint change is claimed.
+- Local verification: `npm test` passed 128 Node tests, 100 frontend tests, 1,611 root Vitest tests (35 opt-in live/emulator tests skipped), and 88 Chromium browser tests. The final SPM-34 rerun passed 13 Vitest tests and one Chromium test after two additional service cases and a UI state adjustment. Targeted SPM-14/SPM-53 regressions, lint and production build passed; the build retained its existing bundle-size warning. HTTP tests use mocked token verification with in-memory persistence; Playwright uses a Firebase double. No Firebase emulator, live project, human manual acceptance, or rules deployment is claimed. `firestore.rules` was not edited.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.

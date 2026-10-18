@@ -7,8 +7,8 @@ import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { listNotifications, markNotificationRead } from '../services/api.js'
 
-// SPM-47, SPM-63 — the signed-in user's in-app notifications: cancellation requests, decisions on them, and
-// cancelled events, each with its reason and a link to the event. The API returns only the user's own.
+// The signed-in user's in-app notifications. Venue booking rejections link to the booking; other notices
+// link to the event. The API returns only the user's own.
 
 function formatDateTime(value) {
   const date = new Date(value ?? '')
@@ -91,7 +91,9 @@ function NotificationsPage() {
                           Mark as read
                         </Button>
                       )}
-                      <Link className="button button-secondary button-small" to={`/requests/${notification.eventRequestId}`}>View event</Link>
+                      <Link className="button button-secondary button-small" to={notification.bookingRequestId
+                        ? `/requests/${notification.eventRequestId}/venue-bookings?bookingId=${encodeURIComponent(notification.bookingRequestId)}`
+                        : `/requests/${notification.eventRequestId}`}>{notification.bookingRequestId ? 'View booking' : 'View event'}</Link>
                     </div>
                   </Card>
                 </li>

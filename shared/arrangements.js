@@ -12,7 +12,8 @@
 //
 // [Team decision, 1 Oct 2026] Minimal sign-off: until the Venue Booking Approval and equipment stories
 // exist, the assigned Venue Staff and Technical Support Staff record one decision each per request. Those
-// stories are expected to build on or replace this. Suggesting alternatives is not modelled.
+// stories are expected to build on or replace this. SPM-34 models a suggested alternative on a rejected
+// booking, separate from this event-level sign-off.
 //
 // Decisions are record metadata, stored at the top level as
 //   arrangementApprovals: { venue?: { decision, byUid, at }, technical?: { decision, byUid, at } }

@@ -23,6 +23,26 @@ export function canReadVenueBooking(user, event, booking) {
     (rolesOf(user).includes(VENUE_STAFF) && booking.assignedVenueStaffUid === user.uid)
 }
 
+export function canRejectVenueBooking(user, event, booking) {
+  return rolesOf(user).includes(VENUE_STAFF) && booking.assignedVenueStaffUid === user.uid &&
+    event.status === PLANNING && booking.status === BOOKING_PENDING
+}
+
+export function normaliseVenueBookingRejection(input) {
+  const errors = {}
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { value: {}, errors: { request: 'A rejection is required.' } }
+  for (const key of Object.keys(input)) if (!['action', 'reason', 'suggestedAlternative'].includes(key)) errors[key] = 'This field cannot be set.'
+  if (input.action !== 'reject') errors.action = 'Choose Reject.'
+  const text = (key, required) => {
+    if (input[key] != null && typeof input[key] !== 'string') errors[key] = 'Enter text for this field.'
+    const value = typeof input[key] === 'string' ? input[key].trim() : ''
+    if (required && !value) errors[key] = 'Enter a reason.'
+    if (value.length > 4000) errors[key] = 'Use at most 4000 characters.'
+    return value
+  }
+  return { value: { reason: text('reason', true), suggestedAlternative: text('suggestedAlternative', false) }, errors }
+}
+
 export function normaliseVenueBooking(input = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { value: {}, errors: { request: 'A booking request object is required.' } }
   const errors = {}

@@ -1,6 +1,6 @@
 # Presentation Evidence Tracker
 
-Last reviewed: 19 September 2026 (organisation profile increment)
+Last reviewed: 18 October 2026 (SPM-34 venue booking rejection)
 
 ## Purpose
 
@@ -212,7 +212,14 @@ Executable evidence: `tests/spm-9/integration/statusTransitionsApi.test.js` veri
 
 Local verification on Windows with Node 22.17.0: lint passed, existing suites passed (128 Node + 67 frontend tests), coverage suites passed (395 passed, 30 opt-in live tests skipped), production build passed with a bundle-size warning, and Playwright Chromium passed all 39 tests. Vite-based checks required execution outside the restricted sandbox. API/E2E persistence and authentication use in-memory doubles; UI component tests mock the API. No live Firebase, emulator, deployed-rules, manual browser or updated GitHub Actions run is claimed. The operational backlog and Sprint records remain unavailable and were not updated; this is regression-fix evidence, not a story Done claim.
 
+## 18 October 2026 — SPM-34 venue booking rejection
+
+Assigned Venue Staff can reject one pending booking with a required reason and optional alternative; the assigned Coordinator sees the decision and receives an in-app notice. The rejected booking's tentative hold is released without changing another venue booking. The acceptance mapping and test locations are in `docs/evidence/spm-34-traceability.md`; the pending human checklist is in `docs/testing/spm-34-manual-testing.md`.
+
+Local verification: `npm test` passed 128 Node tests, 100 frontend tests, 1,611 root Vitest tests (35 opt-in live/emulator tests skipped), and 88 Chromium tests; after the final two service cases and UI adjustment, `npm run test:spm34` passed 13 Vitest and one Chromium test. Lint and production build passed. Tests used in-memory persistence and a local Firebase double. Manual acceptance, live Firebase and the broader SPM-54/SPM-81 all-venue confirmation rule remain outstanding; SPM-34 stays **In Progress** in the backlog. No rules were changed or deployed.
+
 ## Evidence Entry Template
+
 
 Copy this row into the Verified Evidence Register when new evidence is produced:
 
