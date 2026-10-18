@@ -61,7 +61,8 @@ test.describe('SPM-48 — Venue and Technical Support Staff update preparation s
     await page.getByRole('tab', { name: 'Equipment Required' }).click()
     const card = page.locator('.request-form-section', { has: page.getByRole('heading', { name: 'Equipment preparation' }) })
     await expect(card.getByText('Read only')).toBeVisible()
-    await expect(card.getByText('Available once the technical sign-off is approved.')).toBeVisible()
+    // SPM-62: equipment preparation now waits for the equipment reservation, not the technical sign-off.
+    await expect(card.getByText('Available once the equipment is reserved.')).toBeVisible()
     await expect(card.getByText('Not Started')).toBeVisible()
     await expect(page.getByLabel('Equipment preparation status')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Venue preparation' })).toHaveCount(0)

@@ -20,8 +20,10 @@ import {
   NOT_REQUEST_ASSIGNEE,
   NOT_TECHNICAL_STAFF,
   REJECT_EQUIPMENT_REQUEST,
+  EVENT_NOT_RESERVABLE,
   REQUEST_NOT_APPROVED,
   REQUEST_NOT_PENDING_REVIEW,
+  RESERVE_EQUIPMENT,
   SIGN_OFF_ALREADY_APPROVED,
   UNKNOWN_EQUIPMENT_ACTION,
   canReadEquipmentRequest,
@@ -43,6 +45,15 @@ import { getAdminDb } from '../config/firebaseAdmin.js'
 import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 import { EQUIPMENT_TYPES, loadUnitsByType } from './equipmentService.js'
 import { addNotifications } from './notificationService.js'
+import { loadReservedUnitIds, prepareReservationRelease } from './equipmentReservationService.js'
+import {
+  EQUIPMENT_RESERVATIONS_COLLECTION,
+  EQUIPMENT_RESERVED,
+  RESERVATION_STATUS,
+  chooseUnits,
+  equipmentReservationLockPath,
+  reservedEquipmentRecord,
+} from '../../../shared/equipmentReservation.js'
 import { userActor } from './statusHistory.js'
 
 // The same activity type as statusTransitionService's ARRANGEMENT_DECIDED; not imported, because
@@ -188,6 +199,7 @@ const PRESENTED_FIELDS = Object.freeze([
   'replacesId', 'replacedById', 'createdAt', 'closedReason', 'closedAt',
   'approvedByName', 'approvedAt', 'reconfirmedByName', 'reconfirmedAt',
   'rejectedByName', 'rejectedAt', 'rejectionReason', 'suggestedAlternative',
+  'reservedByName', 'reservedAt', 'reservedUnits',
 ])
 
 function presentEquipmentRequest(request) {
@@ -218,18 +230,21 @@ export async function listEventEquipmentRequests(eventId, user, db = getAdminDb(
 // closed in the same transaction (nothing is reserved yet). Reads only; returns the write phase, to run after
 // every read in the transaction. The write phase returns the fields to add to the event's own update: the
 // summary marked Closed when it named a request that was closed.
-const CLOSABLE_STATUSES = Object.freeze([EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW, EQUIPMENT_REQUEST_STATUS.APPROVED])
+// SPM-62: a Reserved request is closed too, and its reservations are released (team decision 2a).
+const CLOSABLE_STATUSES = Object.freeze([EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW, EQUIPMENT_REQUEST_STATUS.APPROVED, EQUIPMENT_REQUEST_STATUS.RESERVED])
 
 export async function prepareEquipmentRequestClose(tx, db, eventId, user, now, closedReason, currentSummary = null) {
   const open = (await tx.get(db.collection(EQUIPMENT_REQUESTS_COLLECTION).where('eventRequestId', '==', eventId))).docs
     .filter((doc) => CLOSABLE_STATUSES.includes(doc.data().status))
+  const releaseReservations = await prepareReservationRelease(tx, db, eventId, user, now, closedReason)
   return () => {
+    const released = releaseReservations()
     const at = now.toISOString()
     for (const doc of open) {
       tx.update(doc.ref, { status: EQUIPMENT_REQUEST_STATUS.CLOSED, closedReason, closedByUid: user.uid, closedAt: at, updatedAt: at })
     }
     const summaryClosed = currentSummary && open.some((doc) => doc.id === currentSummary.id)
-    return summaryClosed ? { currentEquipmentRequest: equipmentRequestSummary(currentSummary.id, EQUIPMENT_REQUEST_STATUS.CLOSED) } : {}
+    return { ...released, ...(summaryClosed ? { currentEquipmentRequest: equipmentRequestSummary(currentSummary.id, EQUIPMENT_REQUEST_STATUS.CLOSED) } : {}) }
   }
 }
 
@@ -243,6 +258,7 @@ const REFUSAL_STATUS = Object.freeze({
   [REQUEST_NOT_PENDING_REVIEW]: 409,
   [REQUEST_NOT_APPROVED]: 409,
   [SIGN_OFF_ALREADY_APPROVED]: 409,
+  [EVENT_NOT_RESERVABLE]: 409,
 })
 
 const REFUSAL_MESSAGES = Object.freeze({
@@ -251,8 +267,9 @@ const REFUSAL_MESSAGES = Object.freeze({
   [NOT_REQUEST_ASSIGNEE]: 'Equipment request not found.',
   [EVENT_NOT_AT_PLANNING]: 'Equipment requests can only be reviewed while the event is in Planning.',
   [REQUEST_NOT_PENDING_REVIEW]: 'Only a request waiting for review can be approved or rejected.',
-  [REQUEST_NOT_APPROVED]: 'Only an approved request can be re-confirmed.',
+  [REQUEST_NOT_APPROVED]: 'Only an approved request can be re-confirmed or reserved.',
   [SIGN_OFF_ALREADY_APPROVED]: 'The technical arrangement is already approved; there is nothing to re-confirm.',
+  [EVENT_NOT_RESERVABLE]: 'Equipment can only be reserved while the event is in Planning or Confirmed.',
 })
 
 /**
@@ -282,9 +299,25 @@ export async function decideEquipmentRequest(eventId, equipmentRequestId, action
     const items = Array.isArray(request.items) ? request.items : []
     const quantityErrors = validateRequestedQuantities(items)
     if (Object.keys(quantityErrors).length) throw new EquipmentRequestValidationError(quantityErrors)
-    const unitsByType = await loadUnitsByType(db, items.map((item) => item.equipmentTypeId), (query) => tx.get(query))
-    const availability = { equipmentRequestId, requiredPeriod: request.requiredPeriod ?? null, checkedAt: now.toISOString(), ...checkRequestAvailability(items, unitsByType) }
+    const typeIds = [...new Set(items.map((item) => item.equipmentTypeId))]
+    // SPM-62: reserving reads one lock per equipment type first, and writes it below, so two reservations of
+    // the same type are serialised and the later one sees the earlier one's units (as SPM-16's venue lock).
+    const lockRef = (typeId) => {
+      const [collection, id] = equipmentReservationLockPath(typeId)
+      return db.collection(collection).doc(id)
+    }
+    const lockRefs = action === RESERVE_EQUIPMENT ? typeIds.map(lockRef) : []
+    await Promise.all(lockRefs.map((ref) => tx.get(ref)))
+    const read = (ref) => tx.get(ref)
+    const unitsByType = await loadUnitsByType(db, typeIds, read)
+    // SPM-57: units reserved for another overlapping event are not available; the event's own are.
+    const blocked = await loadReservedUnitIds(db, typeIds, request.requiredPeriod, { ownEventId: eventId, read })
+    const availability = { equipmentRequestId, requiredPeriod: request.requiredPeriod ?? null, checkedAt: now.toISOString(), ...checkRequestAvailability(items, unitsByType, blocked) }
     if (!availability.fulfillable) throw new EquipmentRequestShortfallError(availability)
+
+    if (action === RESERVE_EQUIPMENT) {
+      return reserveUnits({ tx, db, eventRef, event, request, items, unitsByType, blocked, lockRefs, availability, user, now })
+    }
 
     const at = now.toISOString()
     const reconfirmed = action !== APPROVE_EQUIPMENT_REQUEST
@@ -355,6 +388,61 @@ function rejectInTransaction(tx, { db, eventRef, requestRef, event, request, use
     equipmentRequestId: request.id, reason: value.reason, suggestedAlternative: value.suggestedAlternative, at,
   }))
   return { equipmentRequest: presentEquipmentRequest({ ...request, ...requestUpdate }) }
+}
+
+// SPM-62 — the write phase of reserving: every requested unit or none (a shortfall was refused above).
+// Units are chosen automatically, lowest asset tag first (team decision 1, 18 Oct 2026). One reservation per
+// equipment type; the request moves to Reserved; the event gets the types and quantities only. The technical
+// sign-off is left as approval set it.
+function reserveUnits({ tx, db, eventRef, event, request, items, unitsByType, blocked, lockRefs, availability, user, now }) {
+  const at = now.toISOString()
+  const chosen = chooseUnits(items, unitsByType, blocked)
+  const actor = userActor(user)
+  const reservationIds = []
+  for (const item of chosen) {
+    const ref = db.collection(EQUIPMENT_RESERVATIONS_COLLECTION).doc()
+    reservationIds.push(ref.id)
+    tx.set(ref, {
+      eventRequestId: event.id,
+      equipmentRequestId: request.id,
+      equipmentTypeId: item.equipmentTypeId,
+      equipmentTypeName: item.equipmentTypeName,
+      quantity: item.quantity,
+      unitIds: item.units.map((unit) => unit.id),
+      startsAt: request.requiredPeriod.startsAt,
+      endsAt: request.requiredPeriod.endsAt,
+      status: RESERVATION_STATUS.ACTIVE,
+      reservedByUid: user.uid,
+      reservedByName: user.name ?? null,
+      reservedAt: at,
+    })
+  }
+  for (const ref of lockRefs) tx.set(ref, { lastEquipmentRequestId: request.id, updatedAt: at })
+
+  const requestUpdate = {
+    status: EQUIPMENT_REQUEST_STATUS.RESERVED,
+    reservedByUid: user.uid,
+    reservedByName: user.name ?? null,
+    reservedAt: at,
+    reservationIds,
+    reservedUnits: chosen.map(({ equipmentTypeId, equipmentTypeName, quantity, units }) => ({ equipmentTypeId, equipmentTypeName, quantity, assetTags: units.map((unit) => unit.assetTag) })),
+    updatedAt: at,
+  }
+  tx.update(db.collection(EQUIPMENT_REQUESTS_COLLECTION).doc(request.id), requestUpdate)
+  tx.update(eventRef, {
+    currentEquipmentRequest: equipmentRequestSummary(request.id, EQUIPMENT_REQUEST_STATUS.RESERVED),
+    reservedEquipment: reservedEquipmentRecord(request.id, chosen, at),
+    updatedAt: at,
+  })
+  tx.set(eventRef.collection(ACTIVITY_SUBCOLLECTION).doc(), {
+    type: EQUIPMENT_RESERVED,
+    equipmentRequestId: request.id,
+    reservationIds,
+    items: chosen.map(({ equipmentTypeId, quantity, units }) => ({ equipmentTypeId, quantity, unitIds: units.map((unit) => unit.id) })),
+    actor: { ...actor, role: TECHNICAL_STAFF },
+    at,
+  })
+  return { equipmentRequest: presentEquipmentRequest({ ...request, ...requestUpdate }), availability }
 }
 
 function refusal(reason) {

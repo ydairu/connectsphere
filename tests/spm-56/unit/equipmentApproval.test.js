@@ -12,6 +12,7 @@ import {
   NOT_REQUEST_ASSIGNEE,
   NOT_TECHNICAL_STAFF,
   RECONFIRM_EQUIPMENT_APPROVAL,
+  RESERVE_EQUIPMENT,
   REQUEST_NOT_APPROVED,
   REQUEST_NOT_PENDING_REVIEW,
   SIGN_OFF_ALREADY_APPROVED,
@@ -130,8 +131,9 @@ describe('SPM-56 who may approve', () => {
     expect(decide(tech, {}, {}, RECONFIRM_EQUIPMENT_APPROVAL).reason).toBe(REQUEST_NOT_APPROVED)
     const signedOff = { arrangementApprovals: { technical: { decision: ARRANGEMENT_APPROVED } } }
     expect(decide(tech, signedOff, approved, RECONFIRM_EQUIPMENT_APPROVAL).reason).toBe(SIGN_OFF_ALREADY_APPROVED)
-    expect(equipmentRequestActions(tech, event, { ...pending, ...approved })).toEqual([RECONFIRM_EQUIPMENT_APPROVAL])
-    expect(equipmentRequestActions(tech, { ...event, ...signedOff }, { ...pending, ...approved })).toEqual([])
+    // SPM-62 adds Reserve, which an Approved request also offers.
+    expect(equipmentRequestActions(tech, event, { ...pending, ...approved })).toEqual([RECONFIRM_EQUIPMENT_APPROVAL, RESERVE_EQUIPMENT])
+    expect(equipmentRequestActions(tech, { ...event, ...signedOff }, { ...pending, ...approved })).toEqual([RESERVE_EQUIPMENT])
     expect(equipmentRequestActions(coordinator, event, pending)).toEqual([])
   })
 })

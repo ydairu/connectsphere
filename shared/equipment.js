@@ -6,7 +6,7 @@
 //
 // Only an Available unit counts towards the available quantity. Damaged, Under Repair and Unavailable
 // units are excluded for every period, because a unit's status is not tied to dates (SPM-37 AC1–AC4).
-// Reservations do not exist yet (SPM-38), so nothing reserved is subtracted: this is the usable stock.
+// Units reserved for an overlapping event are excluded for that period only (SPM-57).
 
 import { validateAvailabilityRange } from './venueAvailability.js'
 
@@ -98,22 +98,27 @@ export function isUsableUnit(unit) {
   return unit?.status === EQUIPMENT_UNIT_STATUS.AVAILABLE
 }
 
-export function summariseUnits(units = []) {
+// `reservedUnitIds` (SPM-57) are units reserved for an event overlapping the checked period: an Available
+// unit among them is counted as reserved, not available.
+export function summariseUnits(units = [], reservedUnitIds = new Set()) {
   const byStatus = Object.fromEntries(EQUIPMENT_UNIT_STATUSES.map((status) => [status, 0]))
   for (const unit of units) {
     if (unit?.status in byStatus) byStatus[unit.status] += 1
   }
-  const availableUnits = units.filter(isUsableUnit).length
+  const usable = units.filter(isUsableUnit)
+  const reservedUnits = usable.filter((unit) => reservedUnitIds.has(unit.id)).length
+  const availableUnits = usable.length - reservedUnits
   return {
     totalUnits: units.length,
     availableUnits,
     unavailableUnits: units.length - availableUnits,
+    reservedUnits,
     byStatus,
   }
 }
 
-// An availability check may name a period. It is validated like a venue availability range, but it does
-// not change the counts until reservations exist (SPM-38): status exclusions apply to every period.
+// An availability check may name a period, validated like a venue availability range. Status exclusions
+// apply to every period; with a period, units reserved for events overlapping it are also excluded (SPM-57).
 export function normaliseAvailabilityPeriod(query = {}) {
   if (!query.from && !query.to) return { period: null, errors: {} }
   const { from, to, errors } = validateAvailabilityRange({ from: query.from, to: query.to })

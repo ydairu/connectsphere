@@ -10,6 +10,7 @@ import {
 } from '../../../shared/equipment.js'
 import { TECHNICAL_STAFF } from '../../../shared/permissions.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
+import { loadReservedUnitIds } from './equipmentReservationService.js'
 
 // SPM-37 — equipment types, their units and the available quantity. See shared/equipment.js for the model.
 
@@ -53,7 +54,7 @@ export class DuplicateAssetTagError extends Error {
 export async function loadUnitsByType(db, typeIds, read = (query) => query.get()) {
   const ids = [...new Set(typeIds)]
   const snapshots = await Promise.all(ids.map((typeId) => read(db.collection(EQUIPMENT_UNITS).where('equipmentTypeId', '==', typeId))))
-  return new Map(ids.map((typeId, index) => [typeId, snapshots[index].docs.map((doc) => doc.data())]))
+  return new Map(ids.map((typeId, index) => [typeId, snapshots[index].docs.map((doc) => ({ id: doc.id, ...doc.data() }))]))
 }
 
 function actorName(staff) {
@@ -106,15 +107,19 @@ export async function listEquipmentAvailability(query = {}, db = getAdminDb()) {
   ])
   const unitsByType = new Map()
   for (const doc of unitsSnapshot.docs) {
-    const unit = doc.data()
+    const unit = { id: doc.id, ...doc.data() }
     if (!unitsByType.has(unit.equipmentTypeId)) unitsByType.set(unit.equipmentTypeId, [])
     unitsByType.get(unit.equipmentTypeId).push(unit)
   }
+  // SPM-57: with a period, units reserved for any event overlapping it are not available.
+  const reserved = period
+    ? await loadReservedUnitIds(db, typesSnapshot.docs.map((doc) => doc.id), { startsAt: period.from, endsAt: period.to })
+    : new Set()
 
   const equipment = typesSnapshot.docs
     .map((doc) => {
       const { name, location } = doc.data()
-      return { id: doc.id, name, location: location ?? null, ...summariseUnits(unitsByType.get(doc.id)) }
+      return { id: doc.id, name, location: location ?? null, ...summariseUnits(unitsByType.get(doc.id), reserved) }
     })
     .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
 

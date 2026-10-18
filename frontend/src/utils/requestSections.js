@@ -3,6 +3,7 @@ import {
   PREPARATION_EVENT_CLOSED,
   PREPARATION_NOTES_MAX_LENGTH,
   PREPARATION_NOT_IN_PLANNING,
+  PREPARATION_EQUIPMENT_NOT_RESERVED,
   PREPARATION_SIGN_OFF_PENDING,
   PREPARATION_STATUSES,
   PREPARATION_STATUS_LABELS,
@@ -91,6 +92,8 @@ export function preparationReadOnlyText(section, reason) {
       return `Available once the ${SIGN_OFF_NAME[section] ?? ''} sign-off is approved.`
     case PREPARATION_NOT_IN_PLANNING:
       return 'Available once the event is in Planning.'
+    case PREPARATION_EQUIPMENT_NOT_RESERVED:
+      return 'Available once the equipment is reserved.'
     default:
       return null
   }

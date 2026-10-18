@@ -11,6 +11,7 @@ import {
   NOT_REQUEST_ASSIGNEE,
   NOT_TECHNICAL_STAFF,
   RECONFIRM_EQUIPMENT_APPROVAL,
+  RESERVE_EQUIPMENT,
   REJECT_EQUIPMENT_REQUEST,
   REQUEST_NOT_PENDING_REVIEW,
   equipmentDecision,
@@ -65,7 +66,8 @@ describe('SPM-36 who may reject', () => {
 
   it('spm36_actions_offer_reject_beside_approve_only_on_a_pending_request', () => {
     expect(equipmentRequestActions(tech, event, pending)).toEqual([APPROVE_EQUIPMENT_REQUEST, REJECT_EQUIPMENT_REQUEST])
-    expect(equipmentRequestActions(tech, event, { ...pending, status: 'approved' })).toEqual([RECONFIRM_EQUIPMENT_APPROVAL])
+    // SPM-62 adds Reserve, which an Approved request also offers.
+    expect(equipmentRequestActions(tech, event, { ...pending, status: 'approved' })).toEqual([RECONFIRM_EQUIPMENT_APPROVAL, RESERVE_EQUIPMENT])
     expect(equipmentRequestActions(tech, event, { ...pending, status: 'rejected' })).toEqual([])
     for (const user of [coordinator, secondTech, organiser]) expect(equipmentRequestActions(user, event, pending)).toEqual([])
   })

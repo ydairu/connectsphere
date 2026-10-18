@@ -13,7 +13,7 @@
 // (SPM-62). The Organiser's free-text `equipment` section on the event is left as it is.
 
 import { COORDINATOR, TECHNICAL_STAFF, VENUE_STAFF, isAssignedCoordinator, rolesOf } from './permissions.js'
-import { PLANNING } from './status.js'
+import { CONFIRMED, PLANNING } from './status.js'
 import { ARRANGEMENT_APPROVED, TECHNICAL_ARRANGEMENT, arrangementDecision } from './arrangementDecisions.js'
 
 export const EQUIPMENT_REQUESTS_COLLECTION = 'equipmentRequests'
@@ -190,7 +190,9 @@ export const REJECT_EQUIPMENT_REQUEST = 'reject'
 // [Temporary — until SPM-87] SPM-10 clears the technical sign-off on a significant change while the request
 // stays Approved; re-confirming checks availability again and sets the sign-off again.
 export const RECONFIRM_EQUIPMENT_APPROVAL = 'reconfirm_approval'
-export const EQUIPMENT_REQUEST_ACTIONS = Object.freeze([APPROVE_EQUIPMENT_REQUEST, REJECT_EQUIPMENT_REQUEST, RECONFIRM_EQUIPMENT_APPROVAL])
+// SPM-62: reserve the units of an Approved request (Approved -> Reserved).
+export const RESERVE_EQUIPMENT = 'reserve'
+export const EQUIPMENT_REQUEST_ACTIONS = Object.freeze([APPROVE_EQUIPMENT_REQUEST, REJECT_EQUIPMENT_REQUEST, RECONFIRM_EQUIPMENT_APPROVAL, RESERVE_EQUIPMENT])
 
 // Refusal reasons, in the order they are checked. The service maps each to an HTTP status.
 export const UNKNOWN_EQUIPMENT_ACTION = 'unknown_equipment_action'
@@ -200,11 +202,12 @@ export const EVENT_NOT_AT_PLANNING = 'event_not_at_planning'
 export const REQUEST_NOT_PENDING_REVIEW = 'request_not_pending_review'
 export const REQUEST_NOT_APPROVED = 'request_not_approved'
 export const SIGN_OFF_ALREADY_APPROVED = 'sign_off_already_approved'
+export const EVENT_NOT_RESERVABLE = 'event_not_reservable'
 
 /**
  * May this user take `action` on this request now? { allowed: true } or { allowed: false, reason }.
  * Only the request's assigned Technical Support Staff member, who must also be on the event's
- * assignedStaffUids, and only while the event is at Planning (SPM-56 AC1).
+ * assignedStaffUids, and only while the event is at Planning (SPM-56 AC1); reserving (SPM-62) also at Confirmed.
  */
 export function equipmentDecision(user, event, request, action) {
   if (!EQUIPMENT_REQUEST_ACTIONS.includes(action)) return { allowed: false, reason: UNKNOWN_EQUIPMENT_ACTION }
@@ -212,6 +215,13 @@ export function equipmentDecision(user, event, request, action) {
   const assignee = user?.uid != null && request?.assignedTechnicalStaffUid === user.uid
   if (!assignee || !(event?.assignedStaffUids ?? []).includes(user.uid) || request?.eventRequestId !== event?.id) {
     return { allowed: false, reason: NOT_REQUEST_ASSIGNEE }
+  }
+  if (action === RESERVE_EQUIPMENT) {
+    // [Team decision, 18 Oct 2026 — SPM-62, pending PO confirmation] Planning or Confirmed: approval sets the
+    // technical sign-off, so the event may already be Confirmed when its units are reserved.
+    if (![PLANNING, CONFIRMED].includes(event.status)) return { allowed: false, reason: EVENT_NOT_RESERVABLE }
+    if (request.status !== EQUIPMENT_REQUEST_STATUS.APPROVED) return { allowed: false, reason: REQUEST_NOT_APPROVED }
+    return { allowed: true }
   }
   if (event.status !== PLANNING) return { allowed: false, reason: EVENT_NOT_AT_PLANNING }
   const decidesPending = action === APPROVE_EQUIPMENT_REQUEST || action === REJECT_EQUIPMENT_REQUEST

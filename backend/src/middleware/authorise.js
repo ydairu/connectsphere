@@ -9,6 +9,7 @@
 import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf } from '../../../shared/permissions.js'
 import { canReassignCoordinator } from '../../../shared/coordinatorReassignment.js'
 import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.js'
+import { reservedEquipmentSummary } from '../../../shared/equipmentReservation.js'
 import { canViewChangeHistory, visibleChangeHistory } from '../../../shared/changeHistory.js'
 import { requestOwnerFields } from '../../../shared/requestOwner.js'
 import { preparationEditing } from '../../../shared/preparationAccess.js'
@@ -60,6 +61,8 @@ function outOfScope(user, res) {
  * is sent. `ownerNames` is what services/requestOwnerService.js loaded from users/{uid}.
  * `preparation` (SPM-48) says, for each preparation section this user's staff role edits, why it is
  * read-only now (or null), so the page can explain it: the projected record carries no sign-off for staff.
+ * `reservedEquipment` (SPM-62) lists the reserved equipment types and quantities, never unit ids, to anyone
+ * who may view the equipment section; null when nothing is reserved.
  */
 export function presentRequest(user, request, { coordinatorName = null, ownerNames } = {}) {
   return {
@@ -77,6 +80,7 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
     canViewChangeHistory: canViewChangeHistory(user, request),
     preparation: preparationEditing(user, request),
     canCheckVenueSuitability: canCheckVenueSuitability(user, request),
+    reservedEquipment: reservedEquipmentSummary(user, request),
     ...requestOwnerFields(user, request, ownerNames),
   }
 }

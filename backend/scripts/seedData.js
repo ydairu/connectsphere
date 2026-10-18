@@ -43,6 +43,7 @@ export const VENUE_AVAILABILITY_COLLECTION = 'venueAvailability'
 export const EQUIPMENT_TYPES_COLLECTION = 'equipmentTypes'
 export const EQUIPMENT_UNITS_COLLECTION = 'equipmentUnits'
 export const EQUIPMENT_REQUESTS_COLLECTION = 'equipmentRequests'
+export const EQUIPMENT_RESERVATIONS_COLLECTION = 'equipmentReservations'
 
 // `.test` is reserved (RFC 6761) and never resolves, so no seeded address can reach a real inbox.
 const EMAIL_DOMAIN = 'seed.connectsphere.test'
@@ -96,8 +97,19 @@ const { coordinator, coordinator2, coordinator3, venueStaff, technicalStaff, ven
 // summary. B1's Planning event carries one, so the seed shows both.
 const A1_PENDING_EQUIPMENT_REQUEST_ID = `${SEED_ID_PREFIX}equipment-request-a1-planning-2`
 const B1_SHORT_EQUIPMENT_REQUEST_ID = `${SEED_ID_PREFIX}equipment-request-b1-planning-1`
+// SPM-62: A1's Confirmed event has one projector reserved, so its equipment preparation (SPM-48) is open and
+// availability checks for overlapping events (SPM-57) see one projector fewer. Like A1 Planning, it carries no
+// currentEquipmentRequest summary, so SPM-9's and SPM-10's manual sign-off demonstrations are unchanged.
+const A1_CONFIRMED_EQUIPMENT_REQUEST_ID = `${SEED_ID_PREFIX}equipment-request-a1-confirmed-1`
+const SEED_PROJECTOR_TYPE_ID = `${SEED_ID_PREFIX}equipment-projector`
+const A1_CONFIRMED_RESERVED_AT = '2026-09-18T02:00:00.000Z'
+const a1ConfirmedReservedEquipment = {
+  equipmentRequestId: A1_CONFIRMED_EQUIPMENT_REQUEST_ID,
+  items: [{ equipmentTypeId: SEED_PROJECTOR_TYPE_ID, equipmentTypeName: 'Projector', quantity: 1 }],
+  reservedAt: A1_CONFIRMED_RESERVED_AT,
+}
 
-function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', currentEquipmentRequest, createdAt }) {
+function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', currentEquipmentRequest, reservedEquipment, createdAt }) {
   const core = draft
     ? { title, purpose: null, description: null, preferredDateTime: null, durationHours: null, expectedAttendees: null, ...draftCore }
     : {
@@ -123,6 +135,7 @@ function eventRequest({ slug, status, owner, title, coordinator, assigned = [], 
     internal: { planningNotes: draft ? '' : `Seed internal note (${status}) — must never reach an attendee.` },
     ...(approvals ? { arrangementApprovals: approvals } : {}),
     ...(currentEquipmentRequest ? { currentEquipmentRequest } : {}),
+    ...(reservedEquipment ? { reservedEquipment } : {}),
     createdAt,
   }
 }
@@ -146,7 +159,7 @@ export const SEED_REQUESTS = Object.freeze([
   eventRequest({ slug: 'a1-under-review', coordinator, status: UNDER_REVIEW, owner: organiserA1, title: 'A1 under review', createdAt: '2026-09-03T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-returned', coordinator, status: RETURNED, owner: organiserA1, title: 'A1 returned for clarification', createdAt: '2026-09-04T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-planning', coordinator, status: PLANNING, owner: organiserA1, title: 'A1 planning (all staff assigned)', assigned: bothStaffTeams, createdAt: '2026-09-05T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, approvals: bothArrangementsApproved, createdAt: '2026-09-06T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, approvals: bothArrangementsApproved, reservedEquipment: a1ConfirmedReservedEquipment, createdAt: '2026-09-06T10:00:00+08:00' }),
   // SPM-27 demo: a Confirmed event that has already taken place (1 Oct 2026), so its Coordinator can mark it
   // completed. No venue booking or hold, so it clashes with nothing seeded. Counts towards Seed Coordinator's
   // workload (5), which keeps coordinator-3 the next to be assigned.
@@ -382,4 +395,39 @@ export const SEED_EQUIPMENT_REQUESTS = Object.freeze([
     replacesId: null,
     createdAt: '2026-09-17T02:00:00.000Z',
   }),
+  // SPM-62: A1 Confirmed's request, approved and reserved (one projector, the first projector unit).
+  seedEquipmentRequest(A1_CONFIRMED_EQUIPMENT_REQUEST_ID, {
+    event: SEED_REQUESTS.find((request) => request.id === `${SEED_ID_PREFIX}req-a1-confirmed`),
+    items: [{ type: projectorType, quantity: 1 }],
+    submissionKey: 'seed-a1-confirmed-equipment-1',
+    status: EQUIPMENT_REQUEST_STATUS.RESERVED,
+    replacesId: null,
+    createdAt: '2026-09-14T02:00:00.000Z',
+    approvedByUid: technicalStaff.uid,
+    approvedByName: technicalStaff.name,
+    approvedAt: '2026-09-15T02:00:00.000Z',
+    reservedByUid: technicalStaff.uid,
+    reservedByName: technicalStaff.name,
+    reservedAt: A1_CONFIRMED_RESERVED_AT,
+    reservationIds: [`${SEED_ID_PREFIX}equipment-reservation-a1-confirmed-1`],
+    reservedUnits: [{ equipmentTypeId: SEED_PROJECTOR_TYPE_ID, equipmentTypeName: 'Projector', quantity: 1, assetTags: [SEED_EQUIPMENT_UNITS[0].assetTag] }],
+  }),
+])
+
+// SPM-62: the active reservation behind A1 Confirmed's reserved request.
+export const SEED_EQUIPMENT_RESERVATIONS = Object.freeze([
+  {
+    id: `${SEED_ID_PREFIX}equipment-reservation-a1-confirmed-1`,
+    eventRequestId: `${SEED_ID_PREFIX}req-a1-confirmed`,
+    equipmentRequestId: A1_CONFIRMED_EQUIPMENT_REQUEST_ID,
+    equipmentTypeId: SEED_PROJECTOR_TYPE_ID,
+    equipmentTypeName: 'Projector',
+    quantity: 1,
+    unitIds: [SEED_EQUIPMENT_UNITS[0].id],
+    ...seedEventPeriod('a1-confirmed'),
+    status: 'active',
+    reservedByUid: technicalStaff.uid,
+    reservedByName: technicalStaff.name,
+    reservedAt: A1_CONFIRMED_RESERVED_AT,
+  },
 ])

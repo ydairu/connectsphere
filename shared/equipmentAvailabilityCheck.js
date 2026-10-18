@@ -8,9 +8,11 @@
 // fulfilment (CL1 §6). Transit and transfer time between venues is zero (CL1 §6), so the period checked is
 // exactly the request's requiredPeriod.
 //
+// SPM-57: units reserved for another event whose period overlaps are not counted (`blockedUnitIds`, from
+// reservedUnitIds in shared/equipmentReservation.js). The event's own reservations are not subtracted, so a
+// reserved request can be re-checked.
+//
 // Not yet counted (blocked, effective-requirements.md §4.16):
-//   - units reserved for overlapping events: equipment reservations do not exist (SPM-57 / SPM-62), so
-//     nothing is subtracted, and an event's own reservations cannot be subtracted either;
 //   - technical requirements: they are free text on the request and units have no technical attributes,
 //     so units are matched by type only. The requirements are returned for the staff member to judge.
 
@@ -50,11 +52,12 @@ export function validateRequestedQuantities(items = []) {
 
 /**
  * The availability of each requested type and whether the whole request can be fulfilled.
- * `unitsByType` maps an equipment type id to its units. A type with no units has none available.
+ * `unitsByType` maps an equipment type id to its units (each with `id`). A type with no units has none
+ * available. `blockedUnitIds` are units reserved for other overlapping events (SPM-57).
  */
-export function checkRequestAvailability(items, unitsByType) {
+export function checkRequestAvailability(items, unitsByType, blockedUnitIds = new Set()) {
   const results = items.map((item) => {
-    const availableQuantity = (unitsByType.get(item.equipmentTypeId) ?? []).filter(isUsableUnit).length
+    const availableQuantity = (unitsByType.get(item.equipmentTypeId) ?? []).filter((unit) => isUsableUnit(unit) && !blockedUnitIds.has(unit.id)).length
     const shortfall = Math.max(item.quantity - availableQuantity, 0)
     return {
       equipmentTypeId: item.equipmentTypeId,

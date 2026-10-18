@@ -25,6 +25,7 @@ import {
   PREPARATION_EVENT_CLOSED,
   PREPARATION_NOTES_MAX_LENGTH,
   PREPARATION_NOT_IN_PLANNING,
+  PREPARATION_EQUIPMENT_NOT_RESERVED,
   PREPARATION_SIGN_OFF_PENDING,
   PREPARATION_STATUSES,
   PREPARATION_STATUS_LABELS,
@@ -60,7 +61,8 @@ const attendee = { uid: 'att-1', name: 'Attendee', roles: [ATTENDEE] }
 
 const decision = (value) => (value ? { decision: value } : undefined)
 
-function request({ status = PLANNING, venueDecision = 'approved', technicalDecision = 'approved', ...overrides } = {}) {
+// SPM-62: equipment preparation needs the event's equipment reserved (`reserved`), not the technical sign-off.
+function request({ status = PLANNING, venueDecision = 'approved', technicalDecision = 'approved', reserved = true, ...overrides } = {}) {
   return {
     id: 'req-1',
     status,
@@ -74,6 +76,7 @@ function request({ status = PLANNING, venueDecision = 'approved', technicalDecis
     equipment: { requirements: ['projector'], technicalSupportNeeded: true },
     registration: { enabled: true },
     internal: { planningNotes: 'Hold Hall B' },
+    ...(reserved ? { reservedEquipment: { equipmentRequestId: 'eq-1', items: [{ equipmentTypeId: 'projector', equipmentTypeName: 'Projector', quantity: 1 }] } } : {}),
     ...overrides,
   }
 }
@@ -101,13 +104,14 @@ describe('SPM-48 AC3/AC4/AC5 — the temporary conditions at every status and si
       const expected = OPEN.includes(status) && approved
       it(`${status}, sign-off ${value ?? 'not decided'}: ${expected ? 'may' : 'may not'} update`, () => {
         expect(canUpdateVenuePreparation(request({ status, venueDecision: value, technicalDecision: 'approved' }))).toBe(expected)
-        expect(canUpdateEquipmentPreparation(request({ status, technicalDecision: value, venueDecision: 'approved' }))).toBe(expected)
+        // SPM-62: the equipment condition is the reservation; `approved` here stands for "equipment reserved".
+        expect(canUpdateEquipmentPreparation(request({ status, reserved: approved, technicalDecision: null }))).toBe(expected)
       })
     }
   }
 
   it('each section depends only on its own sign-off', () => {
-    const venueOnly = request({ venueDecision: 'approved', technicalDecision: null })
+    const venueOnly = request({ venueDecision: 'approved', technicalDecision: 'approved', reserved: false })
     expect(canUpdateVenuePreparation(venueOnly)).toBe(true)
     expect(canUpdateEquipmentPreparation(venueOnly)).toBe(false)
   })
@@ -120,7 +124,7 @@ describe('SPM-48 AC3/AC4/AC5 — the temporary conditions at every status and si
   it('read-only reasons follow the same conditions', () => {
     expect(preparationReadOnlyReason(VENUE_PREPARATION, request())).toBeNull()
     expect(preparationReadOnlyReason(VENUE_PREPARATION, request({ venueDecision: null }))).toBe(PREPARATION_SIGN_OFF_PENDING)
-    expect(preparationReadOnlyReason(EQUIPMENT_PREPARATION, request({ status: CONFIRMED, technicalDecision: 'rejected' }))).toBe(PREPARATION_SIGN_OFF_PENDING)
+    expect(preparationReadOnlyReason(EQUIPMENT_PREPARATION, request({ status: CONFIRMED, reserved: false }))).toBe(PREPARATION_EQUIPMENT_NOT_RESERVED)
     for (const status of [COMPLETED, CANCELLED, REJECTED]) {
       expect(preparationReadOnlyReason(VENUE_PREPARATION, request({ status })), status).toBe(PREPARATION_EVENT_CLOSED)
     }
@@ -202,8 +206,8 @@ describe('SPM-48 AC8 — preparation is projected out for Organisers and Attende
 describe('SPM-48 — what the page is told (preparationEditing)', () => {
   it('each staff role gets its own section, editable or with the reason', () => {
     expect(preparationEditing(venue, request())).toEqual({ venuePreparation: { editable: true, readOnlyReason: null } })
-    expect(preparationEditing(technical, request({ technicalDecision: null }))).toEqual({
-      equipmentPreparation: { editable: false, readOnlyReason: PREPARATION_SIGN_OFF_PENDING },
+    expect(preparationEditing(technical, request({ reserved: false }))).toEqual({
+      equipmentPreparation: { editable: false, readOnlyReason: PREPARATION_EQUIPMENT_NOT_RESERVED },
     })
     expect(preparationEditing(both, request({ status: COMPLETED }))).toEqual({
       venuePreparation: { editable: false, readOnlyReason: PREPARATION_EVENT_CLOSED },

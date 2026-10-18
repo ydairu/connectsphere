@@ -127,11 +127,17 @@ The customer did not prescribe password length, complexity, expiry, history, loc
   - **Preparation is internal:** Organisers and Attendees never receive either preparation section or its history.
   - **Preparation is shown from Planning onwards.**
 - **[TEMPORARY] SPM-48 preparation condition.**
-  - **Rule:** a preparation section is editable only at Planning or Confirmed, with the matching SPM-9 sign-off approved in `arrangementApprovals`.
+  - **Rule:** a preparation section is editable only at Planning or Confirmed. Venue preparation needs the SPM-9 venue sign-off approved in `arrangementApprovals`. Equipment preparation needs the event's equipment reserved (`reservedEquipment`, SPM-62), no longer the technical sign-off.
   - **Where it lives:** `canUpdateVenuePreparation` / `canUpdateEquipmentPreparation` in `shared/preparation.js`, applied through `SECTION_CONDITIONS` in `editableSectionsFor`.
   - **Do not:** restate the condition anywhere else, in a route or in the UI. The page gets the reason from the API's `preparation` field.
-  - **Replacing it:** when SPM-54 (approved booking) and SPM-56 / SPM-62 (reserved equipment) exist, replace only these two functions.
-  - **Import order:** `shared/preparation.js` must not import `permissions.js` or `arrangements.js`, because both would make a circular import. Read sign-off through `shared/arrangementDecisions.js`.
+  - **Replacing it:** when SPM-54 (approved booking) exists, replace only `canUpdateVenuePreparation`. SPM-62 has replaced `canUpdateEquipmentPreparation`.
+  - **Import order:** `shared/preparation.js` must not import `permissions.js` or `arrangements.js`, because both would make a circular import. Read sign-off through `shared/arrangementDecisions.js`. For the same reason it reads `reservedEquipment` directly rather than importing `shared/equipmentReservation.js`.
+- **Equipment reservations (SPM-62, SPM-57).**
+  - **Reserving** is the `reserve` action on SPM-56's `POST /api/requests/:id/equipment-requests/:requestId/actions`, by the request's assigned Technical Support Staff member, on an Approved request at Planning or Confirmed.
+  - **Records:** one `equipmentReservations` document per reserved type, belonging to the event and never to a venue booking. The event gets `reservedEquipment` (types and quantities only, never unit ids).
+  - **Overlap and exclusions:** decided only by `shared/equipmentReservation.js` (`periodsOverlap`, `reservedUnitIds`). Every availability count (SPM-18 check, SPM-56 approval, reserving, `/api/equipment` with a period) loads overlapping reservations through `loadReservedUnitIds` in `backend/src/services/equipmentReservationService.js`; do not count reservations anywhere else.
+  - **Locking:** reserving reads and writes `systemLocks/equipmentReservation-{typeId}` for each type, in the same transaction.
+  - **Release:** reservations are released only when the whole event is rejected or cancelled (`prepareReservationRelease`, called from `prepareEquipmentRequestClose`). A significant change or a venue booking change never releases them.
 - **Significant changes (SPM-10).** Which fields are significant, how their values are validated and compared, and what a significant change sets off are decided only by `shared/significantChanges.js`.
   - **Effects:** a significant change at Planning or Confirmed clears the recorded venue and technical sign-off. At Confirmed it also moves the event back to Planning, with a `status_changed` entry whose `action` and `reason` are `significant_change`. Assigned Venue and Technical Support Staff are notified in-app. All of this is written in the same transaction as the edit, through `store.update(..., { recordChanges, consequences })`; do not add another write path.
   - **Not an action:** Confirmed → Planning is not an SPM-9 action. Never add it to `TRANSITIONS` or `availableActions`.
