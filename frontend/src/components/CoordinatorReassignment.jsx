@@ -54,7 +54,7 @@ function CoordinatorReassignment({ user, requestId, busy, onReassigned }) {
   return (
     <Card className="request-form-section">
       <div className="section-heading">
-        <h2>Event Coordinator</h2>
+        <h2>Reassign Coordinator</h2>
       </div>
 
       {!open ? (

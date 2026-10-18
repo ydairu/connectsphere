@@ -117,15 +117,16 @@ describe('SPM-54 preview and replacement regressions', () => {
   })
   it.each(['rejected', 'pending'])('refreshes a %s replacement and retains reviewed edits after failure', async (status) => {
     const old = { ...booking, status, requirements: 'Breakkout Room', specialRequests: 'Wheelchair', canApprove: false }
-    const response = (layoutPreference) => ({ canSubmit: true, event: { core: {}, venue: { layoutPreference } }, bookings: [old] })
+    const response = (layoutPreference) => ({ canSubmit: true, event: { core: { preferredDateTime: input.startsAt, durationHours: 2 }, venue: { layoutPreference } }, bookings: [old] })
     api.listVenues.mockResolvedValue({ venues: [{ id: input.venueId, name: 'Hall', maximumCapacity: 200 }] })
     api.getVenueBookings.mockResolvedValueOnce(response('Breakkout Room')).mockResolvedValue(response('Breakout Room'))
     api.submitVenueBooking.mockRejectedValue(new Error('offline'))
     show(coordinator, '/requests/event/venue-bookings')
+    fireEvent.click(await screen.findByRole('tab', { name: 'Requests' }))
+    fireEvent.click(screen.getByText('Hall', { selector: 'summary span' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Replace request for Hall' }))
     await waitFor(() => expect(screen.getByLabelText('Venue requirements').value).toBe('Breakout Room'))
     expect(screen.getByLabelText('Special requests').value).toBe('Wheelchair')
-    expect(screen.getByText('Breakkout Room')).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Venue requirements'), { target: { value: 'Breakout Room, extra chairs' } })
     fireEvent.submit(screen.getByRole('form', { name: 'Venue booking request' }))
     await screen.findByRole('alert')
@@ -136,12 +137,15 @@ describe('SPM-54 preview and replacement regressions', () => {
 
  it('blocks replacement submission after refresh failure and retries with current defaults', async () => {
    const old = { ...booking, status: 'rejected', requirements: 'Breakkout Room' }
-   const response = { canSubmit: true, event: { core: {}, venue: { layoutPreference: 'Breakout Room' } }, bookings: [old] }
+   const response = { canSubmit: true, event: { core: { preferredDateTime: input.startsAt, durationHours: 2 }, venue: { layoutPreference: 'Breakout Room' } }, bookings: [old] }
    api.listVenues.mockResolvedValue({ venues: [] })
    api.getVenueBookings.mockResolvedValueOnce(response).mockRejectedValueOnce(new Error('offline')).mockResolvedValue(response)
    show(coordinator, '/requests/event/venue-bookings')
+   fireEvent.click(await screen.findByRole('tab', { name: 'Requests' }))
+   fireEvent.click(screen.getByText('Hall', { selector: 'summary span' }))
    fireEvent.click(await screen.findByRole('button', { name: 'Replace request for Hall' }))
    await screen.findByRole('button', { name: 'Retry refresh' })
+   fireEvent.click(screen.getByRole('tab', { name: 'Submit a Request' }))
    expect(screen.getByRole('button', { name: 'Submit booking request' }).closest('fieldset').disabled).toBe(true)
    expect(api.submitVenueBooking).not.toHaveBeenCalled()
    fireEvent.click(screen.getByRole('button', { name: 'Retry refresh' }))

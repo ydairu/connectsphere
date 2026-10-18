@@ -3,12 +3,19 @@ import { DOUBLE_ORIGIN, expect, test, ROLE_USERS, loginAs, logout } from '../../
 const eventId = 'seed-req-a1-planning'
 const path = `/requests/${eventId}/venue-bookings`
 test.use({ timezoneId: 'UTC', locale: 'en-GB' })
+test.beforeEach(async ({ request }) => {
+  const changed = await request.patch(`${DOUBLE_ORIGIN}/api/requests/${eventId}`, {
+    headers: { Authorization: `Bearer test-token:${ROLE_USERS.coordinator.uid}` },
+    data: { core: { preferredDateTime: '2027-03-01T10:00:00.000Z', durationHours: 2 } },
+  })
+  expect(changed.status()).toBe(200)
+})
 
 async function submit(page, venueId) {
   await page.goto(path)
   await page.getByLabel('Venue', { exact: true }).selectOption(venueId)
-  await page.getByLabel('Start', { exact: true }).fill('2027-03-01T10:00')
-  await page.getByLabel('End', { exact: true }).fill('2027-03-01T12:00')
+  await expect(page.getByLabel('Start', { exact: true })).toHaveAttribute('readonly', '')
+  await expect(page.getByLabel('End', { exact: true })).toHaveAttribute('readonly', '')
   await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre layout')
   const response = page.waitForResponse((r) => r.url().endsWith(`/api/requests/${eventId}/venue-bookings`) && r.request().method() === 'POST')
   await page.getByRole('button', { name: 'Submit booking request' }).click()
@@ -52,7 +59,8 @@ test('SPM-54 staff approves one venue; Coordinator sees the booking, notice, cal
   await expect(page).toHaveURL(new RegExp(`bookingId=${booking.id}$`))
   await expect(page.getByText('Approved — venue confirmed')).toBeVisible()
   await page.goto(path)
-  await expect(page.locator('.booking-row').filter({ hasText: 'Status' }).locator('strong')).toHaveText(['pending', 'Approved — venue confirmed'])
+  await page.getByRole('tab', { name: 'Requests' }).click()
+  await expect(page.locator('summary')).toContainText(['Under review', 'Approved'])
   await page.goto(`/requests/${eventId}`)
   await expect(page.locator('.status-pill').first()).toContainText('Planning')
 
@@ -119,6 +127,8 @@ test('SPM-54 rejected replacement refreshes corrected requirements and previews 
   })).status()).toBe(200)
   await signIn(page, ROLE_USERS.coordinator)
   await page.goto(path)
+  await page.getByRole('tab', { name: 'Requests' }).click()
+  await page.locator('summary').first().click()
   await expect(page.getByText('Breakkout Room', { exact: true })).toBeVisible()
   await edit('Breakout Room')
   await page.getByRole('button', { name: 'Replace request for Seed Hall' }).click()
@@ -128,6 +138,7 @@ test('SPM-54 rejected replacement refreshes corrected requirements and previews 
   await page.getByRole('button', { name: 'Submit replacement' }).click()
   const replacement = (await (await saved).json()).booking
   await expect(page.getByRole('status')).toContainText('tentatively held')
+  await page.locator('summary').nth(1).click()
   await expect(page.getByText('Breakkout Room', { exact: true })).toBeVisible()
   await logout(page)
   await signIn(page, ROLE_USERS.venueStaff)
@@ -152,6 +163,8 @@ test('SPM-54 staff warnings follow classroom entered in the booking form, not th
     headers: { Authorization: `Bearer test-token:${ROLE_USERS.venueStaff.uid}` }, data: { action: 'reject', reason: 'Revise layout' },
   })).status()).toBe(200)
   await page.reload()
+  await page.getByRole('tab', { name: 'Requests' }).click()
+  await page.locator('summary').click()
   await page.getByRole('button', { name: /Replace request for Seed Breakout/ }).click()
   await expect(page.getByRole('button', { name: 'Submit replacement' })).toBeVisible()
   await page.getByLabel('Venue requirements', { exact: true }).fill('classroom')

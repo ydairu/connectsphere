@@ -635,6 +635,12 @@ Regression evidence: unit tests cover case-insensitive classroom matching agains
 
 Verification: `npm run test:spm54` passed 54 unit/service/API/component tests and five Chromium tests; four opt-in emulator cases skipped. Lint, production build and whitespace checks passed (existing bundle-size warning). API tests use in-memory persistence and browser tests use the Firebase double. Full regression results above precede this follow-up; the full suite, emulator and live project were not rerun for this narrowly scoped helper change. No deployment or Git publication. SPM-54 remains In Progress; human acceptance, peer review and dependent workflows remain outstanding.
 
+## Event request and venue booking page tabs — 18 October 2026
+
+- The event detail page now groups its existing content into Event Status, Venue Details, Equipment Required and Change Log tabs. Conditional coordinator, arrangement and status notices follow the named Event Status sections. Venue suitability moved to Recommendations on the event's venue booking page, beside Submit a Request and Requests. Request summaries show the venue and recorded status before expansion.
+- The venue request form shows read-only event start/end values and searches for venues available in that period. The submission API rejects a different period before writing a new booking; replacement may still select its own pending hold. This is a later user-directed implementation rule; previously submitted booking periods are unchanged.
+- Verification: lint and production build passed (existing bundle-size warning); 128 Node, 101 frontend and 1,669 root Vitest tests passed (39 opt-in cases skipped). The full Chromium run passed 91 of 93 tests; two tab-related test expectations were corrected and the affected suite then passed 10 of 10. After the final venue tab-panel adjustment, 25 venue Chromium regressions passed. API tests use in-memory persistence and browser tests use a Firebase double. No live Firebase or human acceptance was run, and no Firestore rules were edited or deployed. Operational backlog/Sprint status was not changed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.

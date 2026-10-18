@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
 import { CONFIRMED, DRAFT, PLANNING } from '../../../shared/status.js'
 import { CANCELLATION_REQUEST_OPEN, SIGNIFICANT_FIELDS, significantFieldsIn } from '../../../shared/significantChanges.js'
@@ -13,9 +13,9 @@ import CoordinatorReassignment from '../components/CoordinatorReassignment.jsx'
 import EquipmentRequests from '../components/EquipmentRequests.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
-import StatusActions from '../components/StatusActions.jsx'
+import StatusActions, { StatusNotices } from '../components/StatusActions.jsx'
 import StatusPill from '../components/StatusPill.jsx'
-import VenueSuitability from '../components/VenueSuitability.jsx'
+import Tabs from '../components/Tabs.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getRequest, transitionRequest, updateRequest } from '../services/api.js'
 import { statusLabel } from '../utils/statusLabels.js'
@@ -125,6 +125,15 @@ function EditableField({ section, field, value, onChange, error }) {
 
 function RequestDetailPage() {
   const { id } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const detailTabs = [
+    { id: 'event-status', label: 'Event Status' },
+    { id: 'venue-details', label: 'Venue Details' },
+    { id: 'equipment-required', label: 'Equipment Required' },
+    { id: 'change-log', label: 'Change Log' },
+  ]
+  const activeTab = detailTabs.some((tab) => tab.id === searchParams.get('tab')) ? searchParams.get('tab') : 'event-status'
+  const selectTab = (tab) => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('tab', tab); return next })
   const { user, roles } = useAuth()
   const navigate = useNavigate()
   const [request, setRequest] = useState(null)
@@ -134,7 +143,6 @@ function RequestDetailPage() {
   const [cancellationRequest, setCancellationRequest] = useState(null)
   const [clarificationRequests, setClarificationRequests] = useState(null)
   const [canReassign, setCanReassign] = useState(false)
-  const [canCheckSuitability, setCanCheckSuitability] = useState(false)
   const [assignedCoordinator, setAssignedCoordinator] = useState(null)
   const [cancellation, setCancellation] = useState(null)
   const [rejection, setRejection] = useState(null)
@@ -160,7 +168,6 @@ function RequestDetailPage() {
     setCancellationRequest(response.cancellationRequest ?? null)
     setClarificationRequests(response.clarificationRequests ?? null)
     setCanReassign(response.canReassignCoordinator === true)
-    setCanCheckSuitability(response.canCheckVenueSuitability === true)
     setAssignedCoordinator(response.assignedCoordinator ?? null)
     setCancellation(response.cancellation ?? null)
     setRejection(response.rejection ?? null)
@@ -250,6 +257,7 @@ function RequestDetailPage() {
     const rejected = error.details?.forbiddenFields
     if (rejected?.length) {
       setStatus({ type: 'error', message: `You are not allowed to change: ${rejected.join(', ')}` })
+      selectTab(tabForField(rejected[0]))
       return
     }
 
@@ -267,6 +275,7 @@ function RequestDetailPage() {
     const invalid = error.status === 400 && error.details?.errors ? error.details.errors : null
     if (invalid && Object.keys(invalid).length > 0) {
       setFieldErrors(invalid)
+      selectTab(tabForField(Object.keys(invalid)[0]))
       setStatus({
         type: 'error',
         message: `Please correct: ${Object.entries(invalid).map(([path, problem]) => `${fieldLabel(path)} — ${problem}`).join('; ')}`,
@@ -320,7 +329,31 @@ function RequestDetailPage() {
   }
 
   const visibleSections = SECTION_ORDER.filter((section) => request?.[section])
-  const canEditAnything = editableSections.some((section) => visibleSections.includes(section))
+  const tabForField = (path) => {
+    const section = path?.split('.')[0]
+    if (['venue', 'venuePreparation'].includes(section)) return 'venue-details'
+    if (['equipment', 'registration', 'equipmentPreparation'].includes(section)) return 'equipment-required'
+    return 'event-status'
+  }
+  const tabSections = {
+    'event-status': ['core', 'internal'],
+    'venue-details': ['venue', 'venuePreparation'],
+    'equipment-required': ['equipment', 'registration', 'equipmentPreparation'],
+    'change-log': [],
+  }
+  const canEditCurrentTab = editableSections.some((section) => visibleSections.includes(section) && tabSections[activeTab].includes(section))
+  const renderSection = (section) => {
+    if (!visibleSections.includes(section)) return null
+    const editable = editableSections.includes(section)
+    const readOnlyReason = editable ? null : preparationReadOnlyText(section, preparation?.[section]?.readOnlyReason)
+    return <Card className="request-form-section" key={section}>
+      <div className="section-heading"><h2>{sectionTitle(section)}</h2>{!editable && <span className="section-readonly">Read only</span>}</div>
+      {readOnlyReason && <p className="form-note">{readOnlyReason}</p>}
+      {sectionFields(section).map((field) => editable ?
+        <EditableField key={field.name} section={section} field={field} value={form[section]?.[field.name] ?? ''} onChange={updateField} error={fieldErrors[`${section}.${field.name}`]} /> :
+        <div className="profile-row" key={field.name}><span>{field.label}</span><ReadOnlyValue field={field} value={request[section][field.name]} /></div>)}
+    </Card>
+  }
 
   return (
     <div className="page-shell">
@@ -349,21 +382,15 @@ function RequestDetailPage() {
               </div>
             )}
 
-            <AssignedCoordinator coordinator={assignedCoordinator} />
-            {(roles?.includes(COORDINATOR) || roles?.includes(VENUE_STAFF)) && <p><Link to={`/requests/${id}/venue-bookings`}>Venue booking requests</Link></p>}
-
-            {roles?.includes(ORGANISER) && <ArrangementsSummary request={request} arrangements={arrangements} />}
-
-            <ClarificationRequests status={request.status} entries={clarificationRequests} />
-
+            <Tabs name="request" tabs={detailTabs} active={activeTab} onSelect={selectTab} />
+            <div id={`request-${activeTab}-panel`} role="tabpanel" aria-labelledby={`request-${activeTab}-tab`}>
+            {activeTab === 'event-status' && <>
+            {renderSection('core')}
             <StatusActions
               status={request.status}
               actions={availableActions}
               arrangements={arrangements}
               cancellationRequest={cancellationRequest}
-              cancellation={cancellation}
-              rejection={rejection}
-              completion={completion}
               busy={acting || saving}
               onAction={handleAction}
             />
@@ -376,19 +403,21 @@ function RequestDetailPage() {
                 onReassigned={(name) => navigate('/requests', { replace: true, state: { notice: `Event reassigned to ${name}.` } })}
               />
             )}
-
-            {canCheckSuitability && (
-              <VenueSuitability
-                user={user}
-                request={request}
-                busy={acting || saving}
-                onRequirementsSaved={(response) => {
-                  applyResponse(response)
-                  setHistoryVersion((version) => version + 1)
-                }}
-              />
-            )}
-
+            {renderSection('internal')}
+            <StatusNotices cancellation={cancellation} rejection={rejection} completion={completion} />
+            <AssignedCoordinator coordinator={assignedCoordinator} />
+            {roles?.includes(ORGANISER) && <ArrangementsSummary request={request} arrangements={arrangements} />}
+            <ClarificationRequests status={request.status} entries={clarificationRequests} />
+            </>}
+            {activeTab === 'venue-details' && <>
+              {renderSection('venue')}
+              {renderSection('venuePreparation')}
+              {(roles?.includes(COORDINATOR) || roles?.includes(VENUE_STAFF)) && <Card className="request-form-section"><h2>Venue booking requests</h2><Link to={`/requests/${id}/venue-bookings`}>Open venue booking requests</Link></Card>}
+            </>}
+            {activeTab === 'equipment-required' && <>
+              {renderSection('equipment')}
+              {renderSection('registration')}
+              {renderSection('equipmentPreparation')}
             {/* SPM-17: the API decides who may see equipment requests; for anyone else the card renders nothing. */}
             {(roles?.includes(COORDINATOR) || roles?.includes(TECHNICAL_STAFF)) && (
               <EquipmentRequests
@@ -400,37 +429,8 @@ function RequestDetailPage() {
                 onDecided={async () => applyResponse(await getRequest(user, id))}
               />
             )}
-
-            {visibleSections.map((section) => {
-              const editable = editableSections.includes(section)
-              const readOnlyReason = editable ? null : preparationReadOnlyText(section, preparation?.[section]?.readOnlyReason)
-              return (
-                <Card className="request-form-section" key={section}>
-                  <div className="section-heading">
-                    <h2>{sectionTitle(section)}</h2>
-                    {!editable && <span className="section-readonly">Read only</span>}
-                  </div>
-                  {readOnlyReason && <p className="form-note">{readOnlyReason}</p>}
-                  {sectionFields(section).map((field) =>
-                    editable ? (
-                      <EditableField
-                        key={field.name}
-                        section={section}
-                        field={field}
-                        value={form[section]?.[field.name] ?? ''}
-                        onChange={updateField}
-                        error={fieldErrors[`${section}.${field.name}`]}
-                      />
-                    ) : (
-                      <div className="profile-row" key={field.name}>
-                        <span>{field.label}</span>
-                        <ReadOnlyValue field={field} value={request[section][field.name]} />
-                      </div>
-                    ),
-                  )}
-                </Card>
-              )
-            })}
+            </>}
+            {activeTab === 'change-log' && (canViewHistory ? <ChangeHistory user={user} requestId={id} refreshKey={historyVersion} /> : <Card className="request-form-section"><p>Change history is unavailable for your role.</p></Card>)}
 
             {pendingSignificant && (
               <div className="significant-confirmation" role="alertdialog" aria-labelledby="significant-confirmation-title" aria-describedby="significant-confirmation-text">
@@ -450,7 +450,7 @@ function RequestDetailPage() {
               </div>
             )}
 
-            {canEditAnything ? (
+            {canEditCurrentTab ? (
               <div className="form-actions">
                 <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Button>
               </div>
@@ -458,7 +458,7 @@ function RequestDetailPage() {
               <p className="form-note">You can view this request but cannot change it.</p>
             )}
 
-            {canViewHistory && <ChangeHistory user={user} requestId={id} refreshKey={historyVersion} />}
+            </div>
           </form>
         )}
       </main>

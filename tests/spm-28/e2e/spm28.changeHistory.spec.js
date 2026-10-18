@@ -21,13 +21,16 @@ test.describe('SPM-28 — View the change history of an event (E2E)', () => {
   test('spm28_organiser_edits_a_returned_request_and_sees_the_change_recorded', async ({ page }) => {
     await signIn(page, ROLE_USERS.organiser)
     await page.goto(`/requests/${returned.id}`)
+    await page.getByRole('tab', { name: 'Change Log' }).click()
     await expect(page.getByRole('heading', { name: 'Change history' })).toBeVisible()
     await expect(page.getByText('No changes recorded yet.')).toBeVisible()
 
+    await page.getByRole('tab', { name: 'Event Status' }).click()
     await page.getByLabel('Purpose').fill('Purpose amended after clarification')
     await page.getByRole('button', { name: 'Save changes' }).click()
     await expect(page.getByText('Changes saved.')).toBeVisible()
 
+    await page.getByRole('tab', { name: 'Change Log' }).click()
     await expect(historyRows(page)).toHaveCount(1)
     const row = historyRows(page).first()
     await expect(row).toHaveAccessibleName('Event details · Purpose')
@@ -40,6 +43,7 @@ test.describe('SPM-28 — View the change history of an event (E2E)', () => {
 
     await signIn(page, ROLE_USERS.coordinator)
     await page.goto(`/requests/${planning.id}`)
+    await page.getByRole('tab', { name: 'Change Log' }).click()
     await expect(historyRows(page)).toHaveCount(3)
     await expect(historyRows(page).nth(0)).toHaveAccessibleName('Internal planning · Planning notes')
     await expect(historyRows(page).nth(1)).toHaveAccessibleName('Venue · Layout preference')
@@ -49,6 +53,7 @@ test.describe('SPM-28 — View the change history of an event (E2E)', () => {
 
     await signIn(page, ROLE_USERS.organiser)
     await page.goto(`/requests/${planning.id}`)
+    await page.getByRole('tab', { name: 'Change Log' }).click()
     await expect(historyRows(page)).toHaveCount(2)
     await expect(page.getByRole('listitem', { name: 'Internal planning · Planning notes' })).toHaveCount(0)
     await expect(page.locator('body')).not.toContainText(planning.internal.planningNotes)

@@ -69,7 +69,7 @@ export default function EquipmentRequestQueuePage() {
             <Row label="Submitted">{displayTime(request.createdAt)}</Row>
             {request.approvedAt && <Row label="Approved on">{displayTime(request.approvedAt)}</Row>}
             <div className="booking-actions">
-              <Link className="button button-secondary button-small" to={`/requests/${request.eventRequestId}#equipment-requests`}>Review on event</Link>
+              <Link className="button button-secondary button-small" to={`/requests/${request.eventRequestId}?tab=equipment-required#equipment-requests`}>Review on event</Link>
             </div>
           </Card>
         ))}

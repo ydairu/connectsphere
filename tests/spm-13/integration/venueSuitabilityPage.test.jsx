@@ -1,4 +1,4 @@
-// SPM-13, presentation side: the Venue suitability card on the request page. The API is mocked here;
+// SPM-13, presentation side: the Venue suitability card on the booking recommendations tab. The API is mocked here;
 // the rules and their enforcement are covered by the unit and API tests.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -10,14 +10,14 @@ import { PLANNING } from '../../../shared/status.js'
 import { SUITABLE, SUITABLE_WITH_WARNINGS, UNSUITABLE } from '../../../shared/venueSuitability.js'
 import { AuthContext } from '../../../frontend/src/context/auth-context.js'
 import { ApiRequestError } from '../../../frontend/src/services/api.js'
-import RequestDetailPage from '../../../frontend/src/pages/RequestDetailPage.jsx'
+import VenueBookingsPage from '../../../frontend/src/pages/VenueBookingsPage.jsx'
 
 vi.mock('../../../frontend/src/services/api.js', async (importOriginal) => {
   const actual = await importOriginal()
-  return { ...actual, getRequest: vi.fn(), getVenueSuitability: vi.fn(), updateRequest: vi.fn(), getRequestHistory: vi.fn() }
+  return { ...actual, getRequest: vi.fn(), getVenueBookings: vi.fn(), getVenueSuitability: vi.fn(), updateRequest: vi.fn(), getRequestHistory: vi.fn() }
 })
 
-const { getRequest, getVenueSuitability, updateRequest } = await import('../../../frontend/src/services/api.js')
+const { getRequest, getVenueBookings, getVenueSuitability, updateRequest } = await import('../../../frontend/src/services/api.js')
 
 afterEach(() => {
   cleanup()
@@ -81,11 +81,12 @@ function suitabilityResponse({ requiredFacilities = [], requiredAccessibilityFea
 
 function showRequest(response = requestResponse()) {
   getRequest.mockResolvedValue(response)
+  getVenueBookings.mockResolvedValue({ event: response.request, canSubmit: false, bookings: [] })
   render(
     <AuthContext.Provider value={{ user: coordinatorUser, userProfile: { name: 'Seed Coordinator' }, roles: ['coordinator'], loading: false }}>
-      <MemoryRouter initialEntries={['/requests/req-1']}>
+      <MemoryRouter initialEntries={['/requests/req-1/venue-bookings?tab=recommendations']}>
         <Routes>
-          <Route path="/requests/:id" element={<RequestDetailPage />} />
+          <Route path="/requests/:id/venue-bookings" element={<VenueBookingsPage />} />
           <Route path="/venues/:id" element={<p>Venue detail page</p>} />
         </Routes>
       </MemoryRouter>
@@ -106,11 +107,11 @@ async function loadedSuitabilityCard() {
   return card
 }
 
-describe('SPM-13 — Venue suitability on the request page', () => {
+describe('SPM-13 — Venue suitability on booking recommendations', () => {
   it('spm13_frontend_shows_the_card_only_when_the_api_allows_it', async () => {
     showRequest(requestResponse({ canCheckVenueSuitability: false }))
 
-    expect(await screen.findByRole('heading', { name: 'Partner summit' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Venue booking requests' })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Venue suitability' })).toBeNull()
     expect(getVenueSuitability).not.toHaveBeenCalled()
   })

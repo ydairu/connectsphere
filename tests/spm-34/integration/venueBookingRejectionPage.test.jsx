@@ -44,7 +44,7 @@ describe('SPM-34 booking page', () => {
     cleanup()
     api.getVenueBookings.mockResolvedValue({ canSubmit: true, bookings: [{ ...booking, canReject: false }] })
     show(coordinator)
-    await screen.findByRole('heading', { name: 'Hall' })
+    await screen.findByText('Hall', { selector: 'summary span' })
     expect(screen.queryByRole('button', { name: 'Reject booking' })).toBeNull()
   })
 })

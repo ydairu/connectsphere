@@ -40,6 +40,7 @@ test.describe('SPM-10 — Edit event information and flag significant changes fo
     await expect(statusPill(page)).toHaveText('Planning')
     await expect(arrangement(page, 'Venue arrangement')).toHaveText('Awaiting approval')
     await expect(arrangement(page, 'Technical arrangement')).toHaveText('Awaiting approval')
+    await page.getByRole('tab', { name: 'Change Log' }).click()
     const row = page.getByRole('list', { name: 'Change history entries' }).getByRole('listitem', { name: 'Event details · Expected attendees' })
     await expect(row).toContainText('Significant')
     await expect(row).toContainText('80 → 150')
@@ -54,6 +55,7 @@ test.describe('SPM-10 — Edit event information and flag significant changes fo
     await expect(notice).toContainText('moved back to Planning')
 
     await page.goto(`/requests/${confirmed.id}`)
+    await page.getByRole('tab', { name: 'Venue Details' }).click()
     const card = page.locator('.request-form-section', { has: page.getByRole('heading', { name: 'Venue preparation' }) })
     await expect(card.getByText('Read only')).toBeVisible()
     await expect(card.getByText('Available once the venue sign-off is approved.')).toBeVisible()

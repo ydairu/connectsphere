@@ -2,13 +2,16 @@ import { expect, test, ROLE_USERS, loginAs, logout } from '../../shared/e2e/fixt
 
 const path = '/requests/seed-req-a1-planning/venue-bookings'
 
-test('SPM-34 assigned staff rejects and Coordinator sees the reason, notice and replacement path', async ({ page }) => {
+test('SPM-34 assigned staff rejects and Coordinator sees the reason, notice and replacement path', async ({ page, request }) => {
+  const changed = await request.patch('http://127.0.0.1:5001/api/requests/seed-req-a1-planning', {
+    headers: { Authorization: `Bearer test-token:${ROLE_USERS.coordinator.uid}` },
+    data: { core: { preferredDateTime: '2027-03-01T10:00:00.000Z', durationHours: 2 } },
+  })
+  expect(changed.status()).toBe(200)
   await loginAs(page, ROLE_USERS.coordinator)
   await expect(page).toHaveURL(/\/profile$/)
   await page.goto(path)
   await page.getByLabel('Venue', { exact: true }).selectOption('seed-venue-room')
-  await page.getByLabel('Start', { exact: true }).fill('2027-03-01T10:00')
-  await page.getByLabel('End', { exact: true }).fill('2027-03-01T12:00')
   await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre layout')
   await page.getByRole('button', { name: 'Submit booking request' }).click()
   await expect(page.getByRole('status')).toContainText('tentatively held')
@@ -35,6 +38,8 @@ test('SPM-34 assigned staff rejects and Coordinator sees the reason, notice and 
   await expect(page.getByText('Use the hall')).toBeVisible()
   await page.getByRole('link', { name: 'Back to event' }).click()
   await page.goto(path)
+  await page.getByRole('tab', { name: 'Requests' }).click()
+  await page.locator('summary').click()
   await page.getByRole('button', { name: /Replace request for Seed Breakout/ }).click()
   await page.getByLabel('Venue', { exact: true }).selectOption('seed-venue-hall')
   await page.getByRole('button', { name: 'Submit replacement' }).click()

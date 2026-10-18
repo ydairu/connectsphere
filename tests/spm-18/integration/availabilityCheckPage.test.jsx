@@ -57,7 +57,7 @@ function show({ roles = [TECHNICAL_STAFF], requests = [pending] } = {}) {
   api.listEquipment.mockResolvedValue({ equipment: [] })
   render(
     <AuthContext.Provider value={{ user, userProfile: { name: 'Seed' }, roles, loading: false }}>
-      <MemoryRouter initialEntries={['/requests/req-1']}>
+      <MemoryRouter initialEntries={['/requests/req-1?tab=equipment-required']}>
         <Routes><Route path="/requests/:id" element={<RequestDetailPage />} /></Routes>
       </MemoryRouter>
     </AuthContext.Provider>,

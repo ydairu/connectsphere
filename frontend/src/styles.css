@@ -114,6 +114,10 @@ a { color: inherit; }
 .role-value { flex-wrap: wrap; }
 
 .request-page { padding-top: 72px; padding-bottom: 72px; }
+.page-tabs { display: flex; gap: 8px; overflow-x: auto; border-bottom: 1px solid var(--line); margin: 0 0 24px; }
+.page-tabs button { flex: 0 0 auto; border: 0; border-bottom: 3px solid transparent; background: transparent; padding: 14px 16px; color: var(--muted); font: inherit; font-weight: 700; cursor: pointer; }
+.page-tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.page-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
 .request-form-section { padding: 28px; margin-bottom: 20px; }
 .request-form-section h2 { margin: 0 0 22px; font-size: 22px; letter-spacing: -0.03em; }
 .venue-page { width: min(880px, calc(100% - 40px)); padding-top: 56px; padding-bottom: 72px; }
@@ -263,6 +267,10 @@ a { color: inherit; }
 .booking-back { display: inline-block; margin-bottom: 24px; }
 .booking-card { margin-bottom: 20px; }
 .booking-card h2 { overflow-wrap: anywhere; }
+.booking-card summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; cursor: pointer; font-weight: 700; }
+.booking-card summary::marker { color: var(--accent); }
+.booking-card summary span:last-child { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.booking-card details[open] summary { margin-bottom: 22px; }
 .booking-row { align-items: start; }
 .booking-row strong { min-width: 0; white-space: pre-wrap; }
 .booking-actions { display: flex; justify-content: flex-end; padding-top: 20px; }

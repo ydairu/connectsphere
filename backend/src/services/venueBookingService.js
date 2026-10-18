@@ -4,6 +4,7 @@ import { AVAILABILITY_STATUS, REMOVED_STATUSES, tentativeHoldExpiresAt, validate
 import { venueBookingApprovedNotifications, venueBookingRejectedNotifications } from '../../../shared/notifications.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { pendingVenueBookings } from '../../../shared/venueBooking.js'
+import { eventPeriod } from '../../../shared/venueSuitability.js'
 import { checkVenueHoldInTransaction, venueBookingLockPath, VenueValidationError } from './venueService.js'
 import { addNotifications } from './notificationService.js'
 
@@ -37,6 +38,12 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
       return presentBooking(previousAttempt)
     }
     if (!canRequestVenue(user, event)) throw new VenueBookingError(409, 'Venue requests can only be submitted while the event is in Planning.')
+    const period = eventPeriod(event)
+    if (!period) throw new VenueBookingError(409, 'Set a valid event date and duration before requesting a venue.')
+    const periodErrors = {}
+    if (value.startsAt !== period.startsAt) periodErrors.startsAt = 'Use the event start time.'
+    if (value.endsAt !== period.endsAt) periodErrors.endsAt = 'Use the event end time.'
+    if (Object.keys(periodErrors).length) throw new VenueValidationError(periodErrors)
     const old = value.replacesId ? eventBookings.find((b) => b.id === value.replacesId) : null
     if (value.replacesId && !old) throw new VenueBookingError(404, 'Booking request not found.')
     if (old && ![BOOKING_PENDING, BOOKING_REJECTED].includes(old.status)) throw new VenueBookingError(409, 'This request has already been replaced or closed. Reload the page.')

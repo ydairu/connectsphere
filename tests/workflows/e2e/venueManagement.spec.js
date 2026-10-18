@@ -348,25 +348,29 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
       headers: headers(ROLE_USERS.venueStaff), data: { ...block, startsAt: '2020-01-01T10:00:00Z', endsAt: '2020-01-01T12:00:00Z' },
     })
     expect(response.status()).toBe(201)
+    for (const [eventId, actor] of [['seed-req-a1-planning', ROLE_USERS.coordinator], ['seed-req-b1-planning', EXTRA_USERS.secondCoordinator]]) {
+      const changed = await request.patch(`${DOUBLE_ORIGIN}/api/requests/${eventId}`, {
+        headers: headers(actor), data: { core: { preferredDateTime: '2027-03-01T10:00:00.000Z', durationHours: 2 } },
+      })
+      expect(changed.status()).toBe(200)
+    }
     await signIn(page, ROLE_USERS.coordinator)
     await search(page)
     await expect(page.getByRole('heading', { name: roomName })).toBeVisible()
     await page.goto('/requests/seed-req-a1-planning/venue-bookings')
     await page.getByLabel('Venue', { exact: true }).selectOption(roomId)
-    await page.getByLabel('Start', { exact: true }).fill('2027-03-01T10:00')
-    await page.getByLabel('End', { exact: true }).fill('2027-03-01T12:00')
     await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre')
     await page.getByRole('button', { name: 'Submit booking request', exact: true }).click()
     await expect(statusMessage(page, 'tentatively held')).toContainText('tentatively held')
     await logout(page)
     await signIn(page, EXTRA_USERS.secondCoordinator)
     await page.goto('/requests/seed-req-b1-planning/venue-bookings')
-    await page.getByLabel('Venue', { exact: true }).selectOption(roomId)
-    await page.getByLabel('Start', { exact: true }).fill('2027-03-01T10:00')
-    await page.getByLabel('End', { exact: true }).fill('2027-03-01T12:00')
-    await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre')
-    await page.getByRole('button', { name: 'Submit booking request', exact: true }).click()
-    await expect(page.getByRole('alert')).toContainText('not available')
+    await expect(page.getByLabel('Venue', { exact: true }).locator(`option[value="${roomId}"]`)).toHaveCount(0)
+    const conflict = await request.post(`${DOUBLE_ORIGIN}/api/requests/seed-req-b1-planning/venue-bookings`, {
+      headers: headers(EXTRA_USERS.secondCoordinator),
+      data: { venueId: roomId, startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', requirements: 'Theatre', submissionKey: 'competing-event' },
+    })
+    expect(conflict.status()).toBe(409)
     expect(Object.values((await snapshot(request)).availability).filter((entry) => entry.venueId === roomId && entry.status === AVAILABILITY_STATUS.TENTATIVE_HOLD)).toHaveLength(1)
     for (const [user, action] of [
       [ROLE_USERS.venueStaff, APPROVE_VENUE],

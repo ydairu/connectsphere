@@ -47,14 +47,31 @@ function showRequest(response, roles = ['venue_staff']) {
 }
 
 describe('SPM-42 — viewing a request by role', () => {
+  it('groups sections in the requested tab order and keeps edits while switching tabs', async () => {
+    const user = showRequest({ request: { ...venueStaffResponse.request, equipment: { requirements: ['projector'] }, registration: { enabled: false }, internal: { planningNotes: '' } },
+      editableSections: ['core', 'venue', 'equipment', 'registration', 'internal', 'venuePreparation'] }, ['coordinator'])
+    expect((await screen.findAllByRole('tab')).map((tab) => tab.textContent)).toEqual(['Event Status', 'Venue Details', 'Equipment Required', 'Change Log'])
+    await user.clear(screen.getByLabelText('Title'))
+    await user.type(screen.getByLabelText('Title'), 'Updated event')
+    await user.click(screen.getByRole('tab', { name: 'Venue Details' }))
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Venue', 'Venue preparation', 'Venue booking requests'])
+    await user.click(screen.getByRole('tab', { name: 'Equipment Required' }))
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Equipment and technical support', 'Registration', 'Equipment requests'])
+    await user.click(screen.getByRole('tab', { name: 'Event Status' }))
+    expect(screen.getByLabelText('Title').value).toBe('Updated event')
+  })
+
   it('Venue staff see the venue section and edit venue preparation, and the equipment section is absent', async () => {
     showRequest(venueStaffResponse)
-    expect(await screen.findByText('Venue')).toBeTruthy()
+    await screen.findByText('Event details')
+    await userEvent.click(screen.getByRole('tab', { name: 'Venue Details' }))
+    expect(screen.getByRole('heading', { name: 'Venue' })).toBeTruthy()
     expect(screen.queryByText('Equipment and technical support')).toBeNull()
     // SPM-48: their own section is venue preparation; the requested venue and main details are read-only.
     expect(screen.getByLabelText('Venue preparation status')).toBeTruthy()
     expect(screen.queryByLabelText('Layout preference')).toBeNull()
     expect(screen.queryByLabelText('Title')).toBeNull()
+    await userEvent.click(screen.getByRole('tab', { name: 'Event Status' }))
     expect(screen.getByText('Event details')).toBeTruthy()
   })
 
@@ -80,6 +97,7 @@ describe('SPM-42 #7 — a rejected field is named', () => {
   it('Saving sends only the changed field and reports the fields the API rejected', async () => {
     // SPM-48: Venue Staff's editable field is in venue preparation.
     const user = showRequest(venueStaffResponse)
+    await user.click(await screen.findByRole('tab', { name: 'Venue Details' }))
     const notes = await screen.findByLabelText('Venue preparation notes')
     await user.type(notes, 'Chairs booked')
 
@@ -96,6 +114,7 @@ describe('SPM-42 #7 — a rejected field is named', () => {
   it('A successful save reports the change', async () => {
     // SPM-48: Venue Staff's editable field is in venue preparation.
     const user = showRequest(venueStaffResponse)
+    await user.click(await screen.findByRole('tab', { name: 'Venue Details' }))
     await user.selectOptions(await screen.findByLabelText('Venue preparation status'), 'in_progress')
 
     updateRequest.mockResolvedValueOnce({
@@ -339,10 +358,13 @@ describe('SPM-5 — reviewing and approving for Planning', () => {
     expect(screen.getByLabelText('Expected attendees').value).toBe('80')
     expect(screen.getByLabelText('Duration (hours)').value).toBe('4')
     expect(screen.getByLabelText('Preferred date and time').value).toBe('2026-11-20T09:00')
+    await user.click(screen.getByRole('tab', { name: 'Venue Details' }))
     expect(screen.getByLabelText('Layout preference').value).toBe('theatre')
     expect(screen.getByLabelText('Accessibility required').checked).toBe(true)
     expect(screen.getByLabelText('Accessibility needs').value).toBe('Wheelchair access')
+    await user.click(screen.getByRole('tab', { name: 'Equipment Required' }))
     expect(screen.getByLabelText('Equipment required (one per line)').value).toBe('projector')
+    await user.click(screen.getByRole('tab', { name: 'Event Status' }))
 
     transitionRequest.mockResolvedValue({
       request: { ...reviewRequest, status: 'under_review' },
@@ -452,9 +474,12 @@ describe('SPM-25 — returning a request for clarification', () => {
     expect(screen.getByText('Which room layout do you need?')).toBeTruthy()
 
     // By heading: SPM-64's arrangements summary also has a "Venue" row for Organisers.
-    for (const heading of ['Event details', 'Venue', 'Equipment and technical support', 'Registration']) {
-      expect(screen.getByRole('heading', { name: heading })).toBeTruthy()
-    }
+    expect(screen.getByRole('heading', { name: 'Event details' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('tab', { name: 'Venue Details' }))
+    expect(screen.getByRole('heading', { name: 'Venue' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('tab', { name: 'Equipment Required' }))
+    for (const heading of ['Equipment and technical support', 'Registration']) expect(screen.getByRole('heading', { name: heading })).toBeTruthy()
+    await userEvent.click(screen.getByRole('tab', { name: 'Event Status' }))
     expect(screen.queryByText('Read only')).toBeNull()
     expect(screen.getByLabelText('Title')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy()

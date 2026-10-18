@@ -6,11 +6,12 @@ import { BOOKING_REJECTED } from '../../../shared/venueBooking.js'
 import { CANCEL, REJECT, APPROVE_CANCELLATION } from '../../../shared/statusTransitions.js'
 import { REQUEST_CANCELLATION } from '../../../shared/requestActions.js'
 import { CONFIRMED, PLANNING } from '../../../shared/status.js'
+import { eventPeriod } from '../../../shared/venueSuitability.js'
 import { coordinator, staff, secondStaff, organiser, fixture, input, now } from '../fixtures.js'
 
 let db
 beforeEach(() => { db = fixture() })
-const submit = (overrides = {}, eventId = 'event', actor = coordinator) => submitVenueBooking(eventId, { ...input, ...overrides }, actor, db, now)
+const submit = (overrides = {}, eventId = 'event', actor = coordinator) => submitVenueBooking(eventId, { ...input, ...eventPeriod(db.store.get(eventId)), ...overrides }, actor, db, now)
 const values = (collection) => [...db.collectionData(collection).values()]
 
 describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
@@ -34,8 +35,10 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
     const first = await submit()
     const second = await submit({ venueId: 'room', submissionKey: 'second' })
     expect(second.assignedVenueStaffName).toBe(secondStaff.name)
+    db.store.get('event').core.preferredDateTime = '2027-03-02T10:00:00Z'
     const third = await submit({ venueId: 'room', startsAt: '2027-03-02T10:00:00Z', endsAt: '2027-03-02T12:00:00Z', submissionKey: 'third' })
     expect(third.assignedVenueStaffName).toBe(staff.name)
+    db.store.get('event').core.preferredDateTime = '2027-03-03T10:00:00Z'
     const replacement = await submit({ replacesId: first.id, submissionKey: 'replacement', startsAt: '2027-03-03T10:00:00Z', endsAt: '2027-03-03T12:00:00Z' })
     expect(replacement.assignedVenueStaffName).toBe(staff.name)
   })
@@ -61,15 +64,25 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
     expect(values('venueAvailability')).toEqual([])
     expect(values('systemLocks')).toEqual([])
   })
+  it('refuses a booking period that differs from the current event without writing a hold', async () => {
+    await expect(submit({ startsAt: '2027-03-01T11:00:00Z', endsAt: '2027-03-01T13:00:00Z' }))
+      .rejects.toMatchObject({ errors: { startsAt: 'Use the event start time.', endsAt: 'Use the event end time.' } })
+    expect(values(BOOKINGS)).toEqual([])
+    expect(values('venueAvailability')).toEqual([])
+  })
   it('refuses overlaps including buffers and permits exact occupied boundaries', async () => {
     await submit()
     await expect(submit({ submissionKey: 'overlap' })).rejects.toMatchObject({ name: 'VenueConflictError' })
-    await expect(submit({ submissionKey: 'buffer', startsAt: '2027-03-01T13:14:59Z', endsAt: '2027-03-01T14:00:00Z' })).rejects.toMatchObject({ name: 'VenueConflictError' })
-    await submit({ submissionKey: 'adjacent', startsAt: '2027-03-01T13:15:00Z', endsAt: '2027-03-01T14:00:00Z' })
+    db.store.get('event').core.preferredDateTime = '2027-03-01T13:14:59Z'
+    db.store.get('event').core.durationHours = 1
+    await expect(submit({ submissionKey: 'buffer', startsAt: '2027-03-01T13:14:59Z', endsAt: '2027-03-01T14:14:59Z' })).rejects.toMatchObject({ name: 'VenueConflictError' })
+    db.store.get('event').core.preferredDateTime = '2027-03-01T13:15:00Z'
+    await submit({ submissionKey: 'adjacent', startsAt: '2027-03-01T13:15:00Z', endsAt: '2027-03-01T14:15:00Z' })
     expect(values(BOOKINGS)).toHaveLength(2)
   })
   it('safely replaces same-venue times and releases the old venue on a move', async () => {
     const first = await submit()
+    db.store.get('event').core.durationHours = 3
     const second = await submit({ replacesId: first.id, submissionKey: 'revise', endsAt: '2027-03-01T13:00:00Z' })
     expect(values('venueAvailability').filter((v) => v.lifecycleStatus === 'active')).toHaveLength(1)
     const third = await submit({ replacesId: second.id, submissionKey: 'move', venueId: 'room' })
