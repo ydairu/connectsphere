@@ -17,14 +17,15 @@ beforeEach(async () => {
   for (const [id, status, uid, createdAt] of [
     ['z', 'pending', staff.uid, '2026-10-16'], ['a', 'pending', staff.uid, '2026-10-16'],
     ['old', 'pending', staff.uid, '2026-10-15'], ['other', 'pending', secondStaff.uid, '2026-10-14'],
+    ['expired', 'pending', staff.uid, '2026-10-13'],
     ...['approved', 'rejected', 'replaced', 'cancelled'].map((s) => [s, s, staff.uid, '2026-10-13']),
   ]) await db.collection('venueBookingRequests').doc(id).set({ ...input, eventRequestId: 'event', eventTitle: 'Conference', venueName: 'Hall',
-    status, assignedVenueStaffUid: uid, createdAt, holdExpiresAt: '2020-01-01T00:00:00Z', privateField: 'SECRET' })
+    status, assignedVenueStaffUid: uid, createdAt, holdExpiresAt: id === 'expired' ? '2020-01-01T00:00:00Z' : '2027-01-01T00:00:00Z', privateField: 'SECRET' })
 })
 const get = (path, user) => request(app).get(path).set('Authorization', `Bearer test:${user.uid}`)
 const queue = '/api/venues/booking-requests'
 describe('SPM-53 HTTP with mocked identity and in-memory persistence', () => {
-  it('scopes, orders and projects pending records; expired pending stays', async () => {
+  it('scopes, orders and projects pending records while excluding expired holds', async () => {
     const response = await get(queue, staff)
     expect(response.status).toBe(200)
     expect(response.body.bookings.map((b) => b.id)).toEqual(['old', 'a', 'z'])

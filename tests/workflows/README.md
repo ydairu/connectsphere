@@ -71,5 +71,5 @@ npm run test:e2e
   zero-buffer venue; `tests/spm-73/e2e/spm73.calendarBuffers.spec.js` covers nonzero calendar buffers.
 - SPM-29's affected-staff notification criterion remains outside this suite, following the earlier
   implementation deferral. This is a coverage gap, not removal of the workbook criterion.
-- SPM-74 affected-booking recovery/notifications and SPM-78 calendar hold expiry are separate scope.
+- SPM-74 affected-booking recovery/notifications are separate scope. SPM-78 expiry, warnings, and calendar/search behavior are covered by `tests/spm-78/`; operational scheduling and human acceptance remain to be checked.
 - No live Firebase, emulator, deployed rules, manual acceptance or complete story Done claim is made.

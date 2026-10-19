@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 19 September 2026 (organisation profile increment)
+Last reviewed: 19 October 2026 (SPM-78 venue hold expiry increment; older sections retain their historical dates)
 
 ## Project Purpose
 
@@ -714,6 +714,13 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
       - Root Vitest 1740 passed, 39 opt-in live and emulator tests skipped. On the first full run, `tests/spm-18/integration/availabilityCheckPage.test.jsx` failed once. It passed 3/3 on its own and in the full rerun, so it appears timing-sensitive under load.
       - Playwright Chromium 94/94 passed, including SPM-53's and SPM-62's specs.
     - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. The seed was not run against the real project. `firestore.rules` is unchanged, and no backlog status change is claimed.
+
+## SPM-78 tentative venue hold expiry — 19 October 2026
+
+- New booking holds retain SPM-16's seven-day deadline. A booking is effectively Expired at that instant, including in API capabilities and the Venue Staff queue; approval at or after expiry is refused. The calendar omits the hold and its setup/turnaround slots, matching venue search and conflict checks. An expired request stays in event history and can be replaced while the event remains in Planning.
+- `backend/src/services/venueHoldExpiryService.js` records expiry, releases only the matching venue hold, writes activity, and sends the current Coordinator an in-app notice. It warns once at the 24-hour threshold. It is safe to retry or overlap hourly runs, and skips the warning if the first run is already past expiry. The task does not move the event or release equipment. An isolated Firestore emulator test covers concurrent runs and approval at expiry.
+- The command `npm run process:venue-holds --prefix backend` is wired to `.github/workflows/venue-hold-expiry.yml` at the top of each hour. **Operational gap:** repository secrets and a successful default-branch run have not been verified; there is no deployed-scheduler or live-project claim. Delayed GitHub scheduling can delay notices beyond an hour.
+- `npm run backfill:venue-holds --prefix backend` is dry-run by default; `-- --write` fills missing deadlines where creation time or the linked booking's deadline is known. It lists mismatches and records with no usable time for review. No live backfill was run. The untracked backlog workbook remains In Progress for Sprint 3; manual acceptance is pending. See `docs/evidence/spm-78-traceability.md` and `docs/testing/spm-78-manual-testing.md`.
 
 ## Documentation Boundaries
 

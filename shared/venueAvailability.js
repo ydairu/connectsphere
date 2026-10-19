@@ -22,7 +22,7 @@ export const MAINTENANCE_BLOCK_REASONS = Object.freeze([
 export const REMOVED_STATUSES = new Set(['cancelled', 'removed'])
 
 // SPM-16 — how long a new tentative hold lasts unless it is confirmed (Week 7 Change #4). Seven days is a
-// team default of 15 Oct 2026, pending PO confirmation; SPM-78 owns hold expiry and changes it here.
+// team default of 15 Oct 2026, retained by SPM-78.
 export const TENTATIVE_HOLD_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 
 export function tentativeHoldExpiresAt(createdAt) {
@@ -31,7 +31,7 @@ export function tentativeHoldExpiresAt(createdAt) {
 
 // A tentative hold has expired once its holdExpiresAt is reached. Holds saved before SPM-16 have no
 // holdExpiresAt and still count as active. Conflict detection (SPM-16), venue search (SPM-75) and
-// suitability (SPM-13) apply this; the availability calendar does not yet (SPM-78).
+// suitability (SPM-13) and the availability calendar (SPM-78) apply this.
 export function isExpiredHold(commitment, now = new Date()) {
   return (
     commitment.status === AVAILABILITY_STATUS.TENTATIVE_HOLD &&

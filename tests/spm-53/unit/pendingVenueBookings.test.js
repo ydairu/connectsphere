@@ -3,11 +3,11 @@ import { BOOKING_PENDING, pendingVenueBookings } from '../../../shared/venueBook
 
 const pending = (id, createdAt = '2026-10-16T00:00:00Z') => ({ id, createdAt, status: BOOKING_PENDING })
 describe('SPM-53 pending queue selection', () => {
-  it('includes pending only, including expired holds, without mutating input', () => {
+  it('excludes expired holds without mutating input', () => {
     const bookings = [pending('expired'), ...['approved', 'rejected', 'replaced', 'cancelled'].map((status) => ({ ...pending(status), status }))]
     bookings[0].holdExpiresAt = '2020-01-01T00:00:00Z'
     const before = structuredClone(bookings)
-    expect(pendingVenueBookings(bookings).map((b) => b.id)).toEqual(['expired'])
+    expect(pendingVenueBookings(bookings).map((b) => b.id)).toEqual([])
     expect(bookings).toEqual(before)
   })
   it('orders oldest first with stable ID ties without sorting the input', () => {

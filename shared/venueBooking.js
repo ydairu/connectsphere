@@ -9,10 +9,18 @@ export const BOOKING_APPROVED = 'approved'
 export const BOOKING_REJECTED = 'rejected'
 export const BOOKING_REPLACED = 'replaced'
 export const BOOKING_CANCELLED = 'cancelled'
+export const BOOKING_EXPIRED = 'expired'
 
-// Expired holds do not decide a booking request; only its booking status does.
-export function pendingVenueBookings(bookings) {
-  return bookings.filter((booking) => booking.status === BOOKING_PENDING)
+export function effectiveVenueBookingStatus(booking, now = new Date()) {
+  return booking.status === BOOKING_PENDING && typeof booking.holdExpiresAt === 'string' &&
+    Number.isFinite(Date.parse(booking.holdExpiresAt)) && Date.parse(booking.holdExpiresAt) <= now.getTime()
+    ? BOOKING_EXPIRED : booking.status
+}
+
+// The stored decision is preserved; a pending request becomes effectively expired at its deadline,
+// before the hourly task records the expired status.
+export function pendingVenueBookings(bookings, now = new Date()) {
+  return bookings.filter((booking) => effectiveVenueBookingStatus(booking, now) === BOOKING_PENDING)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
 }
 
@@ -25,13 +33,13 @@ export function canReadVenueBooking(user, event, booking) {
     (rolesOf(user).includes(VENUE_STAFF) && booking.assignedVenueStaffUid === user.uid)
 }
 
-export function canRejectVenueBooking(user, event, booking) {
+export function canRejectVenueBooking(user, event, booking, now = new Date()) {
   return rolesOf(user).includes(VENUE_STAFF) && booking.assignedVenueStaffUid === user.uid &&
-    event.status === PLANNING && booking.status === BOOKING_PENDING
+    event.status === PLANNING && effectiveVenueBookingStatus(booking, now) === BOOKING_PENDING
 }
 
-export function canApproveVenueBooking(user, event, booking) {
-  return canRejectVenueBooking(user, event, booking)
+export function canApproveVenueBooking(user, event, booking, now = new Date()) {
+  return canRejectVenueBooking(user, event, booking, now)
 }
 
 export function venueBookingApprovalErrors(input) {
@@ -105,7 +113,7 @@ export function capacityWarning(attendance, capacity) {
 
 // Least pending work, then cycle through stable UID order after the previous assignee. The rule is
 // chooseStaff (shared/staffAssignment.js), shared with SPM-17's Technical Support Staff assignment.
-export function chooseVenueStaff(users, bookings, lastUid) {
-  const pendingAssignees = bookings.filter((b) => b.status === BOOKING_PENDING).map((b) => b.assignedVenueStaffUid)
+export function chooseVenueStaff(users, bookings, lastUid, now = new Date()) {
+  const pendingAssignees = bookings.filter((b) => effectiveVenueBookingStatus(b, now) === BOOKING_PENDING).map((b) => b.assignedVenueStaffUid)
   return chooseStaff(users, VENUE_STAFF, pendingAssignees, lastUid)
 }

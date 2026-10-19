@@ -83,16 +83,16 @@ describe('SPM-54 atomic approval with in-memory persistence', () => {
     if (allowed) expect((await approve(booking.id)).status).toBe('approved')
     else await expect(approve(booking.id)).rejects.toMatchObject({ name: 'VenueConflictError' })
   })
-  it('rechecks an expired own hold and ignores expired competing holds', async () => {
+  it('refuses approval at the exact expiry time', async () => {
     const booking = await submit()
     db.collectionData('venueAvailability').set('expired', { ...hold(booking.id), bookingRequestId: 'other' })
-    expect((await approve(booking.id, new Date(booking.holdExpiresAt))).status).toBe('approved')
+    await expect(approve(booking.id, new Date(booking.holdExpiresAt))).rejects.toMatchObject({ status: 409 })
   })
-  it('refuses an expired own hold when another request has acquired the period', async () => {
+  it('refuses an expired own hold even when another request has acquired the period', async () => {
     const booking = await submit()
     const after = new Date(booking.holdExpiresAt)
     await submitVenueBooking('event', { ...input, submissionKey: 'new-hold' }, coordinator, db, after)
-    await expect(approve(booking.id, after)).rejects.toMatchObject({ name: 'VenueConflictError' })
+    await expect(approve(booking.id, after)).rejects.toMatchObject({ status: 409 })
   })
   it.each(['missing', 'removed', 'event', 'booking', 'venue', 'time'])('refuses a %s hold without writing', async (kind) => {
     const booking = await submit(), commitment = hold(booking.id)
