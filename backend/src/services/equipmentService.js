@@ -10,7 +10,7 @@ import {
 } from '../../../shared/equipment.js'
 import { TECHNICAL_STAFF } from '../../../shared/permissions.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
-import { loadReservedUnitIds } from './equipmentReservationService.js'
+import { loadReservedUnitIds, loadUnitReservations } from './equipmentReservationService.js'
 
 // SPM-37 — equipment types, their units and the available quantity. See shared/equipment.js for the model.
 
@@ -126,10 +126,12 @@ export async function listEquipmentAvailability(query = {}, db = getAdminDb()) {
   return { period, equipment }
 }
 
-export async function getEquipmentType(id, db = getAdminDb()) {
+// SPM-58: each unit also lists the reservations that hold it, naming only events the viewer may see.
+export async function getEquipmentType(id, db = getAdminDb(), viewer = null) {
   const equipmentType = await getEquipmentTypeRecord(id, db)
   const units = (await loadUnits(db, id)).sort(byAssetTag)
-  return { ...equipmentType, ...summariseUnits(units), units }
+  const reservations = await loadUnitReservations(viewer, id, db)
+  return { ...equipmentType, ...summariseUnits(units), units: units.map((unit) => ({ ...unit, reservations: reservations.get(unit.id) ?? [] })) }
 }
 
 // New units start Available. Asset tags are unique within their equipment type; the check runs in the

@@ -41,6 +41,10 @@ export function decideEquipmentRequest(user, eventId, equipmentRequestId, action
 export function listAssignedEquipmentRequests(user) {
   return authenticatedRequest(user, '/api/equipment/requests/assigned')
 }
+// SPM-58: reservations of the events assigned to the signed-in Technical Support Staff member.
+export function listEquipmentReservations(user, { status } = {}) {
+  return authenticatedRequest(user, `/api/equipment/reservations${status ? `?status=${encodeURIComponent(status)}` : ''}`)
+}
 
 export class ApiRequestError extends Error {
   constructor(message, { status, details } = {}) {

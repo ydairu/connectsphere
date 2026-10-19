@@ -113,6 +113,9 @@ function EquipmentPage() {
               available for any period. Check a period to also leave out units reserved for overlapping events.
             </p>
           </div>
+          {canManage && (
+            <Link className="button button-secondary" to="/equipment/reservations">View reservations</Link>
+          )}
         </div>
 
         {notice && <div className="alert alert-success" role="status">{notice}</div>}

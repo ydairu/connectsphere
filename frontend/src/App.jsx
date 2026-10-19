@@ -7,6 +7,7 @@ import DraftRequestsPage from './pages/DraftRequestsPage.jsx'
 import EquipmentDetailPage from './pages/EquipmentDetailPage.jsx'
 import EquipmentRequestQueuePage from './pages/EquipmentRequestQueuePage.jsx'
 import EquipmentPage from './pages/EquipmentPage.jsx'
+import EquipmentReservationsPage from './pages/EquipmentReservationsPage.jsx'
 import EditVenuePage from './pages/EditVenuePage.jsx'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
@@ -60,6 +61,8 @@ function App() {
       {/* SPM-56: the Technical Support Staff member's own equipment request queue. The API enforces the role too. */}
       <Route element={<ProtectedRoute allowedRoles={[TECHNICAL_STAFF]} />}>
         <Route path="/equipment/requests" element={<EquipmentRequestQueuePage />} />
+        {/* SPM-58: reached from the Equipment page, not the navbar. */}
+        <Route path="/equipment/reservations" element={<EquipmentReservationsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -757,6 +757,22 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - A reserved unit that later becomes Damaged, Under Repair or Unavailable is not flagged (SPM-37 AC5, now buildable).
 - Reservation and release activity entries are recorded but not displayed. The Coordinator is not notified of a reservation.
 
+**[Implemented — SPM-58, 19 Oct 2026]** (`backend/src/services/equipmentReservationService.js`, `GET /api/equipment/reservations`, `GET /api/equipment/:id`):
+
+- **Reservation records:** an Equipment reservations page lists each reservation with its event name, the event's date and start/end time, the equipment type, quantity, reserved units, status (Active or Released), who reserved it and when, and the release time once released. Each links to its event. It has an Active/Released filter.
+- **Units:** each unit on an equipment type's page lists the reservations that hold it (active, and the event not Rejected, Cancelled or Completed) with the event and its date and time.
+- **The event:** the event's Equipment Required tab lists its reserved equipment items and quantities ("Reserved equipment"), for everyone who may view the equipment section, without unit ids.
+- **Preventing double-booking:** this was already in place from SPM-62 and SPM-57 (overlap check and per-type lock). SPM-58 adds evidence on a real Firestore emulator, run in CI:
+  - two simultaneous reservations of the same units for overlapping events: the first saved succeeds and the second is refused;
+  - five at once against three units: no unit is committed twice;
+  - simultaneous back-to-back reservations: both succeed.
+
+**[Team decisions, 19 Oct 2026 — SPM-58, pending PO confirmation]**
+
+- A Technical Support Staff member sees the reservations of the events assigned to them (their SPM-42 record scope), not every event's (`canViewReservation`). Only Technical Support Staff reach the reservations list.
+- On a unit, an event the viewer may not see is shown as "another event" with its date and time, so the unit's commitment is visible without naming another event.
+- The reservations page is reached from the Equipment page ("View reservations"), not from the navbar.
+
 ### 4.18 Attendee Registration
 
 **[Customer-confirmed]** The Organiser configures whether/when registration is open. A person must register to attend, though attendee-facing information may remain visible without registration. Capacity is capped at the event/venue maximum. Waiting-list priority is first-come, first-served; the next person is invited to apply rather than automatically registered.

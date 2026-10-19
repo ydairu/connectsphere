@@ -9,9 +9,10 @@ import {
   listEquipmentAvailability,
   updateEquipmentUnitStatus,
 } from '../services/equipmentService.js'
+import { ReservationQueryError, listVisibleReservations } from '../services/equipmentReservationService.js'
 
 function sendEquipmentError(error, res, next) {
-  if (error instanceof EquipmentValidationError) {
+  if (error instanceof EquipmentValidationError || error instanceof ReservationQueryError) {
     return res.status(400).json({ message: 'Validation failed', errors: error.errors })
   }
   if (error instanceof DuplicateAssetTagError) {
@@ -36,6 +37,14 @@ export function createEquipmentController(getDb) {
         return sendEquipmentError(error, res, next)
       }
     },
+    // SPM-58: reservations of the events this Technical Support Staff member is assigned to.
+    async listReservations(req, res, next) {
+      try {
+        return res.json(await listVisibleReservations(req.user, req.query, getDb()))
+      } catch (error) {
+        return sendEquipmentError(error, res, next)
+      }
+    },
     async createEquipmentType(req, res, next) {
       try {
         const equipment = await createEquipmentType(req.body, req.user, getDb())
@@ -46,7 +55,7 @@ export function createEquipmentController(getDb) {
     },
     async getEquipmentType(req, res, next) {
       try {
-        const equipment = await getEquipmentType(req.params.id, getDb())
+        const equipment = await getEquipmentType(req.params.id, getDb(), req.user)
         return res.json({ equipment })
       } catch (error) {
         return sendEquipmentError(error, res, next)

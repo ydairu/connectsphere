@@ -46,6 +46,8 @@
     "test:spm16": "vitest run tests/spm-16/",
     "test:spm14": "vitest run tests/spm-14/ && playwright test tests/spm-14",
     "test:spm14:emulator": "node tests/spm-14/runEmulatorTests.js",
+    "test:spm58": "vitest run tests/spm-58/ && playwright test tests/spm-58",
+    "test:spm58:emulator": "node tests/spm-58/runEmulatorTests.js",
     "test:spm37": "vitest run tests/spm-37/ && playwright test tests/spm-37",
     "test:spm18": "vitest run tests/spm-18/ && playwright test tests/spm-18",
     "test:spm62": "vitest run tests/spm-62/ && playwright test tests/spm-62",

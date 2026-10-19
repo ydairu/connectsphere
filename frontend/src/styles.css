@@ -253,6 +253,10 @@ a { color: inherit; }
 .equipment-status-under_repair { color: #7b4d12; background: #fbf1df; }
 .equipment-status-unavailable { color: #35414a; background: #eaeef1; }
 
+/* SPM-58 reservation statuses */
+.reservation-status-active { color: #1f6b4f; background: #e6f5ee; }
+.reservation-status-released { color: #35414a; background: #eaeef1; }
+
 /* SPM-42 request detail */
 .request-item-actions { display: flex; align-items: center; gap: 12px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }

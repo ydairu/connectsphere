@@ -6,9 +6,20 @@ import {
   EQUIPMENT_RESERVATIONS_COLLECTION,
   EQUIPMENT_RESERVATION_RELEASED,
   RESERVATION_STATUS,
+  canViewReservation,
   reservationEventIds,
+  reservationHoldsUnits,
   reservedUnitIds,
 } from '../../../shared/equipmentReservation.js'
+import { inScope } from '../../../shared/permissions.js'
+
+export class ReservationQueryError extends Error {
+  constructor(errors) {
+    super('Invalid reservation query.')
+    this.name = 'ReservationQueryError'
+    this.errors = errors
+  }
+}
 
 /**
  * The ids of units reserved for other events whose period overlaps `period` (SPM-57), for these equipment
@@ -51,4 +62,90 @@ export async function prepareReservationRelease(tx, db, eventId, user, now, rele
     })
     return { reservedEquipment: null }
   }
+}
+
+// --- SPM-58: viewing reservations --------------------------------------------------------------------
+
+const rows = (snapshot) => snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+
+async function loadEvents(db, ids) {
+  const unique = [...new Set(ids)]
+  const snapshots = await Promise.all(unique.map((id) => db.collection('eventRequests').doc(id).get()))
+  return new Map(unique.map((id, index) => [id, snapshots[index].exists ? { ...snapshots[index].data(), id } : null]))
+}
+
+/**
+ * SPM-58 — the reservations of the events this Technical Support Staff member is assigned to, with each
+ * one's event name and date/time, equipment type, quantity, the reserved asset tags, status, and when it was
+ * reserved and (if so) released. `query.status` may be 'active' or 'released'. Active first, then by start.
+ */
+export async function listVisibleReservations(user, query = {}, db) {
+  const status = query.status
+  if (status !== undefined && !Object.values(RESERVATION_STATUS).includes(status)) {
+    throw new ReservationQueryError({ status: 'Choose active or released.' })
+  }
+  const base = db.collection(EQUIPMENT_RESERVATIONS_COLLECTION)
+  const reservations = rows(await (status ? base.where('status', '==', status) : base).get())
+  const events = await loadEvents(db, reservations.map((reservation) => reservation.eventRequestId))
+  const visible = reservations.filter((reservation) => canViewReservation(user, events.get(reservation.eventRequestId)))
+
+  const unitIds = [...new Set(visible.flatMap((reservation) => reservation.unitIds ?? []))]
+  const unitSnapshots = await Promise.all(unitIds.map((id) => db.collection('equipmentUnits').doc(id).get()))
+  const assetTags = new Map(unitIds.map((id, index) => [id, unitSnapshots[index].exists ? unitSnapshots[index].data().assetTag : null]))
+
+  const activeFirst = (reservation) => (reservation.status === RESERVATION_STATUS.ACTIVE ? 0 : 1)
+  return {
+    reservations: visible
+      .sort((a, b) => activeFirst(a) - activeFirst(b) || String(a.startsAt).localeCompare(String(b.startsAt)) || a.id.localeCompare(b.id))
+      .map((reservation) => {
+        const event = events.get(reservation.eventRequestId)
+        return {
+          id: reservation.id,
+          eventRequestId: reservation.eventRequestId,
+          eventTitle: event.core?.title ?? null,
+          eventStatus: event.status,
+          startsAt: reservation.startsAt,
+          endsAt: reservation.endsAt,
+          equipmentTypeId: reservation.equipmentTypeId,
+          equipmentTypeName: reservation.equipmentTypeName ?? null,
+          quantity: reservation.quantity,
+          assetTags: (reservation.unitIds ?? []).map((id) => assetTags.get(id)).filter(Boolean),
+          status: reservation.status,
+          reservedAt: reservation.reservedAt ?? null,
+          reservedByName: reservation.reservedByName ?? null,
+          releasedAt: reservation.releasedAt ?? null,
+          releasedReason: reservation.releasedReason ?? null,
+        }
+      }),
+  }
+}
+
+/**
+ * SPM-58 — for each unit of an equipment type, the reservations that still hold it (active, and the event not
+ * Rejected, Cancelled or Completed), soonest first. The event is named only to a viewer who may see that event
+ * (their record scope); otherwise it is shown as another event, with its date and time only.
+ */
+export async function loadUnitReservations(user, equipmentTypeId, db) {
+  const reservations = rows(await db.collection(EQUIPMENT_RESERVATIONS_COLLECTION).where('equipmentTypeId', '==', equipmentTypeId).get())
+    .filter((reservation) => reservation.status === RESERVATION_STATUS.ACTIVE)
+  const events = await loadEvents(db, reservations.map((reservation) => reservation.eventRequestId))
+  const byUnit = new Map()
+  for (const reservation of reservations) {
+    const event = events.get(reservation.eventRequestId)
+    if (!reservationHoldsUnits(reservation, event?.status)) continue
+    const visible = event != null && inScope(user, event)
+    const entry = {
+      startsAt: reservation.startsAt,
+      endsAt: reservation.endsAt,
+      reservedAt: reservation.reservedAt ?? null,
+      eventRequestId: visible ? reservation.eventRequestId : null,
+      eventTitle: visible ? event.core?.title ?? null : null,
+    }
+    for (const unitId of reservation.unitIds ?? []) {
+      if (!byUnit.has(unitId)) byUnit.set(unitId, [])
+      byUnit.get(unitId).push(entry)
+    }
+  }
+  for (const entries of byUnit.values()) entries.sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt)))
+  return byUnit
 }

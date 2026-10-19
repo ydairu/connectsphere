@@ -13,6 +13,8 @@ export function createEquipmentRoutes({ authenticate, getDb }) {
   router.get('/', authenticate, requireRole(TECHNICAL_STAFF, COORDINATOR), controller.listEquipment)
   // SPM-56: the signed-in Technical Support Staff member's equipment requests. Registered before '/:id'.
   router.get('/requests/assigned', authenticate, requireRole(TECHNICAL_STAFF), createEquipmentRequestController(getDb).assigned)
+  // SPM-58: reservations of the events assigned to the signed-in Technical Support Staff member. Before '/:id'.
+  router.get('/reservations', authenticate, requireRole(TECHNICAL_STAFF), controller.listReservations)
   router.post('/', authenticate, requireRole(TECHNICAL_STAFF), controller.createEquipmentType)
   router.get('/:id', authenticate, requireRole(TECHNICAL_STAFF, COORDINATOR), controller.getEquipmentType)
   router.post('/:id/units', authenticate, requireRole(TECHNICAL_STAFF), controller.addEquipmentUnit)
