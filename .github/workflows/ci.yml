@@ -61,6 +61,19 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      # SPM-58: simultaneous equipment reservations, on the same local emulator configuration as SPM-14.
+      - name: Equipment reservation transactions against Firestore emulator
+        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-bookings --config firebase.spm14.json "npm run test:spm58:emulator"
+
+      - name: Upload equipment reservation emulator results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: equipment-reservation-emulator-results
+          path: test-results/spm58-emulator.json
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Resolve Playwright version
         id: playwright
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"

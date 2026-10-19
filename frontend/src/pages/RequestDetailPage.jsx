@@ -11,6 +11,7 @@ import Card from '../components/Card.jsx'
 import ClarificationRequests from '../components/ClarificationRequests.jsx'
 import CoordinatorReassignment from '../components/CoordinatorReassignment.jsx'
 import EquipmentRequests from '../components/EquipmentRequests.jsx'
+import ReservedEquipment from '../components/ReservedEquipment.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import StatusActions, { StatusNotices } from '../components/StatusActions.jsx'
@@ -418,6 +419,8 @@ function RequestDetailPage() {
             </>}
             {activeTab === 'equipment-required' && <>
               {renderSection('equipment')}
+              {/* SPM-58: the reserved items and quantities, under the event's equipment section. */}
+              <ReservedEquipment reservedEquipment={reservedEquipment} />
               {renderSection('registration')}
               {renderSection('equipmentPreparation')}
             {/* SPM-17: the API decides who may see equipment requests; for anyone else the card renders nothing. */}

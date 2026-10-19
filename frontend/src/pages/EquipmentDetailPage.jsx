@@ -14,6 +14,28 @@ function statusLabel(status) {
   return EQUIPMENT_UNIT_STATUS_LABELS[status] ?? 'Unknown'
 }
 
+const displayTime = (value) =>
+  !value || Number.isNaN(Date.parse(value)) ? 'Not set' : new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+
+// SPM-58 — which events this unit is reserved for. An event the viewer is not assigned to is not named.
+function UnitReservations({ reservations }) {
+  if (!Array.isArray(reservations) || reservations.length === 0) return <p className="request-meta">Not reserved</p>
+  return (
+    <ul className="value-list" aria-label="Reservations">
+      {reservations.map((reservation) => (
+        <li key={`${reservation.startsAt}-${reservation.eventRequestId ?? 'other'}`}>
+          {'Reserved for '}
+          {reservation.eventRequestId
+            ? <Link to={`/requests/${reservation.eventRequestId}?tab=equipment-required`}>{reservation.eventTitle || 'Untitled event'}</Link>
+            : 'another event'}
+          {`, ${displayTime(reservation.startsAt)} – ${displayTime(reservation.endsAt)}`}
+          {reservation.reservedAt && <span className="request-meta">{` (reserved ${displayTime(reservation.reservedAt)})`}</span>}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 // One unit. Technical Support Staff change its status here; Coordinators see it read-only.
 function UnitRow({ unit, canManage, onSave }) {
   const [status, setStatus] = useState(unit.status)
@@ -44,6 +66,7 @@ function UnitRow({ unit, canManage, onSave }) {
             <span className={`status-pill equipment-status-${unit.status}`}>{statusLabel(unit.status)}</span>
             {unit.statusNote && <> {unit.statusNote}</>}
           </p>
+          <UnitReservations reservations={unit.reservations} />
         </div>
         {canManage && (
           <form className="request-item-actions" onSubmit={save} aria-label={`Status of ${unit.assetTag}`}>

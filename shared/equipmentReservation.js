@@ -9,7 +9,7 @@
 // venue booking change or cancellation cannot release it (SPM-57). Reservations do not expire.
 
 import { isUsableUnit } from './equipment.js'
-import { EQUIPMENT, viewableSectionsFor } from './permissions.js'
+import { EQUIPMENT, TECHNICAL_STAFF, inScopeAs, viewableSectionsFor } from './permissions.js'
 import { CANCELLED, COMPLETED, REJECTED } from './status.js'
 
 export const EQUIPMENT_RESERVATIONS_COLLECTION = 'equipmentReservations'
@@ -111,4 +111,25 @@ export function reservedEquipmentSummary(user, request) {
 /** The lock document serialising reservations of one equipment type (as SPM-16's venue lock). */
 export function equipmentReservationLockPath(equipmentTypeId) {
   return ['systemLocks', `equipmentReservation-${equipmentTypeId}`]
+}
+
+// --- SPM-58: viewing reservations ------------------------------------------------------------------
+
+export const RESERVATION_STATUS_LABELS = Object.freeze({
+  [RESERVATION_STATUS.ACTIVE]: 'Active',
+  [RESERVATION_STATUS.RELEASED]: 'Released',
+})
+
+/**
+ * [Team decision, 19 Oct 2026 — SPM-58, pending PO confirmation] A Technical Support Staff member sees the
+ * reservations of events assigned to them (their SPM-42 record scope), not every event's. `event` is the
+ * reservation's event record; a missing event shows nothing.
+ */
+export function canViewReservation(user, event) {
+  return event != null && inScopeAs(TECHNICAL_STAFF, user, event)
+}
+
+/** Does a reservation still hold its units? Active, and its event not Rejected, Cancelled or Completed (SPM-57). */
+export function reservationHoldsUnits(reservation, eventStatus) {
+  return reservation.status === RESERVATION_STATUS.ACTIVE && !NON_BLOCKING_EVENT_STATUSES.includes(eventStatus)
 }

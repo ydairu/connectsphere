@@ -722,6 +722,28 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - The command `npm run process:venue-holds --prefix backend` is wired to `.github/workflows/venue-hold-expiry.yml` at the top of each hour. **Operational gap:** repository secrets and a successful default-branch run have not been verified; there is no deployed-scheduler or live-project claim. Delayed GitHub scheduling can delay notices beyond an hour.
 - `npm run backfill:venue-holds --prefix backend` is dry-run by default; `-- --write` fills missing deadlines where creation time or the linked booking's deadline is known. It lists mismatches and records with no usable time for review. No live backfill was run. The untracked backlog workbook remains In Progress for Sprint 3; manual acceptance is pending. See `docs/evidence/spm-78-traceability.md` and `docs/testing/spm-78-manual-testing.md`.
 
+36. **SPM-58 view which event each equipment reservation is for, and prevent double-booking (19 Oct 2026, branch `feature/spm-58`):**
+    - **Built:**
+      - **Reservations list:** `GET /api/equipment/reservations` (Technical Support Staff; `?status=active|released`, else 400) returns the reservations of events in the member's scope, active first. Each has the event name and status, date and start/end time, type, quantity, asset tags, status, who reserved it and when, and the release time and reason.
+      - **Page:** `/equipment/reservations` ("Equipment reservations"), with an Active/Released filter and a link to each event. It is reached from "View reservations" on the Equipment page, not the navbar.
+      - **Units:** `GET /api/equipment/:id` gives each unit `reservations` (active, and the event not Rejected, Cancelled or Completed), naming the event only when the viewer may see it. The equipment type page shows "Reserved for <event>, <date and time>", "Reserved for another event", or "Not reserved".
+      - **Event:** a "Reserved equipment" card under the equipment section on the Equipment Required tab, from the existing `reservedEquipment` response field.
+      - **Double-booking:** the overlap check and per-type lock are SPM-62's. `tests/spm-58/integration/equipmentReservation.emulator.test.js` checks them on a real Firestore emulator. It runs in CI as a new step beside SPM-14's (`.github/workflows/ci.yml`, `npm run test:spm58:emulator`, same `firebase.spm14.json` configuration).
+    - **Decisions:** scope-limited viewing, "another event" on units, and no navbar entry are team decisions of 19 Oct 2026, pending PO confirmation (effective-requirements.md §4.17).
+    - **Gaps:** the reservation record stores no event name; the event's current title is read when the reservations are viewed. Only Technical Support Staff reach the list. The SPM-62 gaps remain.
+    - **Shared files changed:** `.github/workflows/ci.yml` (a new emulator step and its artifact upload; existing steps unchanged); `frontend/src/pages/EquipmentPage.jsx` and `EquipmentDetailPage.jsx` (SPM-37); `RequestDetailPage.jsx` (one card on the Equipment Required tab). No other story's tests were changed.
+    - **Evidence:**
+      - `tests/spm-58/integration/reservationViewApi.test.js`
+      - `tests/spm-58/integration/reservationViewPages.test.jsx`
+      - `tests/spm-58/integration/equipmentReservation.emulator.test.js` (Firestore emulator)
+      - `tests/spm-58/e2e/spm58.reservationView.spec.js`
+    - **Local verification (Windows, 19 Oct 2026, on top of `main` at `a5fe2e4`):**
+      - Lint passed. 128 Node and 101 frontend tests passed. The production build passed with the existing bundle-size warning.
+      - Root Vitest 1763 passed, 44 opt-in live and emulator tests skipped. On the first full run, `tests/spm-36/integration/equipmentRejectionPages.test.jsx` failed once. It is untouched by this change, passed 3/3 alone and in the full rerun, so it appears timing-sensitive under load.
+      - Playwright Chromium 97/97 passed.
+      - Firestore emulator (firebase-tools 15.34.0, local Java 21): `test:spm58:emulator` 3/3 passed.
+    - **Not verified:** no live API run, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.
