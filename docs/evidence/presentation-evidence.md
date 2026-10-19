@@ -218,6 +218,10 @@ Assigned Venue Staff can reject one pending booking with a required reason and o
 
 Local verification: `npm test` passed 128 Node tests, 100 frontend tests, 1,611 root Vitest tests (35 opt-in live/emulator tests skipped), and 88 Chromium tests; after the final two service cases and UI adjustment, `npm run test:spm34` passed 13 Vitest and one Chromium test. Lint and production build passed. Tests used in-memory persistence and a local Firebase double. Manual acceptance, live Firebase and the broader SPM-54/SPM-81 all-venue confirmation rule remain outstanding; SPM-34 stays **In Progress** in the backlog. No rules were changed or deployed.
 
+## 19 October 2026 — SPM-78 tentative venue hold expiry
+
+The repository now contains expiry-aware booking and calendar behavior, a one-hour scheduled workflow, a dry-run backfill, and focused service, browser and emulator tests. Acceptance mapping and verification counts are in `docs/evidence/spm-78-traceability.md`; human checks are in `docs/testing/spm-78-manual-testing.md`. The tested behavior is local. The workflow has not been observed running on the default branch with repository secrets, and the backfill has not been run against a live project. SPM-78 remains **In Progress**.
+
 ## Evidence Entry Template
 
 

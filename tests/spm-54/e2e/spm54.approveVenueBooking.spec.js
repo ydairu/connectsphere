@@ -105,7 +105,7 @@ test('SPM-54 capacity overflow is refused and the booking remains pending', asyn
   await page.getByRole('button', { name: 'Approve booking' }).click()
   await expect(page.getByRole('button', { name: 'Confirm approval' })).toBeDisabled()
   await expect(page.getByRole('region', { name: 'Approval blocked' })).toContainText("above this venue's capacity")
-  await expect(page.getByText('pending', { exact: true })).toBeVisible()
+  await expect(page.getByText('Under review', { exact: true }).first()).toBeVisible()
 })
 
 

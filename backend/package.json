@@ -7,7 +7,9 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "migrate:user-roles": "node scripts/migrate-user-roles.js",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "process:venue-holds": "node scripts/process-venue-holds.js",
+    "backfill:venue-holds": "node scripts/backfill-venue-holds.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

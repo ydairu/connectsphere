@@ -59,6 +59,8 @@
     "test:spm34": "vitest run tests/spm-34/ && playwright test tests/spm-34/",
     "test:spm54": "vitest run tests/spm-54/ && playwright test tests/spm-54/",
     "test:spm54:emulator": "node tests/spm-54/runEmulatorTests.js",
+    "test:spm78": "vitest run tests/spm-78/ && playwright test tests/spm-78/e2e",
+    "test:spm78:emulator": "node tests/spm-78/runEmulatorTests.js",
     "test:spm36": "vitest run tests/spm-36/"
   },
   "devDependencies": {

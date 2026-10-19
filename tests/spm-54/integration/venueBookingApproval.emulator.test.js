@@ -41,13 +41,14 @@ describe.skipIf(!enabled)('SPM-54 real Firestore emulator concurrency', () => {
     const commitment = (await db.collection('venueAvailability').doc(saved.holdId).get()).data()
     expect(saved.status === 'approved' ? commitment.status === 'confirmed_booking' : commitment.lifecycleStatus === 'removed').toBe(true)
   }, 60000)
-  it('serializes expired-hold approval against acquisition of the same period', async () => {
+  it('refuses expired-hold approval while another request acquires the period', async () => {
     const booking = await create(), at = new Date(booking.holdExpiresAt)
     const results = await Promise.allSettled([
       approve(booking.id, at),
       submitVenueBooking('event', { ...input, submissionKey: 'competitor' }, coordinator, db, at),
     ])
-    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    expect(results[0].status).toBe('rejected')
+    expect(results[1].status).toBe('fulfilled')
     const commitments = (await db.collection('venueAvailability').get()).docs.map((d) => d.data())
     expect(commitments.filter((c) => c.lifecycleStatus === 'active' && (c.status === 'confirmed_booking' || Date.parse(c.holdExpiresAt) > at.getTime()))).toHaveLength(1)
   }, 60000)

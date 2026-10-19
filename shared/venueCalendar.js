@@ -4,9 +4,9 @@
 // Maintenance blocks have no setup or turnaround (SPM-16 team decision, 15 Oct 2026).
 //
 // Kept apart from shared/venueAvailability.js because venueOccupancy.js already imports that module.
-// Expired tentative holds are still shown here; showing them as available is SPM-78's.
+// SPM-78 excludes expired holds and their setup/turnaround slots at read time.
 
-import { AVAILABILITY_STATUS, activeCommitmentsInRange } from './venueAvailability.js'
+import { AVAILABILITY_STATUS, activeCommitmentsInRange, isExpiredHold } from './venueAvailability.js'
 import { occupiedPeriod, venueBufferMinutes } from './venueOccupancy.js'
 
 // Slot statuses for the calendar only: never stored as a commitment's status.
@@ -55,7 +55,7 @@ function clip(slot, range) {
  * slots either side of each booking or hold, and available slots in the gaps. `venue` is the full venue
  * record; a venue without setup or turnaround times gets exactly the SPM-11 calendar.
  */
-export function buildVenueCalendar(commitments, range, venue) {
+export function buildVenueCalendar(commitments, range, venue, now = new Date()) {
   const { setupMinutes, turnaroundMinutes } = venueBufferMinutes(venue)
 
   // Read wider than the range, so a booking just outside it still shows its setup or turnaround inside.
@@ -65,7 +65,7 @@ export function buildVenueCalendar(commitments, range, venue) {
   }
 
   const busySlots = []
-  for (const commitment of activeCommitmentsInRange(commitments, readRange)) {
+  for (const commitment of activeCommitmentsInRange(commitments, readRange).filter((item) => !isExpiredHold(item, now))) {
     busySlots.push(commitmentSlot(commitment))
     if (commitment.status === AVAILABILITY_STATUS.MAINTENANCE_BLOCK) continue
 

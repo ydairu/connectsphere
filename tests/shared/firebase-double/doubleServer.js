@@ -13,6 +13,7 @@ import { SEED_ACCOUNTS, SEED_FIELD_HISTORY, SEED_REQUESTS, SEED_VENUES, SEED_VEN
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
+import { processVenueHolds } from '../../../backend/src/services/venueHoldExpiryService.js'
 import { ALL_TEST_USERS, TEST_PASSWORD, profileOf } from '../fixtures/testUsers.js'
 import { createFakeFirestoreEventRequestStore } from './fakeFirestoreEventRequestStore.js'
 
@@ -127,6 +128,24 @@ export function createDouble() {
         id, Object.fromEntries(state.db.collectionData(`venues/${id}/activity`)),
       ])),
     })
+  })
+  // Test-only clock control for SPM-78. This route is never mounted by the product API.
+  router.post('/venue-hold-expiry', (req, res) => {
+    const booking = state.db.collectionData('venueBookingRequests').get(req.body?.bookingId)
+    const deadline = req.body?.holdExpiresAt
+    if (!booking || !Number.isFinite(Date.parse(deadline))) return res.status(400).json({ message: 'Valid booking and deadline required.' })
+    const hold = state.db.collectionData('venueAvailability').get(booking.holdId)
+    if (!hold) return res.status(404).json({ message: 'Hold not found.' })
+    booking.holdExpiresAt = deadline
+    hold.holdExpiresAt = deadline
+    return res.status(204).end()
+  })
+  router.post('/process-venue-holds', async (req, res, next) => {
+    try {
+      const now = req.body?.now ? new Date(req.body.now) : new Date()
+      if (!Number.isFinite(now.getTime())) return res.status(400).json({ message: 'Invalid time.' })
+      return res.json(await processVenueHolds(state.db, now))
+    } catch (error) { return next(error) }
   })
 
   router.post('/auth/signUp', (req, res) => {

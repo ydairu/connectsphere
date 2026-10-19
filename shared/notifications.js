@@ -20,6 +20,7 @@
 //   equipment request approved, or   the assigned Coordinator                    (SPM-56)
 //   its approval re-confirmed
 //   venue booking rejected           the assigned Coordinator                    (SPM-34)
+//   venue hold warning / expiry      the current assigned Coordinator            (SPM-78)
 //   equipment request rejected       the assigned Coordinator, with the reason    (SPM-36)
 // The user who acted is never notified of their own action.
 
@@ -39,6 +40,8 @@ export const SIGNIFICANT_CHANGE_NOTICE = 'significant_change'
 export const EQUIPMENT_REQUEST_APPROVED_NOTICE = 'equipment_request_approved'
 export const VENUE_BOOKING_REJECTED_NOTICE = 'venue_booking_rejected'
 export const VENUE_BOOKING_APPROVED_NOTICE = 'venue_booking_approved'
+export const VENUE_HOLD_WARNING_NOTICE = 'venue_hold_warning'
+export const VENUE_HOLD_EXPIRED_NOTICE = 'venue_hold_expired'
 // SPM-36: the assigned Technical Support Staff member rejected the event's equipment request.
 export const EQUIPMENT_REQUEST_REJECTED_NOTICE = 'equipment_request_rejected'
 
@@ -150,6 +153,20 @@ export function venueBookingApprovedNotifications(event, booking, actor, { at })
     reason: null,
     bookingRequestId: booking.id,
   }], event, actor, title, at)
+}
+
+export function venueHoldNotifications(event, booking, kind, at) {
+  const title = titleOf(event)
+  const message = kind === VENUE_HOLD_WARNING_NOTICE
+    ? `The tentative hold for “${title}” at ${booking.venueName} expires at ${booking.holdExpiresAt}. Ask Venue Staff to approve it before then.`
+    : `The tentative hold for “${title}” at ${booking.venueName} has expired. The venue is available again; submit a new request if needed.`
+  return addressed([{
+    recipientUid: event.assignedCoordinatorUid,
+    type: kind,
+    message,
+    reason: null,
+    bookingRequestId: booking.id,
+  }], event, null, title, at)
 }
 
 /**

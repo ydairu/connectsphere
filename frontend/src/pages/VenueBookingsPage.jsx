@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_CANCELLED, BOOKING_REJECTED, BOOKING_REPLACED, capacityWarning } from '../../../shared/venueBooking.js'
+import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_CANCELLED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_EXPIRED, capacityWarning } from '../../../shared/venueBooking.js'
 import { COORDINATOR } from '../../../shared/permissions.js'
 import { eventPeriod } from '../../../shared/venueSuitability.js'
 import { approveVenueBooking, getRequest, getVenueBookings, getVenueBookingQueue, listVenues, rejectVenueBooking, submitVenueBooking } from '../services/api.js'
@@ -19,7 +19,7 @@ function localTime(value) {
 const displayTime = (value) => !value || Number.isNaN(Date.parse(value)) ? 'Not set' : new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 const emptyForm = () => ({ venueId: '', requirements: '', specialRequests: '', replacesId: null, submissionKey: crypto.randomUUID() })
 const bookingTabs = [{ id: 'submit', label: 'Submit a Request' }, { id: 'recommendations', label: 'Recommendations' }, { id: 'requests', label: 'Requests' }]
-const bookingStatusLabel = (status) => ({ [BOOKING_PENDING]: 'Under review', [BOOKING_APPROVED]: 'Approved', [BOOKING_REJECTED]: 'Rejected', [BOOKING_REPLACED]: 'Replaced', [BOOKING_CANCELLED]: 'Cancelled' })[status] ?? status
+const bookingStatusLabel = (status) => ({ [BOOKING_PENDING]: 'Under review', [BOOKING_APPROVED]: 'Approved', [BOOKING_REJECTED]: 'Rejected', [BOOKING_REPLACED]: 'Replaced', [BOOKING_CANCELLED]: 'Cancelled', [BOOKING_EXPIRED]: 'Expired' })[status] ?? status
 
 function Suitability({ suitability }) {
   return <>
@@ -129,7 +129,7 @@ export default function VenueBookingsPage() {
         if (!current.suitability) throw new Error('Missing suitability preview')
         setApprovingId(current.id)
       } else {
-        if (!response.canSubmit || !current || current.replacedById || ![BOOKING_PENDING, BOOKING_REJECTED].includes(current.status)) {
+        if (!response.canSubmit || !current || current.replacedById || ![BOOKING_PENDING, BOOKING_REJECTED, BOOKING_EXPIRED].includes(current.status)) {
           setForm(emptyForm()); setNotice('This booking can no longer be replaced. Its current state is shown.'); return
         }
         setForm({ venueId: current.venueId, requirements: venueBookingRequirements(response.event), specialRequests: current.specialRequests ?? '',
@@ -217,7 +217,7 @@ export default function VenueBookingsPage() {
         <BookingRow label="Expected attendance">{booking.expectedAttendees ?? 'Not set'}</BookingRow>
         <BookingRow label="Venue requirements">{booking.requirements}</BookingRow>
         <BookingRow label="Special requests">{booking.specialRequests || 'None'}</BookingRow>
-        <BookingRow label="Status">{booking.status === BOOKING_APPROVED ? 'Approved — venue confirmed' : booking.status}</BookingRow>
+        <BookingRow label="Status">{booking.status === BOOKING_APPROVED ? 'Approved — venue confirmed' : bookingStatusLabel(booking.status)}</BookingRow>
         {booking.approvedAt && <BookingRow label="Approved at">{displayTime(booking.approvedAt)}</BookingRow>}
         {booking.status === BOOKING_REJECTED && <>
           <BookingRow label="Rejection reason">{booking.rejectionReason}</BookingRow>
@@ -225,8 +225,9 @@ export default function VenueBookingsPage() {
         </>}
         <BookingRow label="Assigned Venue Staff">{booking.assignedVenueStaffName}</BookingRow>
         {booking.status === BOOKING_APPROVED ? <BookingRow label="Reservation">Confirmed for the booked period</BookingRow> :
-          [BOOKING_REJECTED, BOOKING_CANCELLED, BOOKING_REPLACED].includes(booking.status) ? <BookingRow label="Reservation">Released</BookingRow> :
+          [BOOKING_REJECTED, BOOKING_CANCELLED, BOOKING_REPLACED, BOOKING_EXPIRED].includes(booking.status) ? <BookingRow label="Reservation">Released</BookingRow> :
           <BookingRow label="Hold expiry">{displayTime(booking.holdExpiresAt)}{Date.parse(booking.holdExpiresAt) <= Date.now() ? ' (expired)' : ''}</BookingRow>}
+        {booking.status === BOOKING_EXPIRED && <p role="note">This hold expired. The venue is available for other requests. Submit a new request while the event is in Planning.</p>}
         {booking.capacityWarning && !booking.suitability && <p role="note">{booking.capacityWarning}</p>}
         {booking.status === BOOKING_PENDING && approvingId !== booking.id && <Suitability suitability={booking.suitability} />}
         {booking.status === BOOKING_APPROVED && booking.approvalWarnings?.length > 0 && <section><h3>Warnings recorded at approval</h3>{booking.approvalWarnings.map((warning, index) => <p key={index}>{warning.message}</p>)}</section>}
@@ -253,7 +254,7 @@ export default function VenueBookingsPage() {
             </fieldset></form>}
         </div>}
       </>}
-      {!detailView && data.canSubmit && !booking.replacedById && [BOOKING_PENDING, BOOKING_REJECTED].includes(booking.status) && <button type="button" disabled={busy || refreshing || !!refreshFailure} onClick={() => refreshDecision(booking, 'replace')}>Replace request for {booking.venueName}</button>}
+      {!detailView && data.canSubmit && !booking.replacedById && [BOOKING_PENDING, BOOKING_REJECTED, BOOKING_EXPIRED].includes(booking.status) && <button type="button" disabled={busy || refreshing || !!refreshFailure} onClick={() => refreshDecision(booking, 'replace')}>Replace request for {booking.venueName}</button>}
       </details>
     </Card>)}
     {!detailView && activeTab === 'submit' && data?.canSubmit && <Card className="request-form-section"><div className="section-heading"><h2>{form.replacesId ? 'Replace booking request' : 'Request a venue'}</h2></div>
