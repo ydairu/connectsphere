@@ -773,6 +773,13 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - On a unit, an event the viewer may not see is shown as "another event" with its date and time, so the unit's commitment is visible without naming another event.
 - The reservations page is reached from the Equipment page ("View reservations"), not from the navbar.
 
+**[Implemented — SPM-38, 20 Oct 2026]** The release itself was built with SPM-62 (team decision 2a). SPM-38 checks each criterion and shows the reason:
+
+- an event becomes Cancelled or Rejected only through `reject`, `cancel` or `approve_cancellation`. All three release every active reservation of the event, close its equipment request and remove `reservedEquipment`, in the same transaction as the status change;
+- released units count as available again: another event's availability check for the same period includes them (SPM-57 counts only active reservations);
+- a released reservation record shows Released, the release time, and "Event cancelled" or "Event rejected" (`RELEASE_REASON_LABELS`) on the Equipment reservations page (SPM-58);
+- rejecting or replacing one venue booking (SPM-34, SPM-14) leaves the event's equipment reservations active. Reservations have no venue booking link, and only the whole-event transitions release them.
+
 ### 4.18 Attendee Registration
 
 **[Customer-confirmed]** The Organiser configures whether/when registration is open. A person must register to attend, though attendee-facing information may remain visible without registration. Capacity is capped at the event/venue maximum. Waiting-list priority is first-come, first-served; the next person is invited to apply rather than automatically registered.
