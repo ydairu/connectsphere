@@ -133,3 +133,9 @@ export function canViewReservation(user, event) {
 export function reservationHoldsUnits(reservation, eventStatus) {
   return reservation.status === RESERVATION_STATUS.ACTIVE && !NON_BLOCKING_EVENT_STATUSES.includes(eventStatus)
 }
+
+// SPM-38: why a reservation was released, as recorded by prepareEquipmentRequestClose's closing reason.
+export const RELEASE_REASON_LABELS = Object.freeze({
+  event_cancelled: 'Event cancelled',
+  event_rejected: 'Event rejected',
+})

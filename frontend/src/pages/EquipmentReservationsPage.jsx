@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { RESERVATION_STATUS, RESERVATION_STATUS_LABELS } from '../../../shared/equipmentReservation.js'
+import { RELEASE_REASON_LABELS, RESERVATION_STATUS, RESERVATION_STATUS_LABELS } from '../../../shared/equipmentReservation.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { listEquipmentReservations } from '../services/api.js'
 import Button from '../components/Button.jsx'
@@ -37,7 +37,9 @@ function ReservationCard({ reservation }) {
         <Row label="Equipment">{`${reservation.quantity} × ${reservation.equipmentTypeName ?? reservation.equipmentTypeId}`}</Row>
         {reservation.assetTags.length > 0 && <Row label="Units">{reservation.assetTags.join(', ')}</Row>}
         <Row label="Reserved">{`${displayTime(reservation.reservedAt)}${reservation.reservedByName ? ` by ${reservation.reservedByName}` : ''}`}</Row>
-        {reservation.releasedAt && <Row label="Released">{displayTime(reservation.releasedAt)}</Row>}
+        {reservation.releasedAt && (
+          <Row label="Released">{`${displayTime(reservation.releasedAt)}${RELEASE_REASON_LABELS[reservation.releasedReason] ? ` — ${RELEASE_REASON_LABELS[reservation.releasedReason]}` : ''}`}</Row>
+        )}
         <div className="booking-actions">
           <Link className="button button-secondary button-small" to={`/requests/${reservation.eventRequestId}?tab=equipment-required`}>Open event</Link>
         </div>

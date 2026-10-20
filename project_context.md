@@ -744,6 +744,17 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
       - Firestore emulator (firebase-tools 15.34.0, local Java 21): `test:spm58:emulator` 3/3 passed.
     - **Not verified:** no live API run, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
 
+37. **SPM-38 release reserved equipment when an event is cancelled or rejected (20 Oct 2026, branch `feature/spm-38`):**
+    - **Already built (SPM-62):** `reject`, `cancel` and `approve_cancellation` are the only paths to Rejected or Cancelled. Each releases the event's active reservations (`releasedAt`, `releasedReason`), closes the equipment request and removes `reservedEquipment`, in the status transaction.
+    - **Built (SPM-38):** `RELEASE_REASON_LABELS` in `shared/equipmentReservation.js`. The Equipment reservations page shows "Released: <time> — Event cancelled" or "— Event rejected".
+    - **Evidence, one test per criterion:**
+      - `tests/spm-38/integration/reservationRelease.test.js`: reject, direct cancel and an approved cancellation request each release every reservation; another event's availability for the same period counts the released units; the record's status, time and reason; rejecting or replacing a venue booking leaves reservations active.
+      - `tests/spm-38/integration/releasedReservationPage.test.jsx`
+      - `tests/spm-38/e2e/spm38.releaseOnReject.spec.js`: reserve, reject the event, see Released / "Event rejected", and both units available again. On its first local run it timed out waiting for Rejected on a cold dev server. It now waits for each state, and passed 5/5 repeated runs.
+    - **Gaps:** cancellation and rejection still do not notify Attendees (no registration). No event other than a whole-event transition releases reservations, by design.
+    - **Local verification (Windows, 20 Oct 2026, on top of `main` at `9369591`):** lint passed; 128 Node and 101 frontend tests passed; root Vitest 1771 passed (44 opt-in skipped); the production build passed with the existing bundle-size warning; Playwright Chromium 98/98 passed.
+    - **Not verified:** in-memory doubles only. No live API run, emulator, deployed project or manual browser check. `firestore.rules` is unchanged, and no backlog status change is claimed.
+
 ## Documentation Boundaries
 
 - [`AGENTS.md`](AGENTS.md) governs repository work.
