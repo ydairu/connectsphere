@@ -7,7 +7,7 @@
 // date change at Planning is a significant change (SPM-10) and clears the sign-offs, so the date moves first.
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
-import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test } from '../../shared/e2e/fixtures.js'
+import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test, approveVenueForEvent } from '../../shared/e2e/fixtures.js'
 
 const planning = SEED_REQUESTS.find((request) => request.id === 'seed-req-a1-planning')
 const statusPill = (page) => page.locator('.page-heading .status-pill')
@@ -33,7 +33,7 @@ test.describe('SPM-27 — Coordinator marks an event Completed (E2E)', () => {
       data: { core: { preferredDateTime: pastStart } },
     })
     expect(moved.ok(), 'move the event date into the past').toBeTruthy()
-    await actAs(page.request, ROLE_USERS.venueStaff, 'approve_venue')
+    await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, 'approve_technical')
     await actAs(page.request, ROLE_USERS.coordinator, 'confirm')
 
@@ -63,7 +63,7 @@ test.describe('SPM-27 — Coordinator marks an event Completed (E2E)', () => {
 
   test('spm27_mark_as_completed_is_not_offered_before_the_event_has_taken_place', async ({ page }) => {
     // The seeded event starts 20 Nov 2026; this relies on the real clock being before it ends.
-    await actAs(page.request, ROLE_USERS.venueStaff, 'approve_venue')
+    await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, 'approve_technical')
     await actAs(page.request, ROLE_USERS.coordinator, 'confirm')
 

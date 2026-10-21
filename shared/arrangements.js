@@ -1,4 +1,4 @@
-// Venue and technical arrangement sign-off — the condition SPM-9's Confirm depends on.
+// Venue booking readiness and technical arrangement sign-off — the conditions SPM-9's Confirm depends on.
 //
 // Pure functions: no Firebase, no I/O. The backend records decisions in a transaction
 // (backend/src/services/statusTransitionService.js); the API re-checks with canDecideArrangement().
@@ -10,10 +10,8 @@
 // according to staff and equipment availability for that request"; approval "is based on what the event
 // actually requests." — Clarification 2, Technical Approval.
 //
-// [Team decision, 1 Oct 2026] Minimal sign-off: until the Venue Booking Approval and equipment stories
-// exist, the assigned Venue Staff and Technical Support Staff record one decision each per request. Those
-// stories are expected to build on or replace this. SPM-34 models a suggested alternative on a rejected
-// booking, separate from this event-level sign-off.
+// SPM-79 supersedes the temporary event-wide venue decision. Each required venue need has its own
+// booking decision. The technical decision remains event-level when no current equipment request owns it.
 //
 // Decisions are record metadata, stored at the top level as
 //   arrangementApprovals: { venue?: { decision, byUid, at }, technical?: { decision, byUid, at } }
@@ -73,7 +71,8 @@ export function requiredArrangements(request) {
 
 /** Are all mandatory venue and required technical arrangements approved? SPM-9's Confirm guard. */
 export function arrangementsApproved(request) {
-  return requiredArrangements(request).every((arrangement) => arrangementDecision(request, arrangement) === ARRANGEMENT_APPROVED)
+  return request.venueBookingReadiness?.ready === true &&
+    (!technicalArrangementRequired(request) || arrangementDecision(request, TECHNICAL_ARRANGEMENT) === ARRANGEMENT_APPROVED)
 }
 
 /**
@@ -83,6 +82,7 @@ export function arrangementsApproved(request) {
  */
 export function canDecideArrangement(user, request, arrangement) {
   if (!Object.hasOwn(DECIDED_BY, arrangement)) return { allowed: false, reason: UNKNOWN_ARRANGEMENT }
+  if (arrangement === VENUE_ARRANGEMENT) return { allowed: false, reason: VENUE_BOOKINGS_DECIDE }
   if (request.status !== PLANNING) return { allowed: false, reason: NOT_AT_PLANNING }
   const assigned = user?.uid != null && (request.assignedStaffUids ?? []).includes(user.uid)
   if (!assigned || !rolesOf(user).includes(DECIDED_BY[arrangement])) return { allowed: false, reason: NOT_ASSIGNED_STAFF }
@@ -90,6 +90,8 @@ export function canDecideArrangement(user, request, arrangement) {
   if (!requiredArrangements(request).includes(arrangement)) return { allowed: false, reason: ARRANGEMENT_NOT_REQUIRED }
   return { allowed: true }
 }
+
+export const VENUE_BOOKINGS_DECIDE = 'venue_bookings_decide'
 
 /** The arrangements this user may decide on now, in ARRANGEMENTS order. */
 export function decidableArrangements(user, request) {

@@ -62,7 +62,7 @@ describe('SPM-54 real HTTP, mocked tokens and in-memory persistence', () => {
     db.store.get('event').status = CONFIRMED
     expect((await decide(booking.id)).status).toBe(409)
     db.store.get('event').status = PLANNING
-    db.store.get('event').core.expectedAttendees = 201
+    db.collectionData('venues').get('hall').maximumCapacity = 39
     expect((await decide(booking.id)).status).toBe(409)
     expect(db.collectionData(BOOKINGS).get(booking.id).status).toBe('pending')
   })

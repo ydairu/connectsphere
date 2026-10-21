@@ -32,18 +32,18 @@ describe('SPM-14 pages with mocked API', () => {
     expect(summaries[0].closest('details').textContent).toContain('Quiet room')
   })
 
-  it('prefills, warns above capacity, submits and shows the assignment', async () => {
+  it('prefills editable request details, submits and shows the assignment', async () => {
     setup()
     api.submitVenueBooking.mockResolvedValue({ booking })
     show()
+    await waitFor(() => expect(api.listVenues).toHaveBeenCalledWith(coordinator, { availableFrom: input.startsAt, availableTo: input.endsAt, attendance: '100' }))
     fireEvent.change(await screen.findByLabelText('Venue'), { target: { value: 'hall' } })
-    expect(screen.getByLabelText('Start').readOnly).toBe(true)
-    expect(screen.getByLabelText('End').readOnly).toBe(true)
-    expect(api.listVenues).toHaveBeenCalledWith(coordinator, { availableFrom: input.startsAt, availableTo: input.endsAt })
-    expect(screen.getByText(/exceeds venue capacity/)).toBeTruthy()
+    expect(screen.getByLabelText('Start').readOnly).toBe(false)
+    expect(screen.getByLabelText('End').readOnly).toBe(false)
+    fireEvent.change(screen.getByLabelText('Attendees using this venue'), { target: { value: '40' } })
     fireEvent.click(screen.getByRole('button', { name: 'Submit booking request' }))
     await screen.findByText(/Booking request submitted to Venue One/)
-    expect(api.submitVenueBooking).toHaveBeenCalledWith(coordinator, 'event', expect.objectContaining({ venueId: 'hall', requirements: 'Theatre', submissionKey: expect.any(String) }))
+    expect(api.submitVenueBooking).toHaveBeenCalledWith(coordinator, 'event', expect.objectContaining({ venueId: 'hall', attendeeCount: 40, requirements: 'Theatre', submissionKey: expect.any(String) }))
   })
   it('preserves input and the retry key on failure; replacement targets the selected request', async () => {
     setup([booking])

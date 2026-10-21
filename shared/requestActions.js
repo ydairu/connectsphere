@@ -98,8 +98,8 @@ export function arrangementsSummary(user, request) {
     if (!sections.includes(section)) continue
     summary[arrangement] = {
       required: required.includes(arrangement),
-      decision: arrangementDecision(request, arrangement),
-      at: request.arrangementApprovals?.[arrangement]?.at ?? null,
+      decision: arrangement === VENUE_ARRANGEMENT ? (request.venueBookingReadiness?.ready ? ARRANGEMENT_APPROVED : null) : arrangementDecision(request, arrangement),
+      at: arrangement === VENUE_ARRANGEMENT ? null : request.arrangementApprovals?.[arrangement]?.at ?? null,
     }
   }
   return Object.keys(summary).length > 0 ? summary : null

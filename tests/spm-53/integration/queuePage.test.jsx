@@ -25,7 +25,7 @@ describe('SPM-53 pages with mocked API', () => {
     fireEvent.click(screen.getByRole('link', { name: 'View details' }))
     expect(await screen.findByText(input.requirements)).toBeTruthy()
     expect(screen.getByText(input.specialRequests)).toBeTruthy()
-    expect(screen.getByText('100')).toBeTruthy()
+    expect(screen.getByText('40')).toBeTruthy()
     expect(screen.getByText('Venue One')).toBeTruthy()
     expect(screen.getByText(/\(expired\)/)).toBeTruthy()
     expect(screen.getByRole('note').textContent).toBe('Capacity warning')

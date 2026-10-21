@@ -43,7 +43,7 @@ describe('SPM-45 — Coordinator rejects a request (API, in-memory only)', () =>
   // acceptable alternative can fulfil an essential requirement, then the assigned Coordinator may initiate
   // rejection of the overall event."
   it('spm45_at_planning_after_the_venue_is_rejected_the_coordinator_may_reject_the_event', async () => {
-    expect((await api.act(venueStaff, 'reject_venue', undefined, PLANNING_ID)).status).toBe(200)
+    expect((await api.act(venueStaff, 'reject_venue', undefined, PLANNING_ID)).status).toBe(409)
     const response = await api.act(coordinator, REJECT, REASON, PLANNING_ID)
     expect(response.status).toBe(200)
     expect(api.stored(PLANNING_ID)).toMatchObject({ status: REJECTED, rejection: { previousStatus: PLANNING } })
@@ -109,7 +109,7 @@ describe('SPM-45 — Coordinator rejects a request (API, in-memory only)', () =>
   // AC: "Given Technical Support Staff reject an equipment or technical request, when the overall event has
   // not been rejected by the assigned Event Coordinator, then the event remains in Planning."
   it('spm45_a_venue_or_technical_rejection_keeps_the_event_in_planning', async () => {
-    expect((await api.act(venueStaff, 'reject_venue', undefined, PLANNING_ID)).json.request.status).toBe(PLANNING)
+    expect((await api.act(venueStaff, 'reject_venue', undefined, PLANNING_ID)).status).toBe(409)
     expect((await api.act(technicalStaff, 'reject_technical', undefined, PLANNING_ID)).json.request.status).toBe(PLANNING)
     expect(api.stored(PLANNING_ID).status).toBe(PLANNING)
     expect(api.stored(PLANNING_ID).rejection).toBeUndefined()

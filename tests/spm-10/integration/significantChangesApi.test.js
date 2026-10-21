@@ -93,7 +93,8 @@ const significantNotices = () => notifications().filter((notice) => notice.type 
 const snapshot = (id) => structuredClone({ record: record(id), activity: activity(id), notifications: notifications() })
 
 async function approveBoth(id) {
-  expect((await act(venueStaff, id, 'approve_venue')).status).toBe(200)
+  record(id).arrangementApprovals = { ...record(id).arrangementApprovals, venue: { decision: 'approved', byUid: venueStaff.uid, at: 'legacy' } }
+  db.collectionData('venueBookingRequests').set(`approved-${id}`, { eventRequestId: id, status: 'approved' })
   expect((await act(technicalStaff, id, 'approve_technical')).status).toBe(200)
 }
 
@@ -139,7 +140,7 @@ describe('SPM-10 AC3 — Planning: significant edit clears the recorded sign-off
     expect(record(PLANNING_ID).status).toBe(PLANNING)
     expect(record(PLANNING_ID).arrangementApprovals).toEqual({})
     expect(response.json.arrangements).toEqual({
-      venue: { required: true, decision: null, at: null },
+      venue: { required: true, decision: 'approved', at: null },
       technical: { required: true, decision: null, at: null },
     })
     expect(fieldEntries(PLANNING_ID)).toEqual([expect.objectContaining({ field: 'venue.layoutPreference', significant: true })])
@@ -147,7 +148,7 @@ describe('SPM-10 AC3 — Planning: significant edit clears the recorded sign-off
   })
 
   it('a rejected decision is cleared too', async () => {
-    expect((await act(venueStaff, PLANNING_ID, 'reject_venue')).status).toBe(200)
+    record(PLANNING_ID).arrangementApprovals = { venue: { decision: 'rejected', byUid: venueStaff.uid, at: 'legacy' } }
     await patch(coordinator, PLANNING_ID, { core: { durationHours: 6 } })
     expect(record(PLANNING_ID).arrangementApprovals).toEqual({})
   })
@@ -157,7 +158,7 @@ describe('SPM-10 AC3 — Planning: significant edit clears the recorded sign-off
     const response = await patch(coordinator, PLANNING_ID, { equipment: { requirements: [], technicalSupportNeeded: false } })
     expect(response.status).toBe(200)
     expect(response.json.arrangements.technical).toEqual({ required: false, decision: null, at: null })
-    expect(response.json.arrangements.venue).toEqual({ required: true, decision: null, at: null })
+    expect(response.json.arrangements.venue).toEqual({ required: true, decision: 'approved', at: null })
   })
 })
 
@@ -192,7 +193,7 @@ describe('SPM-10 AC4/AC5 — Confirmed: back to Planning, sign-offs cleared, Con
   it('Confirm is refused until both sign-offs are approved again', async () => {
     await patch(coordinator3, CONFIRMED_ID, { core: { preferredDateTime: '2026-11-27T09:00:00+08:00' } })
     expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(ARRANGEMENTS_NOT_APPROVED)
-    expect((await act(venueStaff, CONFIRMED_ID, 'approve_venue')).status).toBe(200)
+    db.collectionData('venueBookingRequests').set(`approved-${CONFIRMED_ID}`, { eventRequestId: CONFIRMED_ID, status: 'approved' })
     expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(ARRANGEMENTS_NOT_APPROVED)
     expect((await act(technicalStaff, CONFIRMED_ID, 'approve_technical')).status).toBe(200)
     const confirmed = await act(coordinator3, CONFIRMED_ID, 'confirm')

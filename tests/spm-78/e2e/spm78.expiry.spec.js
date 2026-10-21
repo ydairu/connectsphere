@@ -13,7 +13,7 @@ async function createBooking(request, venueId) {
   expect(changed.status()).toBe(200)
   const response = await request.post(`${DOUBLE_ORIGIN}/api/requests/${eventId}/venue-bookings`, {
     headers: auth(ROLE_USERS.coordinator.uid),
-    data: { venueId, startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', requirements: 'Theatre', submissionKey: crypto.randomUUID() },
+    data: { venueId, startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', attendeeCount: venueId === 'seed-venue-room' ? 30 : 80, requirements: 'Theatre', submissionKey: crypto.randomUUID() },
   })
   expect(response.status()).toBe(201)
   return (await response.json()).booking

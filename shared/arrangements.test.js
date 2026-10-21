@@ -9,10 +9,10 @@ import {
   ARRANGEMENT_NOT_REQUIRED,
   ARRANGEMENT_REJECTED,
   NOT_ASSIGNED_STAFF,
-  NOT_AT_PLANNING,
   TECHNICAL_ARRANGEMENT,
   UNKNOWN_ARRANGEMENT,
   VENUE_ARRANGEMENT,
+  VENUE_BOOKINGS_DECIDE,
   arrangementsApproved,
   canDecideArrangement,
   decidableArrangements,
@@ -55,7 +55,7 @@ describe('SPM-9 — which arrangements are required', () => {
   })
 
   test('all required arrangements must be approved — a rejection or a missing decision is not enough', () => {
-    const withApprovals = (arrangementApprovals) => requestAt(PLANNING, { arrangementApprovals })
+    const withApprovals = (arrangementApprovals, ready = true) => requestAt(PLANNING, { arrangementApprovals, venueBookingReadiness: { ready } })
     assert.equal(arrangementsApproved(requestAt(PLANNING)), false)
     assert.equal(arrangementsApproved(withApprovals({ venue: decision(ARRANGEMENT_APPROVED) })), false)
     assert.equal(
@@ -71,27 +71,27 @@ describe('SPM-9 — which arrangements are required', () => {
 
 describe('SPM-9 — who may decide an arrangement, and when', () => {
   test('assigned Venue Staff decide the venue; assigned Technical Staff decide the technical arrangement', () => {
-    assert.deepEqual(decidableArrangements(venueStaff, requestAt(PLANNING)), [VENUE_ARRANGEMENT])
+    assert.deepEqual(decidableArrangements(venueStaff, requestAt(PLANNING)), [])
     assert.deepEqual(decidableArrangements(technicalStaff, requestAt(PLANNING)), [TECHNICAL_ARRANGEMENT])
-    assert.deepEqual(decidableArrangements(bothStaff, requestAt(PLANNING)), [VENUE_ARRANGEMENT, TECHNICAL_ARRANGEMENT])
+    assert.deepEqual(decidableArrangements(bothStaff, requestAt(PLANNING)), [TECHNICAL_ARRANGEMENT])
   })
 
   test('the Coordinator, the Organiser and unassigned staff cannot decide — no override of a missing approval', () => {
     for (const user of [coordinator, owner, unassignedVenueStaff]) {
       for (const arrangement of [VENUE_ARRANGEMENT, TECHNICAL_ARRANGEMENT]) {
-        assert.equal(canDecideArrangement(user, requestAt(PLANNING), arrangement).reason, NOT_ASSIGNED_STAFF, `${user.uid} ${arrangement}`)
+        assert.equal(canDecideArrangement(user, requestAt(PLANNING), arrangement).reason, arrangement === VENUE_ARRANGEMENT ? VENUE_BOOKINGS_DECIDE : NOT_ASSIGNED_STAFF, `${user.uid} ${arrangement}`)
       }
     }
   })
 
   test('staff decide only their own arrangement', () => {
     assert.equal(canDecideArrangement(venueStaff, requestAt(PLANNING), TECHNICAL_ARRANGEMENT).reason, NOT_ASSIGNED_STAFF)
-    assert.equal(canDecideArrangement(technicalStaff, requestAt(PLANNING), VENUE_ARRANGEMENT).reason, NOT_ASSIGNED_STAFF)
+    assert.equal(canDecideArrangement(technicalStaff, requestAt(PLANNING), VENUE_ARRANGEMENT).reason, VENUE_BOOKINGS_DECIDE)
   })
 
   test('decisions are made only at Planning', () => {
     for (const status of STATUSES.filter((status) => status !== PLANNING)) {
-      assert.equal(canDecideArrangement(venueStaff, requestAt(status), VENUE_ARRANGEMENT).reason, NOT_AT_PLANNING, status)
+      assert.equal(canDecideArrangement(venueStaff, requestAt(status), VENUE_ARRANGEMENT).reason, VENUE_BOOKINGS_DECIDE, status)
     }
     assert.deepEqual(decidableArrangements(venueStaff, requestAt(CONFIRMED)), [])
   })

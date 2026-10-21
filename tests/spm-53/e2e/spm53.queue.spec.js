@@ -9,6 +9,7 @@ test('SPM-53 concise queue, selected details, mobile layout and role protection'
   await loginAs(page, ROLE_USERS.coordinator)
   await expect(page).toHaveURL(/\/profile$/)
   await page.goto('/requests/seed-req-a1-planning/venue-bookings')
+  await page.getByLabel('Attendees using this venue').fill('30')
   await page.getByLabel('Venue', { exact: true }).selectOption('seed-venue-room')
   await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre with wheelchair access')
   await page.getByLabel('Special requests', { exact: true }).fill('Quiet room requested')

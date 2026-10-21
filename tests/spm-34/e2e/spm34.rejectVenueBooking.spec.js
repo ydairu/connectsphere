@@ -11,6 +11,7 @@ test('SPM-34 assigned staff rejects and Coordinator sees the reason, notice and 
   await loginAs(page, ROLE_USERS.coordinator)
   await expect(page).toHaveURL(/\/profile$/)
   await page.goto(path)
+  await page.getByLabel('Attendees using this venue').fill('30')
   await page.getByLabel('Venue', { exact: true }).selectOption('seed-venue-room')
   await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre layout')
   await page.getByRole('button', { name: 'Submit booking request' }).click()

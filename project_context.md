@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 19 October 2026 (SPM-78 venue hold expiry increment; older sections retain their historical dates)
+Last reviewed: 21 October 2026 (SPM-79 multiple venue requests; older sections retain their historical dates)
 
 ## Project Purpose
 
@@ -763,3 +763,11 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - The backlog and Sprint records control operational status and estimates.
 - [`docs/evidence/presentation-evidence.md`](docs/evidence/presentation-evidence.md) tracks verified work, evidence locations, gaps, and candidate Week 11 slide content against the course rubric.
 - [`docs/evidence/spm42-spm24-traceability.md`](docs/evidence/spm42-spm24-traceability.md) holds the SPM-42 permission matrix, the criterion-to-test mapping for SPM-42 and SPM-24, and their Definition of Done status.
+
+## SPM-79 multiple venue requests — 21 October 2026
+
+- **Implementation:** venue booking requests now carry their own interval, attendee count and venue need ID. A new request creates a need; a replacement retains it, and older replacement chains derive the same ID without migration. Capacity and event-window checks run before a booking or hold is written. The Coordinator form searches again when time or attendance changes.
+- **Confirmation:** the current request for every need must be approved. The existing Confirm transaction reads booking readiness before changing status. The old `approve_venue` and `reject_venue` event actions are refused. Technical approval remains separate. This readiness helper is available for SPM-67; Send for Safety Check itself is not implemented here.
+- **Status:** remains **In Progress, Sprint 3**. Human acceptance and SPM-67's safety handoff remain outstanding. The temporary SPM-48 venue-preparation gate still reads the legacy sign-off, so preparation access for newly booked events needs integration with SPM-67/88 before those stories can be accepted.
+- **Local verification:** lint and production build passed; 128 Node, 101 frontend, 1,774 root Vitest, 99 Chromium and three isolated SPM-79 Firestore emulator tests passed. The build retains the existing bundle-size warning. Root API tests use in-memory persistence and browser tests use the Firebase double; no live-project or human acceptance is claimed.
+- **Evidence:** `docs/evidence/spm-79-traceability.md`; human checklist `docs/testing/spm-79-manual-testing.md`. No live Firebase project, rules deployment, Git publication or deployment is claimed.

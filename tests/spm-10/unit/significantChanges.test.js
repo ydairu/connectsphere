@@ -205,7 +205,7 @@ describe('SPM-10 AC2–AC5 — effects of a significant change', () => {
     const cleared = { ...after, ...significantChangeEffects(coordinator, before, after, { at }).metadata }
     expect(requiredArrangements(cleared)).toEqual(['venue'])
     expect(arrangementsApproved(cleared)).toBe(false)
-    expect(arrangementsApproved({ ...cleared, arrangementApprovals: { venue: { decision: 'approved' } } })).toBe(true)
+    expect(arrangementsApproved({ ...cleared, venueBookingReadiness: { ready: true } })).toBe(true)
   })
 
   it('AC5: after the reset, Confirm needs both approvals again', () => {

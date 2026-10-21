@@ -27,7 +27,7 @@ test.describe('SPM-10 — Edit event information and flag significant changes fo
     await signIn(page, COORDINATOR)
     await page.goto(`/requests/${confirmed.id}`)
     await expect(statusPill(page)).toHaveText('Confirmed')
-    await expect(arrangement(page, 'Venue arrangement')).toHaveText('Approved')
+    await expect(arrangement(page, 'Venue arrangement')).toHaveText('Awaiting approval')
 
     await page.getByLabel('Expected attendees').fill('150')
     await page.getByRole('button', { name: 'Save changes' }).click()

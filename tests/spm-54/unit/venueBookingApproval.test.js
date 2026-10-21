@@ -28,7 +28,7 @@ describe('SPM-54 approval rules', () => {
     const db = fixture(), current = db.store.get('event'), venue = db.collectionData('venues').get('hall')
     current.core.expectedAttendees = 201
     current.venue.requiredFacilities = ['Stage']
-    expect(venueBookingSuitability(current, booking, venue).problems.map((p) => p.check)).toEqual(['capacity', 'facilities'])
+    expect(venueBookingSuitability(current, { ...booking, attendeeCount: undefined }, venue).problems.map((p) => p.check)).toEqual(['capacity', 'facilities'])
     current.core.expectedAttendees = 200
     current.venue.requiredFacilities = ['Projector']
     current.venue.layoutPreference = 'Banquet'
