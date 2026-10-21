@@ -19,7 +19,7 @@ describe('SPM-53 pages with mocked API', () => {
     api.getVenueBookingQueue.mockResolvedValue({ bookings: [booking] })
     api.getVenueBookings.mockResolvedValue({ canSubmit: false, bookings: [booking, { ...booking, id: 'two', venueName: 'Other room', requirements: 'Other requirements' }] })
     show()
-    expect(await screen.findByText('Conference')).toBeTruthy()
+    expect(await screen.findByText('Conference — Hall')).toBeTruthy()
     expect(screen.queryByText(input.requirements)).toBeNull()
     expect(screen.queryByText(input.specialRequests)).toBeNull()
     fireEvent.click(screen.getByRole('link', { name: 'View details' }))
@@ -50,7 +50,7 @@ describe('SPM-53 pages with mocked API', () => {
     await screen.findByText('No pending booking requests.')
     api.getVenueBookingQueue.mockResolvedValue({ bookings: [booking] })
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
-    await screen.findByText('Conference')
+    await screen.findByText('Conference — Hall')
   })
   it('preserves multiline content, supplies None and keeps selected details read-only for Coordinators too', async () => {
     api.getVenueBookings.mockResolvedValue({ canSubmit: true, bookings: [{ ...booking, requirements: 'Line one\nLine two', specialRequests: '' }] })

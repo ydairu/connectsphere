@@ -771,3 +771,10 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Status:** remains **In Progress, Sprint 3**. Human acceptance and SPM-67's safety handoff remain outstanding. The temporary SPM-48 venue-preparation gate still reads the legacy sign-off, so preparation access for newly booked events needs integration with SPM-67/88 before those stories can be accepted.
 - **Local verification:** lint and production build passed; 128 Node, 101 frontend, 1,774 root Vitest, 99 Chromium and three isolated SPM-79 Firestore emulator tests passed. The build retains the existing bundle-size warning. Root API tests use in-memory persistence and browser tests use the Firebase double; no live-project or human acceptance is claimed.
 - **Evidence:** `docs/evidence/spm-79-traceability.md`; human checklist `docs/testing/spm-79-manual-testing.md`. No live Firebase project, rules deployment, Git publication or deployment is claimed.
+
+## SPM-80 separate requests in the Venue Staff queue — 21 October 2026
+
+- Queue cards now show the event name and requested venue together, with each request's own start/end times and details link. The existing API returns one pending booking record per assigned request; approving or rejecting one does not remove another pending booking for the same event. Assignment scope, route and response shape are unchanged.
+- **Status:** In Progress, Sprint 3. Human acceptance and independent peer review remain outstanding. SPM-81 decisions and SPM-77 booking management are separate stories.
+- **Local verification:** targeted SPM-80/SPM-53 Vitest tests passed (10 tests) and two SPM-80 Chromium journeys passed. Full `npm test` passed 128 Node, 101 frontend, 1,779 root Vitest (47 opt-in cases skipped) and 101 Chromium tests. Lint and build passed; the build retains its large-chunk warning. API tests use mocked identity and in-memory persistence; browser tests use the local Firebase double. No live Firebase, emulator or human acceptance was tested.
+- **Evidence:** `docs/evidence/spm-80-traceability.md`; manual checklist `docs/testing/spm-80-manual-testing.md`. No Firestore rules change/deployment, Git publication or deployment occurred.

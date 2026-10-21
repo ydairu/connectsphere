@@ -212,7 +212,7 @@ export default function VenueBookingsPage() {
     {(!id || detailView || activeTab === 'requests') && bookings?.length === 0 && <Card className="request-form-section"><p>{detailView ? 'This booking request is unavailable or you do not have access to it.' : id ? 'No booking requests.' : 'No pending booking requests.'}</p></Card>}
     {(!id || detailView || activeTab === 'requests') && bookings?.map((booking) => <Card className="request-form-section booking-card" key={booking.id}>
       <details open={!id || detailView ? true : undefined}>
-      <summary><span>{!id ? booking.eventTitle : booking.venueName}</span><span>{bookingStatusLabel(booking.status)}</span></summary>
+      <summary><span>{!id ? `${booking.eventTitle} — ${booking.venueName}` : booking.venueName}</span><span>{bookingStatusLabel(booking.status)}</span></summary>
       {!id ? <>
         <BookingRow label="Requested venue">{booking.venueName}</BookingRow>
         <BookingRow label="Starts">{displayTime(booking.startsAt)}</BookingRow>

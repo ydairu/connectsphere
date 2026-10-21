@@ -64,7 +64,7 @@ describe('SPM-14 pages with mocked API', () => {
   it('shows staff queue details without submission controls', async () => {
     api.getVenueBookingQueue.mockResolvedValue({ bookings: [{ ...booking, eventRequestId: 'event' }] })
     show(staff, true)
-    expect(await screen.findByText('Conference')).toBeTruthy()
+    expect(await screen.findByText('Conference — Hall')).toBeTruthy()
     expect(screen.queryByText('Quiet room')).toBeNull()
     expect(screen.getByRole('link', { name: 'View details' }).getAttribute('href')).toBe('/requests/event/venue-bookings?bookingId=booking')
     expect(screen.queryByRole('button', { name: 'Submit booking request' })).toBeNull()

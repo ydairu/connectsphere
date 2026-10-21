@@ -222,6 +222,10 @@ Local verification: `npm test` passed 128 Node tests, 100 frontend tests, 1,611 
 
 The repository now contains expiry-aware booking and calendar behavior, a one-hour scheduled workflow, a dry-run backfill, and focused service, browser and emulator tests. Acceptance mapping and verification counts are in `docs/evidence/spm-78-traceability.md`; human checks are in `docs/testing/spm-78-manual-testing.md`. The tested behavior is local. The workflow has not been observed running on the default branch with repository secrets, and the backfill has not been run against a live project. SPM-78 remains **In Progress**.
 
+## 21 October 2026 — SPM-80 separate venue queue entries
+
+Venue Staff queue cards now pair the event and venue in each heading. Per-booking selection and decision behavior is covered by `docs/evidence/spm-80-traceability.md`; human checks are in `docs/testing/spm-80-manual-testing.md`. Full local verification passed: 128 Node, 101 frontend, 1,779 root Vitest and 101 Chromium tests, plus lint and build. API/browser persistence used in-memory doubles. Human acceptance and live Firebase verification were not performed; SPM-80 remains **In Progress**.
+
 ## Evidence Entry Template
 
 
