@@ -4,7 +4,7 @@
 // real. The seeded event starts 20 Nov 2026, so this spec relies on the real clock being before then.
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
-import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test } from '../../shared/e2e/fixtures.js'
+import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test, approveVenueForEvent } from '../../shared/e2e/fixtures.js'
 
 const planning = SEED_REQUESTS.find((request) => request.id === 'seed-req-a1-planning')
 const statusPill = (page) => page.locator('.page-heading .status-pill')
@@ -25,7 +25,7 @@ async function actAs(request, account, id, action) {
 
 test.describe('SPM-47 — Organiser requests cancellation (E2E)', () => {
   test('spm47_request_return_resubmit_and_approve_with_notifications', async ({ page }) => {
-    await actAs(page.request, ROLE_USERS.venueStaff, planning.id, 'approve_venue')
+    await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, planning.id, 'approve_technical')
     await actAs(page.request, ROLE_USERS.coordinator, planning.id, 'confirm')
 

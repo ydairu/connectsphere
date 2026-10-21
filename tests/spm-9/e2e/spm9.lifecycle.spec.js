@@ -4,7 +4,7 @@
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { SUBMITTED } from '../../../shared/status.js'
-import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test } from '../../shared/e2e/fixtures.js'
+import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test, approveVenueForEvent } from '../../shared/e2e/fixtures.js'
 
 // loginAs submits the form; the app lands on /profile. Wait for that before navigating.
 async function signIn(page, account) {
@@ -91,7 +91,9 @@ test.describe('SPM-9 — View an event’s current lifecycle status (E2E)', () =
     await expect(arrangementValue(page, 'Venue arrangement')).toHaveText('Awaiting approval')
     // Venue Staff cannot see the equipment section, so the technical sign-off is not shown to them.
     await expect(page.getByText('Technical arrangement')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Approve venue arrangement' }).click()
+    await expect(page.getByRole('button', { name: 'Approve venue arrangement' })).toHaveCount(0)
+    await approveVenueForEvent(page.request, planning.id)
+    await page.reload()
     await expect(arrangementValue(page, 'Venue arrangement')).toHaveText('Approved')
     await logout(page)
 
@@ -109,7 +111,7 @@ test.describe('SPM-9 — View an event’s current lifecycle status (E2E)', () =
   })
 
   test('spm9_organiser_requests_cancellation_and_the_coordinator_approves_it', async ({ page }) => {
-    await actAs(page.request, ROLE_USERS.venueStaff, planning.id, 'approve_venue')
+    await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, planning.id, 'approve_technical')
     await actAs(page.request, ROLE_USERS.coordinator, planning.id, 'confirm')
 

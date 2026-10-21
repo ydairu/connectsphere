@@ -7,7 +7,7 @@ export const coordinator = { uid: 'c', roles: [COORDINATOR], name: 'Coordinator'
 export const staff = { uid: 'v1', roles: [VENUE_STAFF], name: 'Venue One' }
 export const secondStaff = { uid: 'v2', roles: [VENUE_STAFF], name: 'Venue Two' }
 export const organiser = { uid: 'o', roles: [ORGANISER], name: 'Owner' }
-export const input = { venueId: 'hall', startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', requirements: 'Theatre layout', specialRequests: 'Quiet room', submissionKey: 'attempt-1' }
+export const input = { venueId: 'hall', startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', attendeeCount: 40, requirements: 'Theatre layout', specialRequests: 'Quiet room', submissionKey: 'attempt-1' }
 export function fixture() {
   const event = { status: PLANNING, assignedCoordinatorUid: 'c', assignedStaffUids: [], ownerUid: 'o',
     core: { title: 'Conference', expectedAttendees: 100, preferredDateTime: '2027-03-01T10:00:00.000Z', durationHours: 2 },

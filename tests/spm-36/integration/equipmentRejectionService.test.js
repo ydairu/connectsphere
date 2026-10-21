@@ -169,6 +169,7 @@ describe('SPM-36 after a rejection', () => {
     expect((await listEventEquipmentRequests('event', tech, db)).requests.find((request) => request.id === revised.id).actions).toEqual(['approve', 'reject'])
 
     await approve(revised.id)
+    db.collectionData('venueBookingRequests').set('approved-venue', { eventRequestId: 'event', status: 'approved' })
     expect((await transitionEventRequest('event', CONFIRM, coordinator, db, now)).status).toBe(CONFIRMED)
   })
 

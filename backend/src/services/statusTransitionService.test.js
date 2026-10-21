@@ -5,7 +5,7 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { ARRANGEMENT_APPROVED, ARRANGEMENT_REJECTED, NOT_ASSIGNED_STAFF } from '../../../shared/arrangements.js'
+import { ARRANGEMENT_APPROVED, VENUE_BOOKINGS_DECIDE } from '../../../shared/arrangements.js'
 import {
   CANCELLATION_ALREADY_PENDING,
   CANCELLATION_APPROVED,
@@ -19,7 +19,6 @@ import {
   APPROVE_VENUE,
   MAX_REASON_LENGTH,
   REFUSE_CANCELLATION,
-  REJECT_VENUE,
   REQUEST_CANCELLATION,
 } from '../../../shared/requestActions.js'
 import {
@@ -302,11 +301,10 @@ describe('SPM-65 — transition scope preserves multi-role permissions', () => {
     })
   }
 
-  test('an assigned staff member with the Coordinator role can sign off but cannot act as the assigned Coordinator', async () => {
+  test('an assigned staff member with the Coordinator role cannot act as the assigned Coordinator', async () => {
     const user = { ...venueStaff, roles: [VENUE_STAFF, COORDINATOR] }
     const db = fakeDb(planningWithStaff())
-    await transitionEventRequest('request-1', APPROVE_VENUE, user, db, NOW)
-    assert.equal(db.store.get('request-1').arrangementApprovals.venue.decision, 'approved')
+    await assertRefused(transitionEventRequest('request-1', APPROVE_VENUE, user, db, NOW), VENUE_BOOKINGS_DECIDE)
     const before = structuredClone(db.store.get('request-1'))
     const activityBefore = structuredClone(activityOf(db))
     await assertRefused(transitionEventRequest('request-1', REJECT, user, db, NOW), NOT_PERMITTED)
@@ -315,17 +313,17 @@ describe('SPM-65 — transition scope preserves multi-role permissions', () => {
   })
 })
 
-describe('SPM-9 — venue and technical sign-off unlocks Confirm', () => {
-  test('assigned staff approve; each decision is recorded; then the assigned Coordinator confirms', async () => {
+describe('SPM-9 — approved venue bookings and technical sign-off unlock Confirm', () => {
+  test('an approved booking and technical sign-off allow the assigned Coordinator to confirm', async () => {
     const db = fakeDb(planningWithStaff())
 
     await assertRefused(transitionEventRequest('request-1', CONFIRM, assigned, db, NOW), ARRANGEMENTS_NOT_APPROVED)
-    await transitionEventRequest('request-1', APPROVE_VENUE, venueStaff, db, NOW)
+    await assertRefused(transitionEventRequest('request-1', APPROVE_VENUE, venueStaff, db, NOW), VENUE_BOOKINGS_DECIDE)
+    db.collectionData('venueBookingRequests').set('venue-1', { eventRequestId: 'request-1', status: 'approved' })
     await assertRefused(transitionEventRequest('request-1', CONFIRM, assigned, db, NOW), ARRANGEMENTS_NOT_APPROVED)
     await transitionEventRequest('request-1', APPROVE_TECHNICAL, technicalStaff, db, NOW)
 
     assert.deepEqual(db.store.get('request-1').arrangementApprovals, {
-      venue: { decision: ARRANGEMENT_APPROVED, byUid: venueStaff.uid, at: NOW.toISOString() },
       technical: { decision: ARRANGEMENT_APPROVED, byUid: technicalStaff.uid, at: NOW.toISOString() },
     })
     assert.deepEqual(
@@ -333,7 +331,6 @@ describe('SPM-9 — venue and technical sign-off unlocks Confirm', () => {
         .filter((entry) => entry.type === ARRANGEMENT_DECIDED)
         .map(({ arrangement, decision, actor }) => [arrangement, decision, actor.uid]),
       [
-        ['venue', ARRANGEMENT_APPROVED, venueStaff.uid],
         ['technical', ARRANGEMENT_APPROVED, technicalStaff.uid],
       ],
     )
@@ -346,21 +343,20 @@ describe('SPM-9 — venue and technical sign-off unlocks Confirm', () => {
     )
   })
 
-  test('a venue rejection keeps the event in Planning and blocks Confirm; staff may later approve', async () => {
+  test('a rejected need keeps the event in Planning and blocks Confirm until replaced', async () => {
     const db = fakeDb(planningWithStaff({ equipment: { requirements: [], technicalSupportNeeded: false } }))
 
-    const rejected = await transitionEventRequest('request-1', REJECT_VENUE, venueStaff, db, NOW)
-    assert.equal(rejected.status, PLANNING)
-    assert.equal(rejected.arrangementApprovals.venue.decision, ARRANGEMENT_REJECTED)
+    db.collectionData('venueBookingRequests').set('venue-1', { eventRequestId: 'request-1', status: 'rejected' })
+    assert.equal(db.store.get('request-1').status, PLANNING)
     await assertRefused(transitionEventRequest('request-1', CONFIRM, assigned, db, NOW), ARRANGEMENTS_NOT_APPROVED)
 
-    await transitionEventRequest('request-1', APPROVE_VENUE, venueStaff, db, NOW)
+    db.collectionData('venueBookingRequests').set('venue-2', { eventRequestId: 'request-1', replacesId: 'venue-1', status: 'approved' })
     assert.equal((await transitionEventRequest('request-1', CONFIRM, assigned, db, NOW)).status, CONFIRMED)
   })
 
   test('the Coordinator cannot sign off an arrangement in place of the staff', async () => {
     const db = fakeDb(planningWithStaff())
-    await assertRefused(transitionEventRequest('request-1', APPROVE_VENUE, assigned, db, NOW), NOT_ASSIGNED_STAFF)
+    await assertRefused(transitionEventRequest('request-1', APPROVE_VENUE, assigned, db, NOW), VENUE_BOOKINGS_DECIDE)
     assert.equal(db.store.get('request-1').arrangementApprovals, undefined)
     assert.deepEqual(activityOf(db), [])
   })

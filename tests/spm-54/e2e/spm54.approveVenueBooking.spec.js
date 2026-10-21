@@ -13,9 +13,11 @@ test.beforeEach(async ({ request }) => {
 
 async function submit(page, venueId) {
   await page.goto(path)
+  const attendance = page.getByLabel('Attendees using this venue')
+  await attendance.fill(String(Math.min(venueId === 'seed-venue-room' ? 30 : 80, Number(await attendance.getAttribute('max')))))
   await page.getByLabel('Venue', { exact: true }).selectOption(venueId)
-  await expect(page.getByLabel('Start', { exact: true })).toHaveAttribute('readonly', '')
-  await expect(page.getByLabel('End', { exact: true })).toHaveAttribute('readonly', '')
+  await expect(page.getByLabel('Start', { exact: true })).toBeEditable()
+  await expect(page.getByLabel('End', { exact: true })).toBeEditable()
   await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre layout')
   const response = page.waitForResponse((r) => r.url().endsWith(`/api/requests/${eventId}/venue-bookings`) && r.request().method() === 'POST')
   await page.getByRole('button', { name: 'Submit booking request' }).click()
@@ -96,16 +98,13 @@ test('SPM-54 stale staff page reloads after a decision from another tab', async 
   await expect(page.getByRole('button', { name: 'Approve booking' })).toHaveCount(0)
 })
 
-test('SPM-54 capacity overflow is refused and the booking remains pending', async ({ page }) => {
-  await signIn(page, ROLE_USERS.coordinator)
-  const booking = await submit(page, 'seed-venue-room')
-  await logout(page)
-  await signIn(page, ROLE_USERS.venueStaff)
-  await page.goto(`${path}?bookingId=${booking.id}`)
-  await page.getByRole('button', { name: 'Approve booking' }).click()
-  await expect(page.getByRole('button', { name: 'Confirm approval' })).toBeDisabled()
-  await expect(page.getByRole('region', { name: 'Approval blocked' })).toContainText("above this venue's capacity")
-  await expect(page.getByText('Under review', { exact: true }).first()).toBeVisible()
+test('SPM-79 capacity overflow is refused before creating a booking', async ({ request }) => {
+  const response = await request.post(`${DOUBLE_ORIGIN}/api/requests/${eventId}/venue-bookings`, {
+    headers: { Authorization: `Bearer test-token:${ROLE_USERS.coordinator.uid}` },
+    data: { venueId: 'seed-venue-room', startsAt: '2027-03-01T10:00:00Z', endsAt: '2027-03-01T12:00:00Z', attendeeCount: 80,
+      requirements: 'Theatre', submissionKey: 'over-capacity' },
+  })
+  expect(response.status()).toBe(400)
 })
 
 
@@ -117,7 +116,7 @@ test('SPM-54 rejected replacement refreshes corrected requirements and previews 
   }
   await edit('Breakkout Room')
   const originalResponse = await request.post(`${DOUBLE_ORIGIN}/api/requests/${eventId}/venue-bookings`, { headers, data: {
-    venueId: 'seed-venue-hall', startsAt: '2027-03-01T10:00:00Z', endsAt: '2027-03-01T12:00:00Z',
+    venueId: 'seed-venue-hall', startsAt: '2027-03-01T10:00:00Z', endsAt: '2027-03-01T12:00:00Z', attendeeCount: 80,
     requirements: 'Breakkout Room', specialRequests: 'Wheelchair', submissionKey: 'typo-regression',
   } })
   expect(originalResponse.status()).toBe(201)

@@ -45,10 +45,14 @@ export async function startInMemoryApi({ extraAccounts = [], extraRequests = [],
 
   // users/{uid} for SPM-46's assigned Coordinator name, from the same profiles.
   const userDb = createFakeFirestore({ users: Object.fromEntries([...profiles].map(([uid, { uid: _uid, ...profile }]) => [uid, profile])) })
+  // GET/PATCH /api/requests also reads venue booking readiness. Keep that read on an empty
+  // Firestore double, since this harness stores its event requests in the in-memory store.
+  const eventRequestDb = createFakeFirestore()
 
   const app = createApp({
     authenticate,
     eventRequestStore: eventRequestStore ?? createMemoryEventRequestStore([...SEED_REQUESTS, ...extraRequests], { history: SEED_FIELD_HISTORY }),
+    getEventRequestDb: () => eventRequestDb,
     getUserDb: () => userDb,
   })
   const { server, baseUrl } = await listen(app)

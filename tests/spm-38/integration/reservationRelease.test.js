@@ -123,12 +123,12 @@ describe('SPM-38 — the released record', () => {
 describe('SPM-38 — a venue booking change does not release equipment', () => {
   it('spm38_rejecting_or_replacing_one_venue_booking_leaves_the_events_reservations_active', async () => {
     await reserve('event', coordinator, 2, 'venue')
-    const first = await submitVenueBooking('event', { venueId: 'hall', startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', requirements: 'Theatre', submissionKey: 'hall-1' }, coordinator, db, now)
+    const first = await submitVenueBooking('event', { venueId: 'hall', startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', attendeeCount: 40, requirements: 'Theatre', submissionKey: 'hall-1' }, coordinator, db, now)
 
     await rejectVenueBooking('event', first.id, { action: 'reject', reason: 'Hall unavailable' }, venueStaff, db, now)
     expect(reservations().map((reservation) => reservation.status), 'after one booking is rejected').toEqual([RESERVATION_STATUS.ACTIVE])
 
-    await submitVenueBooking('event', { venueId: 'room', startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', requirements: 'Theatre', submissionKey: 'room-1', replacesId: first.id }, coordinator, db, now)
+    await submitVenueBooking('event', { venueId: 'room', startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', attendeeCount: 40, requirements: 'Theatre', submissionKey: 'room-1', replacesId: first.id }, coordinator, db, now)
     expect(reservations().map((reservation) => reservation.status), 'after it is replaced').toEqual([RESERVATION_STATUS.ACTIVE])
     expect(event().reservedEquipment.items).toHaveLength(1)
   })

@@ -87,7 +87,7 @@ describe('SPM-56 technical sign-off follows a current equipment request', () => 
 
   it('spm56_manual_technical_decision_is_refused_while_a_request_is_current', () => {
     expect(canDecideArrangement(tech, withSummary('pending_review'), TECHNICAL_ARRANGEMENT)).toEqual({ allowed: false, reason: EQUIPMENT_REQUEST_DECIDES })
-    expect(canDecideArrangement(venueStaff, withSummary('pending_review'), VENUE_ARRANGEMENT)).toEqual({ allowed: true })
+    expect(canDecideArrangement(venueStaff, withSummary('pending_review'), VENUE_ARRANGEMENT)).toEqual({ allowed: false, reason: 'venue_bookings_decide' })
     // Without a request, the old rule applies: a section asking for equipment lets the assigned member decide.
     expect(canDecideArrangement(tech, { ...event, equipment: { requirements: ['projector'] } }, TECHNICAL_ARRANGEMENT)).toEqual({ allowed: true })
     // Scope is still checked first.
@@ -97,7 +97,7 @@ describe('SPM-56 technical sign-off follows a current equipment request', () => 
   it('spm56_approve_and_reject_technical_are_not_offered_while_a_request_is_current', () => {
     const dualEvent = withSummary('pending_review', { assignedStaffUids: ['d1'], equipment: { requirements: ['projector'] } })
     const actions = allAvailableActions(dualStaff, dualEvent)
-    expect(actions).toContain(APPROVE_VENUE)
+    expect(actions).not.toContain(APPROVE_VENUE)
     expect(actions).not.toContain(APPROVE_TECHNICAL)
     expect(actions).not.toContain(REJECT_TECHNICAL)
     expect(allAvailableActions(dualStaff, { ...dualEvent, currentEquipmentRequest: undefined })).toContain(APPROVE_TECHNICAL)

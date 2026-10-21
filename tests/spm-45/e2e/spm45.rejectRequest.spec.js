@@ -47,7 +47,7 @@ test.describe('SPM-45 — Coordinator rejects an event request (E2E)', () => {
   test('spm45_venue_staff_are_not_offered_reject_and_the_api_refuses_it', async ({ page }) => {
     await signIn(page, ROLE_USERS.venueStaff)
     await page.goto(`/requests/${planning.id}`)
-    await expect(page.getByRole('button', { name: 'Reject venue arrangement' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Reject venue arrangement' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Reject request' })).toHaveCount(0)
 
     const response = await page.request.post(`${DOUBLE_ORIGIN}/api/event-requests/${planning.id}/transitions`, {

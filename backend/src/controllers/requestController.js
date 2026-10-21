@@ -7,6 +7,7 @@ import { SIGNIFICANT_CHANGE, significantChangeEffects } from '../../../shared/si
 import { presentRequest } from '../middleware/authorise.js'
 import { StaleWriteError } from '../services/eventRequestStore.js'
 import { STATUS_CHANGED, userActor } from '../services/statusHistory.js'
+import { loadVenueBookingReadiness } from '../services/venueBookingService.js'
 
 function newestFirst(a, b) {
   return (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0)
@@ -17,7 +18,7 @@ function newestFirst(a, b) {
 // services/requestOwnerService.js and reads only the owners an Organiser may see named. loadStaffRecipients
 // (SPM-10) comes from services/staffRecipientService.js and reads the assigned staff's roles only when a
 // significant change could notify them.
-export function createRequestController(store, loadCoordinatorName, loadOwnerNames = async () => new Map(), loadStaffRecipients = async () => []) {
+export function createRequestController(store, loadCoordinatorName, loadOwnerNames = async () => new Map(), loadStaffRecipients = async () => [], getDb = null) {
   return {
     async loadAll(req, _res, next) {
       // SPM-65: a coordinator-only user is served by a query on assignedCoordinatorUid, using the uid from
@@ -86,7 +87,8 @@ export function createRequestController(store, loadCoordinatorName, loadOwnerNam
         })
         const coordinatorName = await loadCoordinatorName(req.user, request)
         const ownerNames = await loadOwnerNames(req.user, [request])
-        return res.json(presentRequest(req.user, request, { coordinatorName, ownerNames }))
+        const venueBookingReadiness = getDb ? await loadVenueBookingReadiness(req.params.id, getDb()) : null
+        return res.json(presentRequest(req.user, request, { coordinatorName, ownerNames, venueBookingReadiness }))
       } catch (error) {
         if (error instanceof StaleWriteError) {
           return res.status(409).json({ message: 'This request changed since it was loaded. Reload and try again.' })

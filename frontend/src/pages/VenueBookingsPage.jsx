@@ -17,7 +17,7 @@ function localTime(value) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 }
 const displayTime = (value) => !value || Number.isNaN(Date.parse(value)) ? 'Not set' : new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-const emptyForm = () => ({ venueId: '', requirements: '', specialRequests: '', replacesId: null, submissionKey: crypto.randomUUID() })
+const emptyForm = () => ({ venueId: '', startsAt: '', endsAt: '', attendeeCount: '', requirements: '', specialRequests: '', replacesId: null, submissionKey: crypto.randomUUID() })
 const bookingTabs = [{ id: 'submit', label: 'Submit a Request' }, { id: 'recommendations', label: 'Recommendations' }, { id: 'requests', label: 'Requests' }]
 const bookingStatusLabel = (status) => ({ [BOOKING_PENDING]: 'Under review', [BOOKING_APPROVED]: 'Approved', [BOOKING_REJECTED]: 'Rejected', [BOOKING_REPLACED]: 'Replaced', [BOOKING_CANCELLED]: 'Cancelled', [BOOKING_EXPIRED]: 'Expired' })[status] ?? status
 
@@ -72,17 +72,25 @@ export default function VenueBookingsPage() {
       try {
         const response = id ? await getVenueBookings(user, id) : await getVenueBookingQueue(user)
         const period = eventPeriod(response.event)
-        const catalogue = response.canSubmit && !detailView && period ? await listVenues(user, { availableFrom: period.startsAt, availableTo: period.endsAt }) : { venues: [] }
         if (!active) return
         setData(response)
-        setVenues(catalogue.venues)
-        if (response.event?.core) setForm({ ...emptyForm(), requirements: venueBookingRequirements(response.event) })
+        if (response.event?.core) setForm({ ...emptyForm(), ...period, attendeeCount: response.event.core.expectedAttendees ?? '', requirements: venueBookingRequirements(response.event) })
       } catch (err) { if (active) setError(err.details?.message ?? 'Unable to load booking requests.') }
       finally { if (active) setLoading(false) }
     }
     load()
     return () => { active = false }
   }, [id, user, bookingId, detailView, reload])
+  useEffect(() => {
+    if (!data?.canSubmit || detailView || !form.startsAt || !form.endsAt || !Number(form.attendeeCount)) { setVenues([]); return }
+    let active = true
+    const timer = setTimeout(() => {
+      listVenues(user, { availableFrom: form.startsAt, availableTo: form.endsAt, attendance: String(form.attendeeCount) })
+        .then((response) => { if (active) setVenues(response.venues) })
+        .catch(() => { if (active) setVenues([]) })
+    }, 150)
+    return () => { active = false; clearTimeout(timer) }
+  }, [data?.canSubmit, detailView, form.startsAt, form.endsAt, form.attendeeCount, user])
   useEffect(() => {
     if (!id || detailView || activeTab !== 'recommendations' || !roles?.includes(COORDINATOR)) return
     let active = true
@@ -99,19 +107,19 @@ export default function VenueBookingsPage() {
     ? [...venues, { id: replacedBooking.venueId, name: replacedBooking.venueName }]
     : venues
   const selected = availableVenues.find((v) => v.id === form.venueId)
-  const warning = selected ? capacityWarning(data?.event?.core?.expectedAttendees, selected.maximumCapacity) : null
+  const warning = selected ? capacityWarning(form.attendeeCount, selected.maximumCapacity) : null
   async function submit(event) {
     event.preventDefault()
     if (!period) { setError('Set a valid event date and duration before requesting a venue.'); return }
     setBusy(true); setError(''); setNotice('')
     try {
-      const result = await submitVenueBooking(user, id, { ...form, ...period })
+      const result = await submitVenueBooking(user, id, { ...form, attendeeCount: Number(form.attendeeCount) })
       setForm({ ...form, submissionKey: crypto.randomUUID(), replacesId: null })
       selectTab('requests')
       setNotice(`Booking request submitted to ${result.booking.assignedVenueStaffName}. The venue is tentatively held.`)
       try { setData(await getVenueBookings(user, id)) }
       catch { setError('The booking was submitted, but requests could not be refreshed. Reload to see the latest list.'); return }
-      try { setVenues((await listVenues(user, { availableFrom: period.startsAt, availableTo: period.endsAt })).venues) }
+      try { setVenues((await listVenues(user, { availableFrom: form.startsAt, availableTo: form.endsAt, attendance: String(form.attendeeCount) })).venues) }
       catch { setError('The booking was submitted, but available venues could not be refreshed. Reload before submitting another request.') }
     } catch (err) {
       setError([err.details?.message ?? 'Unable to submit. You can retry safely.', ...Object.values(err.details?.errors ?? {})].join(' '))
@@ -132,7 +140,8 @@ export default function VenueBookingsPage() {
         if (!response.canSubmit || !current || current.replacedById || ![BOOKING_PENDING, BOOKING_REJECTED, BOOKING_EXPIRED].includes(current.status)) {
           setForm(emptyForm()); setNotice('This booking can no longer be replaced. Its current state is shown.'); return
         }
-        setForm({ venueId: current.venueId, requirements: venueBookingRequirements(response.event), specialRequests: current.specialRequests ?? '',
+        setForm({ venueId: current.venueId, startsAt: current.startsAt, endsAt: current.endsAt,
+          attendeeCount: current.attendeeCount ?? response.event.core?.expectedAttendees ?? '', requirements: venueBookingRequirements(response.event), specialRequests: current.specialRequests ?? '',
           replacesId: current.id, submissionKey: crypto.randomUUID() })
         selectTab('submit')
         setNotice('Requirements refreshed from the event. Review them and any special requests before submitting. The previous booking remains in history.')
@@ -203,7 +212,7 @@ export default function VenueBookingsPage() {
     {(!id || detailView || activeTab === 'requests') && bookings?.length === 0 && <Card className="request-form-section"><p>{detailView ? 'This booking request is unavailable or you do not have access to it.' : id ? 'No booking requests.' : 'No pending booking requests.'}</p></Card>}
     {(!id || detailView || activeTab === 'requests') && bookings?.map((booking) => <Card className="request-form-section booking-card" key={booking.id}>
       <details open={!id || detailView ? true : undefined}>
-      <summary><span>{!id ? booking.eventTitle : booking.venueName}</span><span>{bookingStatusLabel(booking.status)}</span></summary>
+      <summary><span>{!id ? `${booking.eventTitle} — ${booking.venueName}` : booking.venueName}</span><span>{bookingStatusLabel(booking.status)}</span></summary>
       {!id ? <>
         <BookingRow label="Requested venue">{booking.venueName}</BookingRow>
         <BookingRow label="Starts">{displayTime(booking.startsAt)}</BookingRow>
@@ -214,7 +223,7 @@ export default function VenueBookingsPage() {
         <BookingRow label="Requested venue">{booking.venueName}</BookingRow>
         <BookingRow label="Starts">{displayTime(booking.startsAt)}</BookingRow>
         <BookingRow label="Ends">{displayTime(booking.endsAt)}</BookingRow>
-        <BookingRow label="Expected attendance">{booking.expectedAttendees ?? 'Not set'}</BookingRow>
+        <BookingRow label="Attendees using this venue">{booking.attendeeCount ?? booking.expectedAttendees ?? 'Not set'}</BookingRow>
         <BookingRow label="Venue requirements">{booking.requirements}</BookingRow>
         <BookingRow label="Special requests">{booking.specialRequests || 'None'}</BookingRow>
         <BookingRow label="Status">{booking.status === BOOKING_APPROVED ? 'Approved — venue confirmed' : bookingStatusLabel(booking.status)}</BookingRow>
@@ -263,10 +272,11 @@ export default function VenueBookingsPage() {
           <div className="field"><label htmlFor="booking-venue">Venue</label><select id="booking-venue" required value={form.venueId} onChange={(e) => setForm({ ...form, venueId: e.target.value })}>
             <option value="">Choose a venue</option>{availableVenues.map((v) => <option key={v.id} value={v.id}>{v.name}{v.maximumCapacity != null ? ` (capacity ${v.maximumCapacity})` : ''}</option>)}
           </select></div>
-          {period && availableVenues.length === 0 && <p className="form-note">No venues are available for the event period.</p>}
+          {period && availableVenues.length === 0 && <p className="form-note">No venues are available for this window and attendee count.</p>}
           {warning && <p role="note">{warning}</p>}
           {[['startsAt', 'Start'], ['endsAt', 'End']].map(([key, label]) =>
-            <div className="field" key={key}><label htmlFor={`booking-${key}`}>{label}</label><input id={`booking-${key}`} type="datetime-local" value={localTime(period?.[key])} readOnly /></div>)}
+            <div className="field" key={key}><label htmlFor={`booking-${key}`}>{label}</label><input id={`booking-${key}`} type="datetime-local" required value={localTime(form[key])} onChange={(e) => setForm({ ...form, [key]: e.target.value ? new Date(e.target.value).toISOString() : '' })} /></div>)}
+          <div className="field"><label htmlFor="booking-attendeeCount">Attendees using this venue</label><input id="booking-attendeeCount" type="number" min="1" max={data.event.core?.expectedAttendees} required value={form.attendeeCount} onChange={(e) => setForm({ ...form, attendeeCount: e.target.value })} /></div>
           {!period && <p className="field-error">Set a valid event date and duration before requesting a venue.</p>}
           {[['requirements', 'Venue requirements', 'text'], ['specialRequests', 'Special requests', 'text']].map(([key, label, type]) =>
             <div className="field" key={key}><label htmlFor={`booking-${key}`}>{label}</label><input id={`booking-${key}`} type={type} required={key !== 'specialRequests'} maxLength={4000} value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} /></div>)}

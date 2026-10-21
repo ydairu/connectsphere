@@ -258,7 +258,7 @@ describe('SPM-17 closing on event rejection or cancellation', () => {
   it('spm17_rejection_releases_spm14_holds_and_closes_equipment_requests_in_one_transaction', async () => {
     await db.collection('venues').doc('hall').set({ name: 'Hall', maximumCapacity: 200, setupMinutes: 0, turnaroundMinutes: 0 })
     await submitVenueBooking('event', {
-      venueId: 'hall', startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', requirements: 'Theatre', submissionKey: 'venue-1',
+      venueId: 'hall', startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', attendeeCount: 40, requirements: 'Theatre', submissionKey: 'venue-1',
     }, coordinator, db, now)
     const pending = await submit()
     const before = db.transactions.length

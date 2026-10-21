@@ -17,6 +17,37 @@ export function effectiveVenueBookingStatus(booking, now = new Date()) {
     ? BOOKING_EXPIRED : booking.status
 }
 
+// Older bookings did not store a need ID. Follow their replacement chain to its root.
+export function venueNeedId(booking, bookings) {
+  if (booking.venueNeedId) return booking.venueNeedId
+  const byId = new Map(bookings.map((item) => [item.id, item]))
+  const seen = new Set()
+  let current = booking
+  while (current?.replacesId) {
+    if (seen.has(current.id)) return null
+    seen.add(current.id)
+    current = byId.get(current.replacesId)
+    if (!current) return null
+  }
+  return current?.id ?? null
+}
+
+export function venueBookingReadiness(bookings, now = new Date()) {
+  const needs = new Map()
+  for (const booking of bookings) {
+    const id = venueNeedId(booking, bookings)
+    if (!id) return { ready: false, total: 0, approved: 0 }
+    if (!needs.has(id)) needs.set(id, [])
+    needs.get(id).push(booking)
+  }
+  let approved = 0
+  for (const chain of needs.values()) {
+    const current = chain.filter((item) => !chain.some((other) => other.replacesId === item.id))
+    if (current.length === 1 && effectiveVenueBookingStatus(current[0], now) === BOOKING_APPROVED) approved++
+  }
+  return { ready: needs.size > 0 && approved === needs.size, total: needs.size, approved }
+}
+
 // The stored decision is preserved; a pending request becomes effectively expired at its deadline,
 // before the hourly task records the expired status.
 export function pendingVenueBookings(bookings, now = new Date()) {
@@ -58,6 +89,7 @@ export function venueBookingSuitability(event, booking, venue) {
   const result = checkVenueSuitability({ ...event, core: { ...event.core,
     preferredDateTime: booking.startsAt,
     durationHours: (Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 3600000,
+    expectedAttendees: booking.attendeeCount ?? event.core?.expectedAttendees,
   }, venue: { ...event.venue, layoutPreference: requirements || event.venue?.layoutPreference } }, venue)
   // Requirements are free text: do not claim to have parsed extra instructions as a layout.
   if (requirements) result.warnings = result.warnings.map((warning) => warning.check === LAYOUT
@@ -84,11 +116,12 @@ export function normaliseVenueBookingRejection(input) {
 export function normaliseVenueBooking(input = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { value: {}, errors: { request: 'A booking request object is required.' } }
   const errors = {}
-  const allowed = ['venueId', 'startsAt', 'endsAt', 'requirements', 'specialRequests', 'submissionKey', 'replacesId']
+  const allowed = ['venueId', 'startsAt', 'endsAt', 'attendeeCount', 'requirements', 'specialRequests', 'submissionKey', 'replacesId']
   for (const key of Object.keys(input)) if (!allowed.includes(key)) errors[key] = 'This field cannot be set.'
   const range = validateAvailabilityRange({ from: input.startsAt, to: input.endsAt })
   if (range.errors.from) errors.startsAt = range.errors.from
   if (range.errors.to) errors.endsAt = range.errors.to
+  if (!Number.isInteger(input.attendeeCount) || input.attendeeCount <= 0) errors.attendeeCount = 'Enter a positive whole number of attendees.'
   const text = (key, required = false) => {
     const value = typeof input[key] === 'string' ? input[key].trim() : ''
     if ((required && !value) || (input[key] != null && typeof input[key] !== 'string')) errors[key] = 'Enter text for this field.'
@@ -97,7 +130,7 @@ export function normaliseVenueBooking(input = {}) {
   }
   const value = {
     venueId: text('venueId', true), startsAt: range.from?.toISOString() ?? null,
-    endsAt: range.to?.toISOString() ?? null, requirements: text('requirements', true),
+    endsAt: range.to?.toISOString() ?? null, attendeeCount: input.attendeeCount, requirements: text('requirements', true),
     specialRequests: text('specialRequests'), submissionKey: text('submissionKey', true), replacesId: text('replacesId') || null,
   }
   for (const key of ['venueId', 'submissionKey', 'replacesId']) {

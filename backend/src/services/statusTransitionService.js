@@ -15,6 +15,7 @@ import {
   NOT_ASSIGNED_STAFF,
   NOT_AT_PLANNING,
   UNKNOWN_ARRANGEMENT,
+  VENUE_BOOKINGS_DECIDE,
   canDecideArrangement,
 } from '../../../shared/arrangements.js'
 import {
@@ -49,6 +50,7 @@ import {
   APPROVE_CANCELLATION,
   ARRANGEMENTS_NOT_APPROVED,
   CANCEL,
+  CONFIRM,
   COMPLETE,
   EVENT_NOT_ENDED,
   INSUFFICIENT_INFORMATION,
@@ -68,7 +70,7 @@ import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError, submitDraftEventRequest } from './eventRequestService.js'
 import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
-import { prepareVenueHoldRelease } from './venueBookingService.js'
+import { loadVenueBookingReadiness, prepareVenueHoldRelease } from './venueBookingService.js'
 import { prepareEquipmentRequestClose } from './equipmentRequestService.js'
 
 export const REASON_REQUIRED = 'reason_required'
@@ -99,6 +101,7 @@ const MESSAGES = Object.freeze({
   [ARRANGEMENT_NOT_REQUIRED]: 'This event did not request equipment or technical support.',
   [EQUIPMENT_REQUEST_DECIDES]: 'The technical arrangement is decided by reviewing the event\'s equipment request.',
   [UNKNOWN_ARRANGEMENT]: 'Unknown arrangement.',
+  [VENUE_BOOKINGS_DECIDE]: 'Venue approval is decided on each booking request.',
   [REASON_REQUIRED]: 'A reason is required for this action.',
   [REASON_INVALID]: `A reason must be text of at most ${MAX_REASON_LENGTH} characters.`,
 })
@@ -208,7 +211,8 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       }
       addActivity(tx, docRef, { type: ARRANGEMENT_DECIDED, arrangement, decision, actor, at })
     } else {
-      const decision = canTransition(user, existing, action, now)
+      const readiness = action === CONFIRM ? await loadVenueBookingReadiness(id, db, now, tx) : null
+      const decision = canTransition(user, readiness ? { ...existing, venueBookingReadiness: readiness } : existing, action, now)
       refuse(decision)
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }

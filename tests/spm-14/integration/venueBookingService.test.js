@@ -17,7 +17,7 @@ const values = (collection) => [...db.collectionData(collection).values()]
 describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
   it('creates a request, scoped assignment and expiring hold atomically; duplicate retry is safe', async () => {
     const result = await submit()
-    expect(result.capacityWarning).toContain('100')
+    expect(result.capacityWarning).toBeNull()
     expect(result.assignedVenueStaffName).toBe(staff.name)
     expect(result.holdExpiresAt).toBe('2026-10-23T00:00:00.000Z')
     expect(values('venueAvailability')).toHaveLength(1)
@@ -66,7 +66,7 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
   })
   it('refuses a booking period that differs from the current event without writing a hold', async () => {
     await expect(submit({ startsAt: '2027-03-01T11:00:00Z', endsAt: '2027-03-01T13:00:00Z' }))
-      .rejects.toMatchObject({ errors: { startsAt: 'Use the event start time.', endsAt: 'Use the event end time.' } })
+      .rejects.toMatchObject({ errors: { endsAt: 'End within the event schedule.' } })
     expect(values(BOOKINGS)).toEqual([])
     expect(values('venueAvailability')).toEqual([])
   })

@@ -25,7 +25,7 @@ describe('SPM-14 real HTTP routes with mocked identity and in-memory persistence
   it('creates, lists and displays full assigned-staff details without unrelated sections', async () => {
     const created = await post()
     expect(created.status).toBe(201)
-    expect(created.body.booking.capacityWarning).toContain('exceeds')
+    expect(created.body.booking.capacityWarning).toBeNull()
     const listed = await get('/api/requests/event/venue-bookings', coordinator)
     expect(listed.body.canSubmit).toBe(true)
     const queue = await get('/api/venues/booking-requests', staff)
@@ -43,7 +43,7 @@ describe('SPM-14 real HTTP routes with mocked identity and in-memory persistence
     expect((await post({ ...input, endsAt: input.startsAt })).status).toBe(400)
     const alteredPeriod = await post({ ...input, startsAt: '2027-03-01T11:00:00Z', endsAt: '2027-03-01T13:00:00Z' })
     expect(alteredPeriod.status).toBe(400)
-    expect(alteredPeriod.body.errors).toMatchObject({ startsAt: 'Use the event start time.', endsAt: 'Use the event end time.' })
+    expect(alteredPeriod.body.errors).toMatchObject({ endsAt: 'End within the event schedule.' })
     expect((await post(input, organiser)).status).toBe(403)
     expect((await post(input, coordinator, 'other')).status).toBe(404)
     expect((await post(input, coordinator, 'missing')).status).toBe(404)

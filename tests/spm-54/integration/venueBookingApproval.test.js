@@ -58,7 +58,7 @@ describe('SPM-54 atomic approval with in-memory persistence', () => {
   })
   it.each(['capacity', 'facilities'])('rejects a fresh %s failure without any writes', async (kind) => {
     const booking = await submit()
-    if (kind === 'capacity') db.store.get('event').core.expectedAttendees = 201
+    if (kind === 'capacity') db.collectionData('venues').get('hall').maximumCapacity = 39
     else db.store.get('event').venue.requiredFacilities = ['Missing stage']
     const before = snapshot()
     await expect(approve(booking.id)).rejects.toMatchObject({ status: 409 })
@@ -160,11 +160,11 @@ describe('SPM-54 atomic approval with in-memory persistence', () => {
    db.store.get('event').venue.layoutPreference = 'Breakout Room'
    expect((await listEventVenueBookings('event', staff, db)).bookings[0].suitability.warnings[0].message).toContain('"Breakout Room"')
    await expect(listEventVenueBookings('event', secondStaff, db)).rejects.toMatchObject({ status: 404 })
-   db.store.get('event').core.expectedAttendees = 201
+   db.collectionData('venues').get('hall').maximumCapacity = 39
    const changed = snapshot()
    await expect(approve(booking.id)).rejects.toMatchObject({ status: 409 })
    expect(snapshot()).toEqual(changed)
-   db.store.get('event').core.expectedAttendees = 100
+   db.collectionData('venues').get('hall').maximumCapacity = 50
    expect((await approve(booking.id)).approvalWarnings[0].message).toContain('"Breakout Room"')
  })
 

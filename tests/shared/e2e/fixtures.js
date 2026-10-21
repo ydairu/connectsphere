@@ -3,6 +3,7 @@
 
 import { expect, test as base } from '@playwright/test'
 import { EXTRA_USERS, ROLE_USERS, TEST_PASSWORD } from '../fixtures/testUsers.js'
+import { eventPeriod } from '../../../shared/venueSuitability.js'
 
 export const DOUBLE_ORIGIN = process.env.E2E_DOUBLE_ORIGIN ?? 'http://127.0.0.1:5001'
 export const LOGIN_HEADING = 'Welcome back'
@@ -24,6 +25,30 @@ export const test = base.extend({
 })
 
 export { expect, EXTRA_USERS, ROLE_USERS, TEST_PASSWORD }
+
+export async function approveVenueForEvent(request, eventId, coordinator = ROLE_USERS.coordinator) {
+  const origin = process.env.E2E_DOUBLE_ORIGIN ?? 'http://127.0.0.1:5001'
+  const coordinatorHeaders = { Authorization: `Bearer test-token:${coordinator.uid}` }
+  const eventResponse = await request.get(`${origin}/api/requests/${eventId}`, { headers: coordinatorHeaders })
+  expect(eventResponse.ok()).toBeTruthy()
+  const event = (await eventResponse.json()).request
+  const period = eventPeriod(event)
+  const created = await request.post(`${origin}/api/requests/${eventId}/venue-bookings`, {
+    headers: coordinatorHeaders,
+    data: { venueId: 'seed-venue-room', ...period, attendeeCount: Math.min(30, event.core.expectedAttendees),
+      requirements: 'Classroom', submissionKey: crypto.randomUUID() },
+  })
+  expect(created.status(), await created.text()).toBe(201)
+  const booking = (await created.json()).booking
+  const staff = [ROLE_USERS.venueStaff, EXTRA_USERS.venueTechnicalStaff]
+    .find((account) => account.name === booking.assignedVenueStaffName)
+  expect(staff).toBeTruthy()
+  const approved = await request.post(`${origin}/api/requests/${eventId}/venue-bookings/${booking.id}/actions`, {
+    headers: { Authorization: `Bearer test-token:${staff.uid}` }, data: { action: 'approve' },
+  })
+  expect(approved.status(), await approved.text()).toBe(200)
+  return booking
+}
 
 export async function loginAs(page, account, password = TEST_PASSWORD) {
   await page.goto('/login')

@@ -2,7 +2,7 @@ import {
   DOUBLE_ORIGIN, EXTRA_USERS, FORBIDDEN_HEADING, ROLE_USERS, expect, loginAs, logout, test,
 } from '../../shared/e2e/fixtures.js'
 import { AVAILABILITY_STATUS, MAINTENANCE_BLOCK_REASONS } from '../../../shared/venueAvailability.js'
-import { APPROVE_TECHNICAL, APPROVE_VENUE } from '../../../shared/requestActions.js'
+import { APPROVE_TECHNICAL } from '../../../shared/requestActions.js'
 import { CANCEL, CONFIRM } from '../../../shared/statusTransitions.js'
 
 const roomId = 'seed-venue-room'
@@ -358,6 +358,7 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
     await search(page)
     await expect(page.getByRole('heading', { name: roomName })).toBeVisible()
     await page.goto('/requests/seed-req-a1-planning/venue-bookings')
+    await page.getByLabel('Attendees using this venue').fill('30')
     await page.getByLabel('Venue', { exact: true }).selectOption(roomId)
     await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre')
     await page.getByRole('button', { name: 'Submit booking request', exact: true }).click()
@@ -368,12 +369,17 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
     await expect(page.getByLabel('Venue', { exact: true }).locator(`option[value="${roomId}"]`)).toHaveCount(0)
     const conflict = await request.post(`${DOUBLE_ORIGIN}/api/requests/seed-req-b1-planning/venue-bookings`, {
       headers: headers(EXTRA_USERS.secondCoordinator),
-      data: { venueId: roomId, startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', requirements: 'Theatre', submissionKey: 'competing-event' },
+      data: { venueId: roomId, startsAt: '2027-03-01T10:00:00.000Z', endsAt: '2027-03-01T12:00:00.000Z', attendeeCount: 30, requirements: 'Theatre', submissionKey: 'competing-event' },
     })
     expect(conflict.status()).toBe(409)
     expect(Object.values((await snapshot(request)).availability).filter((entry) => entry.venueId === roomId && entry.status === AVAILABILITY_STATUS.TENTATIVE_HOLD)).toHaveLength(1)
+    const bookingList = await request.get(`${DOUBLE_ORIGIN}/api/requests/seed-req-a1-planning/venue-bookings`, { headers: headers(ROLE_USERS.coordinator) })
+    const booking = (await bookingList.json()).bookings.find((item) => item.venueId === roomId && item.status === 'pending')
+    const venueDecision = await request.post(`${DOUBLE_ORIGIN}/api/requests/seed-req-a1-planning/venue-bookings/${booking.id}/actions`, {
+      headers: headers(ROLE_USERS.venueStaff), data: { action: 'approve' },
+    })
+    expect(venueDecision.status()).toBe(200)
     for (const [user, action] of [
-      [ROLE_USERS.venueStaff, APPROVE_VENUE],
       [ROLE_USERS.technicalStaff, APPROVE_TECHNICAL],
       [ROLE_USERS.coordinator, CONFIRM],
     ]) {

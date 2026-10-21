@@ -9,6 +9,7 @@ import {
 } from '../services/eventRequestService.js'
 import { NoEligibleCoordinatorError } from '../services/coordinatorAssignmentService.js'
 import { presentRequest } from '../middleware/authorise.js'
+import { loadVenueBookingReadiness } from '../services/venueBookingService.js'
 import { NOT_PERMITTED, UNKNOWN_ACTION } from '../../../shared/statusTransitions.js'
 import { NOT_ASSIGNED_STAFF, UNKNOWN_ARRANGEMENT } from '../../../shared/arrangements.js'
 import {
@@ -105,7 +106,8 @@ export function createEventRequestController(getDb, loadCoordinatorName = async 
         })
         const coordinatorName = await loadCoordinatorName(req.user, eventRequest)
         const ownerNames = await loadOwnerNames(req.user, [eventRequest])
-        return res.json(presentRequest(req.user, eventRequest, { coordinatorName, ownerNames }))
+        const venueBookingReadiness = await loadVenueBookingReadiness(req.params.id, getDb())
+        return res.json(presentRequest(req.user, eventRequest, { coordinatorName, ownerNames, venueBookingReadiness }))
       } catch (error) {
         return sendEventRequestError(error, res, next)
       }

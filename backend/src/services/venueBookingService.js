@@ -1,5 +1,5 @@
 import { COORDINATOR, VENUE_STAFF, isAssignedCoordinator, projectRequest, rolesOf } from '../../../shared/permissions.js'
-import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_CANCELLED, BOOKING_EXPIRED, effectiveVenueBookingStatus, canReadVenueBooking, canRejectVenueBooking, canApproveVenueBooking, canRequestVenue, capacityWarning, chooseVenueStaff, normaliseVenueBooking, normaliseVenueBookingRejection, venueBookingApprovalErrors, venueBookingSuitability } from '../../../shared/venueBooking.js'
+import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_CANCELLED, BOOKING_EXPIRED, effectiveVenueBookingStatus, canReadVenueBooking, canRejectVenueBooking, canApproveVenueBooking, canRequestVenue, chooseVenueStaff, normaliseVenueBooking, normaliseVenueBookingRejection, venueBookingApprovalErrors, venueBookingSuitability, venueBookingReadiness, venueNeedId } from '../../../shared/venueBooking.js'
 import { AVAILABILITY_STATUS, REMOVED_STATUSES, tentativeHoldExpiresAt, validateAvailabilityRange } from '../../../shared/venueAvailability.js'
 import { venueBookingApprovedNotifications, venueBookingRejectedNotifications } from '../../../shared/notifications.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
@@ -41,8 +41,9 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
     const period = eventPeriod(event)
     if (!period) throw new VenueBookingError(409, 'Set a valid event date and duration before requesting a venue.')
     const periodErrors = {}
-    if (value.startsAt !== period.startsAt) periodErrors.startsAt = 'Use the event start time.'
-    if (value.endsAt !== period.endsAt) periodErrors.endsAt = 'Use the event end time.'
+    if (value.startsAt < period.startsAt || value.startsAt >= period.endsAt) periodErrors.startsAt = 'Start within the event schedule.'
+    if (value.endsAt > period.endsAt || value.endsAt <= period.startsAt) periodErrors.endsAt = 'End within the event schedule.'
+    if (!Number.isInteger(event.core?.expectedAttendees) || value.attendeeCount > event.core.expectedAttendees) periodErrors.attendeeCount = 'Attendee count cannot exceed event attendance.'
     if (Object.keys(periodErrors).length) throw new VenueValidationError(periodErrors)
     const old = value.replacesId ? eventBookings.find((b) => b.id === value.replacesId) : null
     if (value.replacesId && !old) throw new VenueBookingError(404, 'Booking request not found.')
@@ -68,12 +69,17 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
       await tx.get(oldLock)
     }
     const { venue, lockRef } = await checkVenueHoldInTransaction(tx, db, value, now, old?.status === BOOKING_PENDING ? old.holdId : undefined)
+    if (!Number.isFinite(Number(venue.maximumCapacity)) || value.attendeeCount > Number(venue.maximumCapacity)) {
+      throw new VenueValidationError({ attendeeCount: 'Attendee count exceeds venue capacity.' })
+    }
     const ref = db.collection(BOOKINGS).doc()
+    const needId = old ? venueNeedId(old, eventBookings) : ref.id
+    if (!needId) throw new VenueBookingError(409, 'The original booking chain is incomplete. Reload or contact support.')
     const holdRef = db.collection('venueAvailability').doc()
     const at = now.toISOString()
-    const booking = { ...value, eventRequestId: eventId, eventTitle: event.core?.title ?? '',
+    const booking = { ...value, venueNeedId: needId, eventRequestId: eventId, eventTitle: event.core?.title ?? '',
       expectedAttendees: event.core?.expectedAttendees ?? null, venueName: venue.name,
-      capacityWarning: capacityWarning(event.core?.expectedAttendees, venue.maximumCapacity),
+      capacityWarning: null,
       status: BOOKING_PENDING, assignedVenueStaffUid: assignee.uid, assignedVenueStaffName: assignee.name ?? 'Venue Staff',
       holdId: holdRef.id, holdExpiresAt: tentativeHoldExpiresAt(now), createdByUid: user.uid, createdAt: at }
     if (old) {
@@ -83,7 +89,7 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
     }
     tx.set(ref, booking)
     tx.set(holdRef, { venueId: value.venueId, eventRequestId: eventId, bookingRequestId: ref.id,
-      startsAt: value.startsAt, endsAt: value.endsAt, title: event.core?.title ?? '',
+      startsAt: value.startsAt, endsAt: value.endsAt, attendeeCount: value.attendeeCount, title: event.core?.title ?? '',
       status: AVAILABILITY_STATUS.TENTATIVE_HOLD, lifecycleStatus: 'active', holdExpiresAt: booking.holdExpiresAt,
       createdAt: at, createdByUid: user.uid })
     tx.set(lockRef, { venueId: value.venueId, lastCommitmentId: holdRef.id, updatedAt: at })
@@ -157,7 +163,10 @@ export async function approveVenueBooking(eventId, bookingId, input, user, db = 
     const errors = venueBookingApprovalErrors(input)
     if (Object.keys(errors).length) throw new VenueValidationError(errors)
     const range = validateAvailabilityRange({ from: booking.startsAt, to: booking.endsAt })
-    if (Object.keys(range.errors).length || !Number.isInteger(event.core?.expectedAttendees) || event.core.expectedAttendees <= 0) {
+    const eventWindow = eventPeriod(event)
+    const attendeeCount = booking.attendeeCount ?? event.core?.expectedAttendees
+    if (Object.keys(range.errors).length || !eventWindow || booking.startsAt < eventWindow.startsAt || booking.endsAt > eventWindow.endsAt ||
+      !Number.isInteger(attendeeCount) || attendeeCount <= 0 || attendeeCount > event.core?.expectedAttendees) {
       throw new VenueBookingError(409, 'The booking needs valid dates and current event attendance before approval.')
     }
     if (typeof booking.holdId !== 'string' || !booking.holdId) throw new VenueBookingError(409, 'The booking hold is missing. Ask the Coordinator to replace the request.')
@@ -167,6 +176,7 @@ export async function approveVenueBooking(eventId, bookingId, input, user, db = 
     if (!hold || hold.bookingRequestId !== bookingId || hold.eventRequestId !== eventId || hold.venueId !== booking.venueId ||
       hold.status !== AVAILABILITY_STATUS.TENTATIVE_HOLD || REMOVED_STATUSES.has(hold.lifecycleStatus) ||
       hold.startsAt !== booking.startsAt || hold.endsAt !== booking.endsAt ||
+      (hold.attendeeCount != null && hold.attendeeCount !== attendeeCount) ||
       hold.holdExpiresAt !== booking.holdExpiresAt || !Number.isFinite(Date.parse(hold.holdExpiresAt)) ||
       Date.parse(hold.holdExpiresAt) <= decisionNow.getTime()) {
       throw new VenueBookingError(409, 'The booking hold has changed or was released. Ask the Coordinator to replace the request.')
@@ -196,8 +206,14 @@ export async function approveVenueBooking(eventId, bookingId, input, user, db = 
 }
 
 function presentBooking(booking, canReject = false, canApprove = false, now = new Date()) {
-  const keys = ['id', 'eventRequestId', 'eventTitle', 'expectedAttendees', 'venueId', 'venueName', 'startsAt', 'endsAt', 'requirements', 'specialRequests', 'status', 'assignedVenueStaffName', 'holdExpiresAt', 'capacityWarning', 'createdAt', 'replacesId', 'replacedById', 'rejectionReason', 'suggestedAlternative', 'rejectedAt', 'approvedAt', 'approvalWarnings']
+  const keys = ['id', 'eventRequestId', 'eventTitle', 'expectedAttendees', 'attendeeCount', 'venueNeedId', 'venueId', 'venueName', 'startsAt', 'endsAt', 'requirements', 'specialRequests', 'status', 'assignedVenueStaffName', 'holdExpiresAt', 'capacityWarning', 'createdAt', 'replacesId', 'replacedById', 'rejectionReason', 'suggestedAlternative', 'rejectedAt', 'approvedAt', 'approvalWarnings']
   return { ...Object.fromEntries(keys.filter((key) => booking[key] !== undefined).map((key) => [key, booking[key]])), status: effectiveVenueBookingStatus(booking, now), canReject, canApprove }
+}
+
+export async function loadVenueBookingReadiness(eventId, db = getAdminDb(), now = new Date(), tx = null) {
+  const query = db.collection(BOOKINGS).where('eventRequestId', '==', eventId)
+  const snapshot = tx ? await tx.get(query) : await query.get()
+  return venueBookingReadiness(rows(snapshot), now)
 }
 
 export async function listEventVenueBookings(eventId, user, db = getAdminDb(), now = new Date()) {

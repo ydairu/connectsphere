@@ -263,16 +263,17 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
   })
 
   it('spm9_assigned_venue_and_technical_staff_sign_off_then_the_coordinator_confirms', async () => {
-    expect((await view(venueStaff, 'a1-planning')).json.availableActions).toEqual([APPROVE_VENUE, 'reject_venue'])
+    expect((await view(venueStaff, 'a1-planning')).json.availableActions).toEqual([])
     expect((await view(coordinator, 'a1-planning')).json.availableActions).toEqual([REJECT])
 
     expect((await act(coordinator, 'a1-planning', CONFIRM)).json.reason).toBe(ARRANGEMENTS_NOT_APPROVED)
-    expect((await act(venueStaff, 'a1-planning', APPROVE_VENUE)).status).toBe(200)
+    expect((await act(venueStaff, 'a1-planning', APPROVE_VENUE)).status).toBe(409)
+    db.collectionData('venueBookingRequests').set('venue-approved', { eventRequestId: 'seed-req-a1-planning', status: 'approved' })
     expect((await act(technicalStaff, 'a1-planning', APPROVE_TECHNICAL)).status).toBe(200)
 
     // Each role sees only the sign-off for the section it may view, and not who decided.
     const venueView = await view(venueStaff, 'a1-planning')
-    expect(venueView.json.arrangements).toEqual({ venue: { required: true, decision: 'approved', at: expect.any(String) } })
+    expect(venueView.json.arrangements).toEqual({ venue: { required: true, decision: 'approved', at: null } })
     const organiserView = await view(organiserA1, 'a1-planning')
     expect(Object.keys(organiserView.json.arrangements)).toEqual(['venue', 'technical'])
     expect(organiserView.json.request.arrangementApprovals).toBeUndefined()
@@ -286,8 +287,8 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
 
   it('spm9_the_coordinator_cannot_override_a_missing_approval', async () => {
     const byAction = await act(coordinator, 'a1-planning', APPROVE_VENUE)
-    expect(byAction.status).toBe(403)
-    expect(byAction.json.reason).toBe('not_assigned_staff')
+    expect(byAction.status).toBe(409)
+    expect(byAction.json.reason).toBe('venue_bookings_decide')
 
     // Nor through the section-edit route: the sign-off is record metadata, which no PATCH can write.
     const byPatch = await call('PATCH', '/api/requests/seed-req-a1-planning', coordinator, {

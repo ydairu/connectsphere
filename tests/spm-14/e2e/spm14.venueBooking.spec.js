@@ -14,9 +14,10 @@ async function signIn(page, user) {
   await expect(page).toHaveURL(/\/profile$/)
 }
 async function fill(page, venue = 'seed-venue-room') {
+  await page.getByLabel('Attendees using this venue').fill(venue === 'seed-venue-room' ? '30' : '80')
   await page.getByLabel('Venue', { exact: true }).selectOption(venue)
-  await expect(page.getByLabel('Start', { exact: true })).toHaveAttribute('readonly', '')
-  await expect(page.getByLabel('End', { exact: true })).toHaveAttribute('readonly', '')
+  await expect(page.getByLabel('Start', { exact: true })).toBeEditable()
+  await expect(page.getByLabel('End', { exact: true })).toBeEditable()
   await page.getByLabel('Venue requirements', { exact: true }).fill('Theatre with wheelchair access')
   await page.getByLabel('Special requests', { exact: true }).fill('Quiet room requested')
 }
@@ -25,7 +26,7 @@ test('SPM-14 submit, capacity warning, conflict, replacement and staff queue', a
   await signIn(page, ROLE_USERS.coordinator)
   await page.goto(path)
   await fill(page)
-  await expect(page.getByText(/exceeds venue capacity/)).toBeVisible()
+  await expect(page.getByLabel('Attendees using this venue')).toHaveValue('30')
   await page.getByRole('button', { name: 'Submit booking request', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('Seed Venue Staff')
   // An already-held venue is absent from the dropdown; a direct request still gets a conflict.
@@ -33,7 +34,7 @@ test('SPM-14 submit, capacity warning, conflict, replacement and staff queue', a
   await expect(page.getByLabel('Venue', { exact: true }).locator('option[value="seed-venue-room"]')).toHaveCount(0)
   const conflict = await page.request.post('http://127.0.0.1:5001/api/requests/seed-req-a1-planning/venue-bookings', {
     headers: { Authorization: `Bearer test-token:${ROLE_USERS.coordinator.uid}` },
-    data: { venueId: 'seed-venue-room', startsAt: '2027-03-01T10:00:00Z', endsAt: '2027-03-01T12:00:00Z', requirements: 'Theatre', submissionKey: 'duplicate-hold' },
+    data: { venueId: 'seed-venue-room', startsAt: '2027-03-01T10:00:00Z', endsAt: '2027-03-01T12:00:00Z', attendeeCount: 30, requirements: 'Theatre', submissionKey: 'duplicate-hold' },
   })
   expect(conflict.status()).toBe(409)
   await page.getByRole('tab', { name: 'Requests' }).click()
@@ -53,7 +54,7 @@ test('SPM-14 submit, capacity warning, conflict, replacement and staff queue', a
   await expect(page.getByRole('button', { name: 'Submit booking request' })).toHaveCount(0)
   const retry = await page.request.post('http://127.0.0.1:5001/api/requests/seed-req-b1-planning/venue-bookings', {
     headers: { Authorization: `Bearer test-token:${EXTRA_USERS.secondCoordinator.uid}` },
-    data: { venueId: 'seed-venue-room', ...seedEventPeriod('b1-planning'), requirements: 'Theatre', specialRequests: '', submissionKey: 'released-period' },
+    data: { venueId: 'seed-venue-room', ...seedEventPeriod('b1-planning'), attendeeCount: 30, requirements: 'Theatre', specialRequests: '', submissionKey: 'released-period' },
   })
   expect(retry.status()).toBe(201)
 })

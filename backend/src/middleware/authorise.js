@@ -6,7 +6,7 @@
 // predicates, and combining them lets one role's open gate unlock another role's sections (the
 // multi-role leak; CLAUDE.md, "Evaluate per role, then union the results").
 
-import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf } from '../../../shared/permissions.js'
+import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf, viewableSectionsFor } from '../../../shared/permissions.js'
 import { canReassignCoordinator } from '../../../shared/coordinatorReassignment.js'
 import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.js'
 import { reservedEquipmentSummary } from '../../../shared/equipmentReservation.js'
@@ -64,12 +64,14 @@ function outOfScope(user, res) {
  * `reservedEquipment` (SPM-62) lists the reserved equipment types and quantities, never unit ids, to anyone
  * who may view the equipment section; null when nothing is reserved.
  */
-export function presentRequest(user, request, { coordinatorName = null, ownerNames } = {}) {
+export function presentRequest(user, request, { coordinatorName = null, ownerNames, venueBookingReadiness = null } = {}) {
+  const current = { ...request, venueBookingReadiness }
   return {
     request: projectRequest(user, request),
     editableSections: SECTIONS.filter((section) => canEdit(user, request, section)),
-    availableActions: allAvailableActions(user, request),
-    arrangements: arrangementsSummary(user, request),
+    availableActions: allAvailableActions(user, current),
+    arrangements: arrangementsSummary(user, current),
+    venueBookingReadiness: venueBookingReadiness && viewableSectionsFor(user, request).includes('venue') ? venueBookingReadiness : null,
     cancellationRequest: cancellationSummary(user, request),
     clarificationRequests: clarificationSummary(user, request),
     canReassignCoordinator: canReassignCoordinator(user, request),
