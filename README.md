@@ -132,13 +132,13 @@ npm run build
 
 User-story suites live under `tests/` and are organised by story (`tests/spm-1`, `tests/spm-2`, with `tests/shared` for fixtures and doubles both stories use and `tests/lint` for repository-level checks). Every test name carries its `spm1_`/`spm2_` identifier. Unit and integration tests run in Vitest (React Testing Library for components, Supertest for the Express API) with the Firebase client and Admin SDKs replaced by in-memory fakes. The Playwright suites run the real React app and the real Express API in Chromium against an in-memory Firebase double (`tests/shared/firebase-double`), so no Firebase project, emulator or Java is needed.
 
-None of this is live Firebase, emulator, deployed-rule or production-database verification. In particular, `firestore.rules` is only checked as source text (`tests/spm-2/integration/firestoreRules.static.test.js`); executing the rules needs the Firestore emulator.
+The default `npm test` command does not exercise a live Firebase project, the Firestore emulator, deployed rules, or a production database. The CI emulator job is separate. In the default suite, `firestore.rules` is checked only as source text (`tests/spm-2/integration/firestoreRules.static.test.js`); executing the rules needs a separate rules test.
 
 The pre-existing suites are unchanged: `node:test` in `shared/`, `backend/src/` and `backend/scripts/`, and the frontend's co-located Vitest suites (`npm test --prefix frontend`). They cover shared validation and permissions, backend services and scripts, registration and profile UI behavior, session restoration, profile updates, and failure paths. API suites send real HTTP requests to the Express app with Firebase token verification and persistence replaced by mocks or in-memory equivalents.
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` runs three independent jobs on every push and on pull requests into `main`: code checks (lint, existing suites, `tests/` suites with coverage, and production build), six Firestore emulator transaction suites (SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81), and the Playwright E2E suites. It needs no secrets. Coverage, the Playwright report, and the existing SPM-14/SPM-58 emulator JSON results are uploaded as workflow artifacts. The emulator suites use local Firestore, not a deployed project.
+`.github/workflows/ci.yml` starts three independent jobs on every push and on pull requests into `main`. `code_checks` runs lint, existing tests, root Vitest coverage, and the production build; `firestore_emulator` runs six transaction suites (SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81); `e2e` runs Playwright with one worker. Each job installs its own dependencies and the jobs can run at the same time. CI needs no Firebase secrets. Coverage, the Playwright report, and the SPM-14/SPM-58 emulator JSON results are uploaded as artifacts. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for setup, commands, failure checks, and verification limits.
 
 The same API cases can also run against the real Firebase project, using real sign-ins for the seeded accounts:
 

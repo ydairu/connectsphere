@@ -23,12 +23,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        id: setup_node
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "npm cache hit: ${{ steps.setup_node.outputs.cache-hit }}"
+          npm ci --timing
 
       - name: Lint
         run: npm run lint
@@ -61,12 +64,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        id: setup_node
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "npm cache hit: ${{ steps.setup_node.outputs.cache-hit }}"
+          npm ci --timing
 
       - name: Java for local Firestore concurrency checks
         uses: actions/setup-java@v4
@@ -120,12 +126,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        id: setup_node
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "npm cache hit: ${{ steps.setup_node.outputs.cache-hit }}"
+          npm ci --timing
 
       - name: Resolve Playwright version
         id: playwright

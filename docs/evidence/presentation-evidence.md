@@ -1,6 +1,6 @@
 # Presentation Evidence Tracker
 
-Last reviewed: 18 October 2026 (SPM-34 venue booking rejection)
+Last reviewed: 22 October 2026 (CI job structure and local verification; earlier evidence retains its dated limits)
 
 ## Purpose
 
@@ -42,7 +42,7 @@ Use repository-relative paths only. Do not add personal filesystem paths, tempor
 | System design | C4 diagrams explain context, containers, major components, responsibilities, interfaces, data stores, and relevant design trade-offs; diagrams agree with the implementation. | Current stack and observed implementation state are summarised in [`project_context.md`](../../project_context.md). | Gap / blocker | Create and commit the required C4 design artefacts after the target architecture is agreed; verify them against the implemented system. |
 | Working software | Demonstrable end-to-end increments satisfy selected acceptance criteria and the Definition of Done; screenshots or recordings show real behaviour using representative data. | Authentication/profile code, Event Organiser create/draft/submit flows, draft listing, and role-based request list/detail/edit surfaces exist under [`frontend/src/`](../../frontend/src/), [`backend/src/`](../../backend/src/), and [`shared/`](../../shared/). SPM-7, SPM-4, SPM-3, SPM-2, SPM-24, and SPM-42 have story-level evidence below; SPM-1 and some SPM-42/SPM-24 claims still need stronger manual/live evidence. | In progress | Capture representative browser evidence for SPM-1, SPM-24, and multi-role SPM-42 workflows; avoid claiming live Firebase/security-rule or CI verification until actually run. |
 | Testing and traceability | Core features have positive, negative, authorisation, and relevant boundary tests; each acceptance criterion maps to test evidence and results. | Node/Vitest tests cover shared model rules, backend draft persistence/privacy/submission, profile registration/update rules, route guards, draft-list API rules, seed data, migration guards, and role-permission examples. SPM-7, SPM-4, SPM-3, SPM-2, SPM-24, and SPM-42 test evidence is recorded below. | In progress | A criterion-to-test matrix exists for SPM-42 and SPM-24 ([`spm42-spm24-traceability.md`](spm42-spm24-traceability.md)); extend it to the remaining stories and add manual/e2e evidence for journeys without automated browser tests. |
-| Code quality and CI | The repository has agreed conventions, reviewable changes, lint/build/test automation, and a CI pipeline that executes relevant quality checks. | [`AGENTS.md`](../../AGENTS.md) defines evidence and implementation guardrails. Local commands exist for `npm test`, frontend lint, and frontend build, but no tracked CI workflow is present. | In progress | Add CI and preserve successful run evidence from the pipeline, not only local runs. |
+| Code quality and CI | The repository has agreed conventions, reviewable changes, lint/build/test automation, and a CI pipeline that executes relevant quality checks. | [`AGENTS.md`](../../AGENTS.md) defines evidence guardrails. The [CI workflow](../../.github/workflows/ci.yml) and [pipeline guide](../testing/ci-pipeline.md) describe three independent jobs; the checks passed locally as recorded below. | In progress | Preserve a successful GitHub Actions run and its job/artifact results; local runs do not establish CI execution. |
 | Accountability and explainability | Contributions, decisions, changes, ownership, review feedback, limitations, and individual understanding are visible and credible. | Sprint 1 story ownership and current decisions/gaps are recorded in [`project_context.md`](../../project_context.md); source priority and evidence rules are in [`AGENTS.md`](../../AGENTS.md). | In progress | Keep contribution and decision records current; link commits or merge requests to stories; record review feedback, rationale, and individual responsibilities. |
 
 ## Verified Evidence Register
@@ -186,7 +186,7 @@ Create a subsection for each Sprint containing:
 | C4 system design | Diagrams are legible, internally consistent, implementation-aligned, and explain responsibilities and interfaces. | Add design paths here. | Planned |
 | Test cases and traceability | Every core feature and relevant acceptance criterion maps to executable test evidence and results. | Add test and traceability paths here. | Gap / blocker |
 | Working code and README | A teammate can set up, run, verify, and understand the implemented scope without relying on one person's machine. | [`README.md`](../../README.md), [`frontend/`](../../frontend/), [`backend/`](../../backend/) | In progress |
-| CI pipeline and results | Pipeline runs the relevant build, lint, and test checks; recorded evidence comes from real runs. | Add workflow path here. | Gap / blocker |
+| CI pipeline and results | Pipeline runs the relevant build, lint, and test checks; recorded evidence comes from real runs. | [CI workflow](../../.github/workflows/ci.yml) and [pipeline guide](../testing/ci-pipeline.md); local results recorded below, GitHub Actions run evidence pending. | In progress |
 | Final-Sprint ceremony recordings | Sprint Planning, Sprint Review, Sprint Retrospective, and one Daily Scrum are retained as required evidence. | Store only an approved repository-accessible reference or submission reference. | Planned |
 | Repository-access evidence | Assessors can access the correct repository/version and contribution history. | Record the approved submission reference when available. | Planned |
 | Week 11 slide deck | Uses the released template; self-contained; concise; every completion claim is supported by this register. | Add the final deck path here. | Planned |
@@ -225,6 +225,10 @@ The repository now contains expiry-aware booking and calendar behavior, a one-ho
 ## 21 October 2026 — SPM-80 separate venue queue entries
 
 Venue Staff queue cards now pair the event and venue in each heading. Per-booking selection and decision behavior is covered by `docs/evidence/spm-80-traceability.md`; human checks are in `docs/testing/spm-80-manual-testing.md`. Full local verification passed: 128 Node, 101 frontend, 1,779 root Vitest and 101 Chromium tests, plus lint and build. API/browser persistence used in-memory doubles. Human acceptance and live Firebase verification were not performed; SPM-80 remains **In Progress**.
+
+## 22 October 2026 — CI job structure
+
+The [CI workflow](../../.github/workflows/ci.yml) defines independent code-check, Firestore emulator, and Playwright jobs; the [pipeline guide](../testing/ci-pipeline.md) records their commands, artifacts, and limits. The emulator job now includes SPM-54, SPM-78, and SPM-79 alongside SPM-14, SPM-58, and SPM-81. Local verification passed: lint, 128 Node tests, 101 frontend tests, 1,798 root Vitest tests with coverage (49 opt-in cases skipped), 103 Chromium tests, the production build, and all six Firestore emulator suites. This verifies the commands locally; a GitHub Actions run is still needed to show that the jobs start independently and upload their artifacts. No live Firebase project or deployed-rule verification is claimed.
 
 ## Evidence Entry Template
 

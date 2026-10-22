@@ -339,7 +339,9 @@ The E2E commands start two servers themselves (double + API on `127.0.0.1:5001`,
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` runs `npm ci`, `npm run lint`, `npm run test:existing`, `npm run test:coverage`, `npm run build`, then the Playwright suites, on every push and on pull requests into `main`. It needs no secrets. The Playwright HTML report and `coverage/` are attached to each run as artifacts.
+At the September 2026 setup, `.github/workflows/ci.yml` ran `npm ci`, `npm run lint`, `npm run test:existing`, `npm run test:coverage`, `npm run build`, then the Playwright suites, on every push and on pull requests into `main`. It needed no secrets. The Playwright HTML report and `coverage/` were attached to each run as artifacts.
+
+**Current workflow (22 October 2026):** those checks now run in separate code-check and E2E jobs alongside a Firestore emulator job. See the [CI pipeline guide](ci-pipeline.md) for the three-job structure and added transaction suites.
 
 ## 6. Expected results
 
@@ -379,3 +381,4 @@ Add a row for every change to the suite (new tests, renamed tests, removed tests
 | 2026-09-22 | Suite designed; npm workspace, root Vitest/Playwright/ESLint configuration, GitHub Actions workflow and the SPM-1/SPM-2 unit tests created. | `package.json`, `vitest.config.js`, `playwright.config.js`, `eslint.config.js`, `.npmrc`, `.github/workflows/ci.yml`, `tests/spm-1/unit/*`, `tests/spm-2/unit/*`, `tests/shared/*` | ydairu |
 | 2026-09-24 | Integration and E2E suites completed; Firebase double for Playwright; four test-side corrections (import hoisting, nav-scoped "Log in" queries, jsdom timeout, post-redirect login expectation). Full suite verified green twice: 404 tests. | `tests/spm-1/integration/*`, `tests/spm-1/e2e/*`, `tests/spm-2/integration/*`, `tests/spm-2/e2e/*`, `tests/shared/firebase-double/*`, `tests/lint/*`, `README.md`, `project_context.md` | ydairu |
 | 2026-09-24 | This document created. | `docs/testing/spm-1-spm-2-automated-tests.md` | ydairu |
+| 2026-10-22 | Labelled the original CI description as historical and linked the current three-job guide; no SPM-1/SPM-2 tests changed. | `docs/testing/spm-1-spm-2-automated-tests.md`, `docs/testing/ci-pipeline.md` | Codex |

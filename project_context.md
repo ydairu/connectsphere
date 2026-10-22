@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 22 October 2026 (SPM-77 individual venue booking management; older sections retain their historical dates)
+Last reviewed: 22 October 2026 (SPM-77 individual venue booking management and CI structure; older sections retain their historical dates)
 
 ## Project Purpose
 
@@ -52,7 +52,7 @@ Tracked application routes currently include:
 - `/register`
 - protected `/profile`
 
-The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. A GitHub Actions workflow (`.github/workflows/ci.yml`) runs three parallel jobs on every push and on pull requests into `main`: lint, existing tests, root Vitest coverage and build; six isolated Firestore emulator transaction suites (SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81); and the full Playwright E2E suite. The opt-in live API harness is not part of CI.
+The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. The [CI workflow](.github/workflows/ci.yml) defines three independent jobs on every push and on pull requests into `main`: code checks and build, six local Firestore emulator transaction suites, and the full Playwright E2E suite. The opt-in live API harness is not part of CI. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for commands, artifacts, and verification boundaries.
 
 ## Independently Observed Implementation State
 
