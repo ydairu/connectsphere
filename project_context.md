@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 21 October 2026 (SPM-81 independent venue decisions; older sections retain their historical dates)
+Last reviewed: 22 October 2026 (SPM-77 individual venue booking management; older sections retain their historical dates)
 
 ## Project Purpose
 
@@ -787,3 +787,10 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Evidence:** `docs/evidence/spm-81-traceability.md`; Dairu's manual checklist `docs/testing/spm-81-manual-testing.md`. No Firestore rules change or deployment, live Firebase verification, or Git publication is claimed.
 - **Local verification:** lint, production build and whitespace checks passed; `npm test` passed 128 Node, 101 frontend, 1,788 root Vitest tests (49 opt-in cases skipped) and 102 Chromium browser tests. Two isolated SPM-81 Firestore emulator concurrency tests passed. HTTP tests use mocked identity and in-memory persistence; browser tests use the Firebase double. The existing build chunk-size warning remains. Human manual acceptance and live-project verification were not performed.
 - A final missing-reservation guard and test were added after the full suite; `npm run test:spm81` passed 10 unit/service/API tests and its Chromium journey, and lint passed afterward. The full suite was not rerun for that guard.
+
+## SPM-77 individual venue booking management — 22 October 2026
+
+- The event Venue Details tab now shows one current booking per venue need for Coordinators and in-scope Organisers, with separate status, period, next step and expandable earlier attempts. The existing booking GET API supplies a limited customer-facing response to Organisers; action permissions remain unchanged.
+- Approved-booking changes reuse SPM-81 cancellation followed by SPM-14 replacement. The selected venue need remains unresolved until its replacement is approved. Sibling venue bookings and equipment reservations remain intact; whole-event closure still releases active venue commitments.
+- **Status:** In Progress, Sprint 3. SPM-74 is still To Do and must supply and verify the recorded affected-booking flag for post-approval venue unavailability before the final Organiser display criterion is Done. Human acceptance and independent peer review are pending.
+- **Evidence:** `docs/evidence/spm-77-traceability.md`; manual checklist `docs/testing/spm-77-manual-testing.md`. Targeted SPM-77 Vitest passed 9 tests and its Chromium journey passed after the final small follow-ups. The earlier full local run passed 128 Node, 101 frontend, 1,797 root Vitest and 103 Chromium tests; SPM-79 and SPM-81 Firestore emulator suites passed 3 and 2 transaction tests. Lint and build passed with the existing large-chunk warning. No live-project verification, rules deployment, commit, push or PR is claimed.

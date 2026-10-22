@@ -1,4 +1,4 @@
-import { COORDINATOR, VENUE_STAFF, isAssignedCoordinator, projectRequest, rolesOf } from '../../../shared/permissions.js'
+import { COORDINATOR, ORGANISER, VENUE_STAFF, inScopeAs, isAssignedCoordinator, projectRequest, rolesOf } from '../../../shared/permissions.js'
 import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_CANCELLED, BOOKING_EXPIRED, VENUE_BOOKING_CANCELLED, effectiveVenueBookingStatus, canReadVenueBooking, canRejectVenueBooking, canApproveVenueBooking, canCancelVenueBooking, canRequestVenue, chooseVenueStaff, normaliseVenueBooking, normaliseVenueBookingRejection, venueBookingApprovalErrors, venueBookingCancellationErrors, venueBookingSuitability, venueBookingReadiness, venueNeedId } from '../../../shared/venueBooking.js'
 import { AVAILABILITY_STATUS, REMOVED_STATUSES, tentativeHoldExpiresAt, validateAvailabilityRange } from '../../../shared/venueAvailability.js'
 import { venueBookingApprovedNotifications, venueBookingRejectedNotifications } from '../../../shared/notifications.js'
@@ -265,6 +265,13 @@ function presentBooking(booking, canReject = false, canApprove = false, now = ne
   return { ...Object.fromEntries(keys.filter((key) => booking[key] !== undefined).map((key) => [key, booking[key]])), status: effectiveVenueBookingStatus(booking, now), canReject, canApprove, canCancel }
 }
 
+// The Organiser sees booking outcomes, not staff assignment, internal requirements or approval notes.
+function presentOrganiserBooking(booking, now) {
+  const fields = ['id', 'venueNeedId', 'replacesId', 'venueName', 'startsAt', 'endsAt', 'createdAt', 'approvedAt', 'cancelledAt']
+  return { ...Object.fromEntries(fields.filter((key) => booking[key] !== undefined).map((key) => [key, booking[key]])),
+    status: effectiveVenueBookingStatus(booking, now) }
+}
+
 export async function loadVenueBookingReadiness(eventId, db = getAdminDb(), now = new Date(), tx = null) {
   const query = db.collection(BOOKINGS).where('eventRequestId', '==', eventId)
   const snapshot = tx ? await tx.get(query) : await query.get()
@@ -277,10 +284,15 @@ export async function listEventVenueBookings(eventId, user, db = getAdminDb(), n
   const event = { ...snapshot.data(), id: eventId }
   const bookings = rows(await db.collection(BOOKINGS).where('eventRequestId', '==', eventId).get())
   const coordinator = rolesOf(user).includes(COORDINATOR) && isAssignedCoordinator(user, event)
+  const organiser = inScopeAs(ORGANISER, user, event)
   const visible = bookings.filter((b) => canReadVenueBooking(user, event, b))
-  if (!coordinator && !visible.length) throw new VenueBookingError(404, 'Event not found.')
+  if (!coordinator && !organiser && !visible.length) throw new VenueBookingError(404, 'Event not found.')
   return { event: projectRequest(user, event), canSubmit: canRequestVenue(user, event),
     bookings: await Promise.all(visible.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(async (b) => {
+      // A dual-role user keeps their assigned staff view, but other bookings in their organisation
+      // receive only the customer-facing projection.
+      const staffAccess = rolesOf(user).includes(VENUE_STAFF) && b.assignedVenueStaffUid === user.uid
+      if (organiser && !coordinator && !staffAccess) return presentOrganiserBooking(b, now)
       const presented = presentBooking(b, canRejectVenueBooking(user, event, b, now), canApproveVenueBooking(user, event, b, now), now,
         canCancelVenueBooking(user, event, b, now) && !b.replacedById)
       if (presented.status === BOOKING_PENDING) {

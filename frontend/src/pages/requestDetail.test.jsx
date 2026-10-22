@@ -54,7 +54,7 @@ describe('SPM-42 — viewing a request by role', () => {
     await user.clear(screen.getByLabelText('Title'))
     await user.type(screen.getByLabelText('Title'), 'Updated event')
     await user.click(screen.getByRole('tab', { name: 'Venue Details' }))
-    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Venue', 'Venue preparation', 'Venue booking requests'])
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Venue', 'Venue preparation', 'Venue bookings', 'Venue booking requests'])
     await user.click(screen.getByRole('tab', { name: 'Equipment Required' }))
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Equipment and technical support', 'Registration', 'Equipment requests'])
     await user.click(screen.getByRole('tab', { name: 'Event Status' }))

@@ -33,6 +33,7 @@ test('one approved venue can be cancelled and replaced without releasing the oth
   await approve(hall)
   await approve(room)
   await loginAs(page, coordinator)
+  await expect(page).toHaveURL(/\/profile$/)
   await page.goto(`${pageUrl}?bookingId=${hall.id}`)
   await page.getByRole('button', { name: 'Cancel booking' }).click()
   await expect(page.getByRole('form', { name: 'Cancel venue booking' })).toContainText('Seed Hall')

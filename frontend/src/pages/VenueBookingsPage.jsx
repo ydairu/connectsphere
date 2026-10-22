@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_CANCELLED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_EXPIRED, capacityWarning } from '../../../shared/venueBooking.js'
+import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_CANCELLED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_EXPIRED, capacityWarning, venueBookingStatusLabel } from '../../../shared/venueBooking.js'
 import { COORDINATOR } from '../../../shared/permissions.js'
 import { eventPeriod } from '../../../shared/venueSuitability.js'
 import { approveVenueBooking, cancelVenueBooking, getRequest, getVenueBookings, getVenueBookingQueue, listVenues, rejectVenueBooking, submitVenueBooking } from '../services/api.js'
@@ -19,7 +19,6 @@ function localTime(value) {
 const displayTime = (value) => !value || Number.isNaN(Date.parse(value)) ? 'Not set' : new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 const emptyForm = () => ({ venueId: '', startsAt: '', endsAt: '', attendeeCount: '', requirements: '', specialRequests: '', replacesId: null, submissionKey: crypto.randomUUID() })
 const bookingTabs = [{ id: 'submit', label: 'Submit a Request' }, { id: 'recommendations', label: 'Recommendations' }, { id: 'requests', label: 'Requests' }]
-const bookingStatusLabel = (status) => ({ [BOOKING_PENDING]: 'Under review', [BOOKING_APPROVED]: 'Approved', [BOOKING_REJECTED]: 'Rejected', [BOOKING_REPLACED]: 'Replaced', [BOOKING_CANCELLED]: 'Cancelled', [BOOKING_EXPIRED]: 'Expired' })[status] ?? status
 
 function Suitability({ suitability }) {
   return <>
@@ -232,7 +231,7 @@ export default function VenueBookingsPage() {
     {(!id || detailView || activeTab === 'requests') && bookings?.length === 0 && <Card className="request-form-section"><p>{detailView ? 'This booking request is unavailable or you do not have access to it.' : id ? 'No booking requests.' : 'No pending booking requests.'}</p></Card>}
     {(!id || detailView || activeTab === 'requests') && bookings?.map((booking) => <Card className="request-form-section booking-card" key={booking.id}>
       <details open={!id || detailView ? true : undefined}>
-      <summary><span>{!id ? `${booking.eventTitle} — ${booking.venueName}` : booking.venueName}</span><span>{bookingStatusLabel(booking.status)}</span></summary>
+      <summary><span>{!id ? `${booking.eventTitle} — ${booking.venueName}` : booking.venueName}</span><span>{venueBookingStatusLabel(booking.status)}</span></summary>
       {!id ? <>
         <BookingRow label="Requested venue">{booking.venueName}</BookingRow>
         <BookingRow label="Starts">{displayTime(booking.startsAt)}</BookingRow>
@@ -246,7 +245,7 @@ export default function VenueBookingsPage() {
         <BookingRow label="Attendees using this venue">{booking.attendeeCount ?? booking.expectedAttendees ?? 'Not set'}</BookingRow>
         <BookingRow label="Venue requirements">{booking.requirements}</BookingRow>
         <BookingRow label="Special requests">{booking.specialRequests || 'None'}</BookingRow>
-        <BookingRow label="Status">{booking.status === BOOKING_APPROVED ? 'Approved — venue confirmed' : bookingStatusLabel(booking.status)}</BookingRow>
+        <BookingRow label="Status">{booking.status === BOOKING_APPROVED ? 'Approved — venue confirmed' : venueBookingStatusLabel(booking.status)}</BookingRow>
         {booking.approvedAt && <BookingRow label="Approved at">{displayTime(booking.approvedAt)}</BookingRow>}
         {booking.cancelledAt && <BookingRow label="Cancelled at">{displayTime(booking.cancelledAt)}</BookingRow>}
         {booking.status === BOOKING_REJECTED && <>
