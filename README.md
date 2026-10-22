@@ -138,7 +138,7 @@ The pre-existing suites are unchanged: `node:test` in `shared/`, `backend/src/` 
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` runs on every push and on pull requests into `main`: lint, the existing suites, the `tests/` suites with coverage, the production build, then the Playwright E2E suites. It needs no secrets. The Playwright report and coverage are uploaded as workflow artifacts.
+`.github/workflows/ci.yml` runs three independent jobs on every push and on pull requests into `main`: code checks (lint, existing suites, `tests/` suites with coverage, and production build), six Firestore emulator transaction suites (SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81), and the Playwright E2E suites. It needs no secrets. Coverage, the Playwright report, and the existing SPM-14/SPM-58 emulator JSON results are uploaded as workflow artifacts. The emulator suites use local Firestore, not a deployed project.
 
 The same API cases can also run against the real Firebase project, using real sign-ins for the seeded accounts:
 

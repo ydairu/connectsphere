@@ -52,7 +52,7 @@ Tracked application routes currently include:
 - `/register`
 - protected `/profile`
 
-The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. A GitHub Actions workflow (`.github/workflows/ci.yml`) runs lint, all test suites, the production build and the Playwright E2E suites on every push and on pull requests into `main`.
+The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. A GitHub Actions workflow (`.github/workflows/ci.yml`) runs three parallel jobs on every push and on pull requests into `main`: lint, existing tests, root Vitest coverage and build; six isolated Firestore emulator transaction suites (SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81); and the full Playwright E2E suite. The opt-in live API harness is not part of CI.
 
 ## Independently Observed Implementation State
 

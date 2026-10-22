@@ -1,9 +1,8 @@
 name: CI
 
-# Runs the full automated suite on every push and on pull requests into main.
-# Nothing here needs Firebase credentials: unit/integration tests mock Firebase and the E2E suite
-# runs against the in-memory Firebase double. The opt-in live harness (test:api:live) never runs here.
-# SPM-14 also exercises actual transactions against a local, credential-free Firestore emulator.
+# Runs code checks, Firestore emulator tests and browser tests in independent jobs.
+# Nothing here needs Firebase credentials: the live API harness (test:api:live) is opt-in.
+# E2E uses an in-memory Firebase double; transaction tests use a local Firestore emulator.
 on:
   push:
   pull_request:
@@ -14,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Lint, test, build, E2E
+  code_checks:
+    name: Lint, unit and integration tests, build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -43,14 +42,55 @@ jobs:
       - name: Frontend production build
         run: npm run build
 
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+          retention-days: 14
+          if-no-files-found: ignore
+
+  firestore_emulator:
+    name: Firestore emulator transactions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Java for local Firestore concurrency checks
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
 
-      - name: Booking transactions against Firestore emulator
+      - name: Booking transactions against Firestore emulator (SPM-14)
         run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-bookings --config firebase.spm14.json "npm run test:spm14:emulator"
+
+      - name: Venue booking approval transactions (SPM-54)
+        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-spm54 --config tests/spm-54/firebase.emulator.json "npm run test:spm54:emulator"
+
+      - name: Equipment reservation transactions (SPM-58)
+        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-bookings --config firebase.spm14.json "npm run test:spm58:emulator"
+
+      - name: Venue hold expiry transactions (SPM-78)
+        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-spm78 --config firebase.spm14.json "npm run test:spm78:emulator"
+
+      - name: Multiple venue booking transactions (SPM-79)
+        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-spm79 --config firebase.spm14.json "npm run test:spm79:emulator"
+
+      - name: Individual venue cancellation against Firestore emulator (SPM-81)
+        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-spm81 --config firebase.spm14.json "npm run test:spm81:emulator"
 
       - name: Upload booking emulator results
         if: always()
@@ -61,13 +101,6 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-      # SPM-58: simultaneous equipment reservations, on the same local emulator configuration as SPM-14.
-      - name: Equipment reservation transactions against Firestore emulator
-        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-bookings --config firebase.spm14.json "npm run test:spm58:emulator"
-
-      - name: Individual venue cancellation against Firestore emulator
-        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-spm81 --config firebase.spm14.json "npm run test:spm81:emulator"
-
       - name: Upload equipment reservation emulator results
         if: always()
         uses: actions/upload-artifact@v4
@@ -76,6 +109,23 @@ jobs:
           path: test-results/spm58-emulator.json
           retention-days: 14
           if-no-files-found: ignore
+
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Resolve Playwright version
         id: playwright
@@ -107,14 +157,5 @@ jobs:
           path: |
             playwright-report
             test-results
-          retention-days: 14
-          if-no-files-found: ignore
-
-      - name: Upload coverage report
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage
           retention-days: 14
           if-no-files-found: ignore
