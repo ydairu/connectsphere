@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_CANCELLED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_EXPIRED, capacityWarning } from '../../../shared/venueBooking.js'
 import { COORDINATOR } from '../../../shared/permissions.js'
 import { eventPeriod } from '../../../shared/venueSuitability.js'
-import { approveVenueBooking, getRequest, getVenueBookings, getVenueBookingQueue, listVenues, rejectVenueBooking, submitVenueBooking } from '../services/api.js'
+import { approveVenueBooking, cancelVenueBooking, getRequest, getVenueBookings, getVenueBookingQueue, listVenues, rejectVenueBooking, submitVenueBooking } from '../services/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { venueBookingRequirements } from '../utils/venueBookingRequirements.js'
 import Navbar from '../components/Navbar.jsx'
@@ -56,6 +56,7 @@ export default function VenueBookingsPage() {
   const [refreshFailure, setRefreshFailure] = useState(null)
   const [rejectingId, setRejectingId] = useState(null)
   const [approvingId, setApprovingId] = useState(null)
+  const [cancellingId, setCancellingId] = useState(null)
   const [staleDecision, setStaleDecision] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [suggestedAlternative, setSuggestedAlternative] = useState('')
@@ -67,6 +68,7 @@ export default function VenueBookingsPage() {
       setError('')
       setApprovingId(null)
       setRejectingId(null)
+      setCancellingId(null)
       setStaleDecision(false)
       setRefreshFailure(null)
       try {
@@ -128,6 +130,7 @@ export default function VenueBookingsPage() {
   async function refreshDecision(booking, purpose) {
     setRefreshing(true); setRefreshFailure(null); setError(''); setNotice('')
     if (purpose === 'approve') setApprovingId(null)
+    if (purpose === 'cancel') setCancellingId(null)
     try {
       const response = await getVenueBookings(user, id)
       setData(response)
@@ -136,8 +139,11 @@ export default function VenueBookingsPage() {
         if (!current?.canApprove) { setNotice('This booking can no longer be approved. Its current state is shown.'); return }
         if (!current.suitability) throw new Error('Missing suitability preview')
         setApprovingId(current.id)
+      } else if (purpose === 'cancel') {
+        if (!current?.canCancel) { setNotice('This booking can no longer be cancelled. Its current state is shown.'); return }
+        setCancellingId(current.id)
       } else {
-        if (!response.canSubmit || !current || current.replacedById || ![BOOKING_PENDING, BOOKING_REJECTED, BOOKING_EXPIRED].includes(current.status)) {
+        if (!response.canSubmit || !current || current.replacedById || ![BOOKING_PENDING, BOOKING_REJECTED, BOOKING_EXPIRED, BOOKING_CANCELLED].includes(current.status)) {
           setForm(emptyForm()); setNotice('This booking can no longer be replaced. Its current state is shown.'); return
         }
         setForm({ venueId: current.venueId, startsAt: current.startsAt, endsAt: current.endsAt,
@@ -177,6 +183,20 @@ export default function VenueBookingsPage() {
       setNotice('Booking approved. The venue is confirmed for the booked period and the Coordinator has been notified.')
     } catch (err) {
       setError([err.details?.message ?? 'Unable to approve the booking. Please try again.', ...Object.values(err.details?.errors ?? {})].join(' '))
+      setStaleDecision([404, 409].includes(err.status))
+    } finally { setBusy(false) }
+  }
+  async function cancel(event) {
+    event.preventDefault()
+    setBusy(true); setError(''); setNotice(''); setStaleDecision(false)
+    try {
+      await cancelVenueBooking(user, id, cancellingId)
+      setCancellingId(null)
+      setNotice('Booking cancelled. Only this venue reservation was released; replace it before confirming the event.')
+      try { setData(await getVenueBookings(user, id)) }
+      catch { setError('The booking was cancelled, but requests could not be refreshed. Reload to see the latest list.') }
+    } catch (err) {
+      setError(err.details?.message ?? 'Unable to cancel the booking. Reload and try again.')
       setStaleDecision([404, 409].includes(err.status))
     } finally { setBusy(false) }
   }
@@ -228,6 +248,7 @@ export default function VenueBookingsPage() {
         <BookingRow label="Special requests">{booking.specialRequests || 'None'}</BookingRow>
         <BookingRow label="Status">{booking.status === BOOKING_APPROVED ? 'Approved — venue confirmed' : bookingStatusLabel(booking.status)}</BookingRow>
         {booking.approvedAt && <BookingRow label="Approved at">{displayTime(booking.approvedAt)}</BookingRow>}
+        {booking.cancelledAt && <BookingRow label="Cancelled at">{displayTime(booking.cancelledAt)}</BookingRow>}
         {booking.status === BOOKING_REJECTED && <>
           <BookingRow label="Rejection reason">{booking.rejectionReason}</BookingRow>
           {booking.suggestedAlternative && <BookingRow label="Suggested alternative">{booking.suggestedAlternative}</BookingRow>}
@@ -262,8 +283,16 @@ export default function VenueBookingsPage() {
               <button type="button" onClick={() => { setRejectingId(null); setError('') }}>Cancel</button>
             </fieldset></form>}
         </div>}
+        {detailView && booking.canCancel && <div className="booking-actions">
+          {cancellingId !== booking.id ? <button className="button button-secondary" type="button" disabled={busy || refreshing || !!refreshFailure || staleDecision} onClick={() => refreshDecision(booking, 'cancel')}>Cancel booking</button> :
+            <form onSubmit={cancel} aria-label="Cancel venue booking"><fieldset disabled={busy || refreshing || !!refreshFailure || staleDecision}>
+              <p>Cancel the approved booking for {booking.venueName}? Only this venue reservation will be released. The event will be in Planning until a replacement is approved.</p>
+              <button className="button button-primary" type="submit">{busy ? 'Cancelling…' : 'Confirm booking cancellation'}</button>
+              <button type="button" onClick={() => setCancellingId(null)}>Keep booking</button>
+            </fieldset></form>}
+        </div>}
       </>}
-      {!detailView && data.canSubmit && !booking.replacedById && [BOOKING_PENDING, BOOKING_REJECTED, BOOKING_EXPIRED].includes(booking.status) && <button type="button" disabled={busy || refreshing || !!refreshFailure} onClick={() => refreshDecision(booking, 'replace')}>Replace request for {booking.venueName}</button>}
+      {!detailView && data.canSubmit && !booking.replacedById && [BOOKING_PENDING, BOOKING_REJECTED, BOOKING_EXPIRED, BOOKING_CANCELLED].includes(booking.status) && <button type="button" disabled={busy || refreshing || !!refreshFailure} onClick={() => refreshDecision(booking, 'replace')}>Replace request for {booking.venueName}</button>}
       </details>
     </Card>)}
     {!detailView && activeTab === 'submit' && data?.canSubmit && <Card className="request-form-section"><div className="section-heading"><h2>{form.replacesId ? 'Replace booking request' : 'Request a venue'}</h2></div>

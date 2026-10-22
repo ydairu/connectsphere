@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 21 October 2026 (SPM-79 multiple venue requests; older sections retain their historical dates)
+Last reviewed: 21 October 2026 (SPM-81 independent venue decisions; older sections retain their historical dates)
 
 ## Project Purpose
 
@@ -778,3 +778,12 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Status:** In Progress, Sprint 3. Human acceptance and independent peer review remain outstanding. SPM-81 decisions and SPM-77 booking management are separate stories.
 - **Local verification:** targeted SPM-80/SPM-53 Vitest tests passed (10 tests) and two SPM-80 Chromium journeys passed. Full `npm test` passed 128 Node, 101 frontend, 1,779 root Vitest (47 opt-in cases skipped) and 101 Chromium tests. Lint and build passed; the build retains its large-chunk warning. API tests use mocked identity and in-memory persistence; browser tests use the local Firebase double. No live Firebase, emulator or human acceptance was tested.
 - **Evidence:** `docs/evidence/spm-80-traceability.md`; manual checklist `docs/testing/spm-80-manual-testing.md`. No Firestore rules change/deployment, Git publication or deployment occurred.
+
+## SPM-81 independent venue decisions — 21 October 2026
+
+- Existing SPM-54 approval and SPM-34 rejection paths decide only the selected booking. SPM-81 adds explicit multi-venue checks and a narrow individual cancellation path on the existing booking action API. The assigned Coordinator cancels one current approved booking; only its confirmed reservation is released. The booking retains its Cancelled history and its venue need can be replaced.
+- **Team decision approved for this increment:** cancelling an approved booking on a Confirmed event returns it to Planning with status history. The action is available before the event starts and while no whole-event cancellation request is open. The remaining venue bookings and equipment reservations stay intact. Confirm needs approval of the replacement venue need.
+- **Scope:** this is the approved-booking cancellation path needed by SPM-81. Broader SPM-77 booking management, SPM-67 safety handoff, SPM-48/89 preparation integration, and human acceptance remain separate. SPM-81 stays **In Progress, Sprint 3** until all acceptance and Definition of Done checks are complete.
+- **Evidence:** `docs/evidence/spm-81-traceability.md`; Dairu's manual checklist `docs/testing/spm-81-manual-testing.md`. No Firestore rules change or deployment, live Firebase verification, or Git publication is claimed.
+- **Local verification:** lint, production build and whitespace checks passed; `npm test` passed 128 Node, 101 frontend, 1,788 root Vitest tests (49 opt-in cases skipped) and 102 Chromium browser tests. Two isolated SPM-81 Firestore emulator concurrency tests passed. HTTP tests use mocked identity and in-memory persistence; browser tests use the Firebase double. The existing build chunk-size warning remains. Human manual acceptance and live-project verification were not performed.
+- A final missing-reservation guard and test were added after the full suite; `npm run test:spm81` passed 10 unit/service/API tests and its Chromium journey, and lint passed afterward. The full suite was not rerun for that guard.

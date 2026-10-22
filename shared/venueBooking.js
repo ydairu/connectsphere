@@ -1,8 +1,9 @@
 import { COORDINATOR, VENUE_STAFF, isAssignedCoordinator, rolesOf } from './permissions.js'
-import { PLANNING } from './status.js'
+import { CONFIRMED, PLANNING } from './status.js'
 import { chooseStaff } from './staffAssignment.js'
 import { validateAvailabilityRange } from './venueAvailability.js'
 import { checkVenueSuitability, LAYOUT } from './venueSuitability.js'
+import { eventHasStarted, hasOpenCancellation } from './cancellationRequests.js'
 
 export const BOOKING_PENDING = 'pending'
 export const BOOKING_APPROVED = 'approved'
@@ -10,6 +11,7 @@ export const BOOKING_REJECTED = 'rejected'
 export const BOOKING_REPLACED = 'replaced'
 export const BOOKING_CANCELLED = 'cancelled'
 export const BOOKING_EXPIRED = 'expired'
+export const VENUE_BOOKING_CANCELLED = 'venue_booking_cancelled'
 
 export function effectiveVenueBookingStatus(booking, now = new Date()) {
   return booking.status === BOOKING_PENDING && typeof booking.holdExpiresAt === 'string' &&
@@ -71,6 +73,20 @@ export function canRejectVenueBooking(user, event, booking, now = new Date()) {
 
 export function canApproveVenueBooking(user, event, booking, now = new Date()) {
   return canRejectVenueBooking(user, event, booking, now)
+}
+
+export function canCancelVenueBooking(user, event, booking, now = new Date()) {
+  return rolesOf(user).includes(COORDINATOR) && isAssignedCoordinator(user, event) &&
+    [PLANNING, CONFIRMED].includes(event.status) && booking.status === BOOKING_APPROVED &&
+    !hasOpenCancellation(event) && !eventHasStarted(event, now)
+}
+
+export function venueBookingCancellationErrors(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { request: 'A cancellation action is required.' }
+  const errors = {}
+  for (const key of Object.keys(input)) if (key !== 'action') errors[key] = 'This field cannot be set.'
+  if (input.action !== 'cancel') errors.action = 'Choose Cancel booking.'
+  return errors
 }
 
 export function venueBookingApprovalErrors(input) {
