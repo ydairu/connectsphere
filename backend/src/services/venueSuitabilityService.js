@@ -7,6 +7,7 @@ import { getAdminDb } from '../config/firebaseAdmin.js'
 import { buildVenueFilterOptions } from '../../../shared/venueSearch.js'
 import {
   NOT_PERMITTED,
+  UNSUITABLE,
   checkVenueSuitability,
   compareSuitability,
   eventPeriod,
@@ -14,6 +15,12 @@ import {
   venueRequirements,
 } from '../../../shared/venueSuitability.js'
 import { formatSingaporePeriod } from '../../../shared/operatingHours.js'
+import {
+  BOOKING_APPROVED,
+  BOOKING_PENDING,
+  currentVenueBookingGroups,
+  effectiveVenueBookingStatus,
+} from '../../../shared/venueBooking.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError } from './eventRequestService.js'
 import { requireRequestScope } from './statusTransitionService.js'
 import { VenueNotFoundError } from './venueService.js'
@@ -37,8 +44,20 @@ function eventSummary(request) {
   }
 }
 
+const VENUE_BOOKINGS = 'venueBookingRequests'
+
+// SPM-76: the event's own venues are the current request of each venue need that is still pending or
+// approved; rejected, cancelled, expired and replaced requests no longer name a venue for the event.
+function eventVenueBookings(bookings, now) {
+  return currentVenueBookingGroups(bookings)
+    .map(({ venueNeedId, current }) => ({ venueNeedId, booking: current, status: effectiveVenueBookingStatus(current, now) }))
+    .filter(({ status }) => status === BOOKING_PENDING || status === BOOKING_APPROVED)
+}
+
 /**
- * GET /api/event-requests/:id/venue-suitability. Returns { event, venues, options }:
+ * GET /api/event-requests/:id/venue-suitability. Returns { event, eventVenues, venues, options }:
+ * - eventVenues: each venue the event has asked for (SPM-76), in the order requested, each checked
+ *   separately with { result, problems, warnings } and its request status;
  * - venues: every catalogue venue (or only `venueId`) with { result, problems, warnings }, suitable first;
  * - options: the facilities and accessibility features recorded in the catalogue, for choosing requirements.
  *
@@ -46,7 +65,14 @@ function eventSummary(request) {
  * else outside it EventRequestForbiddenError. In scope but not the assigned Coordinator is forbidden; the
  * wrong status is VenueSuitabilityUnavailableError. An unknown venueId is VenueNotFoundError.
  */
-export async function getVenueSuitability(id, user, { venueId } = {}, eventDb = getAdminDb(), venueDb = getAdminDb()) {
+export async function getVenueSuitability(
+  id,
+  user,
+  { venueId } = {},
+  eventDb = getAdminDb(),
+  venueDb = getAdminDb(),
+  now = new Date(),
+) {
   const snapshot = await eventDb.collection('eventRequests').doc(id).get()
   if (!snapshot.exists) throw new EventRequestNotFoundError()
   const request = { id, ...snapshot.data() }
@@ -56,9 +82,10 @@ export async function getVenueSuitability(id, user, { venueId } = {}, eventDb = 
   if (refusal === NOT_PERMITTED) throw new EventRequestForbiddenError('Only the assigned Event Coordinator can check venue suitability.')
   if (refusal) throw new VenueSuitabilityUnavailableError()
 
-  const [venuesSnapshot, availabilitySnapshot] = await Promise.all([
+  const [venuesSnapshot, availabilitySnapshot, bookingsSnapshot] = await Promise.all([
     venueDb.collection('venues').get(),
     venueDb.collection('venueAvailability').get(),
+    eventDb.collection(VENUE_BOOKINGS).where('eventRequestId', '==', id).get(),
   ])
   const catalogue = venuesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
   const venues = venueId === undefined ? catalogue : catalogue.filter((venue) => venue.id === venueId)
@@ -71,18 +98,36 @@ export async function getVenueSuitability(id, user, { venueId } = {}, eventDb = 
     commitmentsByVenue.get(commitment.venueId).push(commitment)
   }
 
+  const summarise = (venue) => ({
+    id: venue.id,
+    name: venue.name,
+    location: venue.location ?? null,
+    maximumCapacity: venue.maximumCapacity ?? null,
+    ...checkVenueSuitability(request, venue, commitmentsByVenue.get(venue.id) ?? [], now),
+  })
+  const catalogueById = new Map(catalogue.map((venue) => [venue.id, venue]))
+  const bookings = bookingsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  const eventVenues = eventVenueBookings(bookings, now).map(({ venueNeedId, booking, status }) => {
+    const venue = catalogueById.get(booking.venueId)
+    const checked = venue
+      ? summarise(venue)
+      : {
+          id: booking.venueId ?? null,
+          name: booking.venueName ?? 'Unknown venue',
+          location: null,
+          maximumCapacity: null,
+          result: UNSUITABLE,
+          problems: [{ check: 'venue', message: 'This venue is no longer in the venue catalogue.' }],
+          warnings: [],
+        }
+    return { venueNeedId, bookingId: booking.id, bookingStatus: status, ...checked }
+  })
+
   const options = buildVenueFilterOptions(catalogue)
   return {
     event: eventSummary(request),
-    venues: venues
-      .map((venue) => ({
-        id: venue.id,
-        name: venue.name,
-        location: venue.location ?? null,
-        maximumCapacity: venue.maximumCapacity ?? null,
-        ...checkVenueSuitability(request, venue, commitmentsByVenue.get(venue.id) ?? []),
-      }))
-      .sort(compareSuitability),
+    eventVenues,
+    venues: venues.map(summarise).sort(compareSuitability),
     options: { facilities: options.facilities, accessibilityFeatures: options.accessibilityFeatures },
   }
 }
