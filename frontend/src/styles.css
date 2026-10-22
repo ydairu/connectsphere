@@ -205,6 +205,8 @@ a { color: inherit; }
 .availability-slot-setup, .availability-slot-turnaround { border-style: dashed; border-left-style: dashed; border-left-color: #6b5b95; background: repeating-linear-gradient(135deg, #f6f3fb, #f6f3fb 8px, #ece6f6 8px, #ece6f6 16px); }
 
 .venue-suitability .form-actions { margin-bottom: 18px; }
+.suitability-group { display: grid; gap: 12px; margin-top: 20px; }
+.suitability-group > h3 { margin: 0; font-size: 18px; }
 .suitability-list { list-style: none; display: grid; gap: 12px; margin: 0; padding: 0; }
 .suitability-item { display: grid; gap: 10px; padding: 16px 18px; border: 1px solid var(--line); border-left-width: 5px; border-radius: 12px; background: #f9fbfa; }
 .suitability-item-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }

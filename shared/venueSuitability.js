@@ -3,13 +3,17 @@
 // Six checks (backlog AC1). Capacity overflow, a missing required facility and unavailability at the
 // event's date/time make a venue unsuitable; an unsupported layout, a missing accessibility feature and
 // operating hours give warnings, and the venue can still be selected (AC2). Every failure and warning is
-// named (AC10). Setup/turnaround and several venues per event are SPM-76's.
+// named (AC10). SPM-76 adds the venue's setup and turnaround to the availability check (the event and
+// the other bookings are compared on their occupied periods, as SPM-16 does) and checks each of an
+// event's venues separately (backend/src/services/venueSuitabilityService.js).
 
 import { isAssignedCoordinator } from './permissions.js'
 import { PLANNING, UNDER_REVIEW } from './status.js'
 import { formatSingaporePeriod, operatingHoursCheck } from './operatingHours.js'
-import { AVAILABILITY_STATUS, activeCommitmentsInRange, isExpiredHold } from './venueAvailability.js'
+import { AVAILABILITY_STATUS, activeCommitmentsInRange, isExpiredHold, overlaps } from './venueAvailability.js'
 import { venueSearchKey } from './venueSearch.js'
+import { commitmentOccupiedPeriod } from './venueConflicts.js'
+import { occupiedPeriod, venueBufferMinutes } from './venueOccupancy.js'
 
 export const SUITABLE = 'suitable'
 export const SUITABLE_WITH_WARNINGS = 'suitable_with_warnings'
@@ -35,6 +39,7 @@ export const VENUE_REQUIREMENT_FIELDS = Object.freeze(['requiredFacilities', 're
 
 const MAX_REQUIREMENT_LENGTH = 160
 const HOUR_MS = 60 * 60 * 1000
+const MINUTE_MS = 60 * 1000
 
 const MAINTENANCE_REASON_LABELS = Object.freeze({
   maintenance: 'maintenance',
@@ -115,6 +120,20 @@ function unavailabilityLabel(commitment) {
   return `blocked for ${MAINTENANCE_REASON_LABELS[commitment.reason] ?? 'maintenance'}`
 }
 
+// A clash that exists only because of setup or turnaround (the periods themselves do not overlap) names
+// the buffer that causes it. A booking's own turnaround and the next booking's setup both count; a
+// maintenance block has neither, so only the event's own buffer can clash with it.
+function bufferClashMessage(commitment, period, venue) {
+  const { setupMinutes, turnaroundMinutes } = venueBufferMinutes(venue)
+  const label = `${unavailabilityLabel(commitment)}, ${formatSingaporePeriod(commitment.startsAt, commitment.endsAt)}`
+  const isBlock = commitment.status === AVAILABILITY_STATUS.MAINTENANCE_BLOCK
+  const before = Date.parse(commitment.endsAt) <= Date.parse(period.startsAt)
+  const parts = before
+    ? [!isBlock && `${turnaroundMinutes} minutes of turnaround after it`, `${setupMinutes} minutes of setup before the event`]
+    : [`${turnaroundMinutes} minutes of turnaround after the event`, !isBlock && `${setupMinutes} minutes of setup before it`]
+  return `Not available: ${label}. The venue needs ${parts.filter(Boolean).join(' and ')}, which overlap.`
+}
+
 /**
  * The suitability of `venue` for the event in `request`, given the venue's availability commitments:
  * { result, problems: [{ check, message }], warnings: [{ check, message }] }.
@@ -145,16 +164,25 @@ export function checkVenueSuitability(request, venue, commitments = [], now = ne
       message: "The event's date, time or duration is not recorded, so availability and operating hours were not checked.",
     })
   } else {
-    const clashes = activeCommitmentsInRange(
+    const occupied = occupiedPeriod(period, venue)
+    const { setupMinutes, turnaroundMinutes } = venueBufferMinutes(venue)
+    // The widened range only narrows the candidates; the exact comparison on occupied periods follows.
+    const candidates = activeCommitmentsInRange(
       commitments.filter(
         (commitment) => commitment.eventRequestId !== request.id && !isExpiredHold(commitment, now),
       ),
-      { from: new Date(period.startsAt), to: new Date(period.endsAt) },
+      {
+        from: new Date(Date.parse(occupied.startsAt) - turnaroundMinutes * MINUTE_MS),
+        to: new Date(Date.parse(occupied.endsAt) + setupMinutes * MINUTE_MS),
+      },
     )
-    for (const clash of clashes) {
+    for (const clash of candidates) {
+      if (!overlaps(commitmentOccupiedPeriod(clash, venue), occupied)) continue
       problems.push({
         check: AVAILABILITY,
-        message: `Not available: ${unavailabilityLabel(clash)}, ${formatSingaporePeriod(clash.startsAt, clash.endsAt)}.`,
+        message: overlaps(clash, period)
+          ? `Not available: ${unavailabilityLabel(clash)}, ${formatSingaporePeriod(clash.startsAt, clash.endsAt)}.`
+          : bufferClashMessage(clash, period, venue),
       })
     }
   }

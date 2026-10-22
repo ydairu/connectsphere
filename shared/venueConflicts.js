@@ -33,7 +33,7 @@ export function findVenueConflict({ candidate, venue, commitments, now = new Dat
 
   const conflict = activeCommitmentsInRange(sameVenue, searchRange)
     .filter((commitment) => !isExpiredHold(commitment, now))
-    .map((commitment) => ({ commitment, period: periodOf(commitment, venue) }))
+    .map((commitment) => ({ commitment, period: commitmentOccupiedPeriod(commitment, venue) }))
     .find(({ period }) => overlaps(period, occupied))
 
   if (!conflict) return null
@@ -47,7 +47,8 @@ export function findVenueConflict({ candidate, venue, commitments, now = new Dat
   }
 }
 
-function periodOf(commitment, venue) {
+/** The period a commitment occupies the venue: its own period for a block, the occupied period otherwise. */
+export function commitmentOccupiedPeriod(commitment, venue) {
   if (commitment.status === AVAILABILITY_STATUS.MAINTENANCE_BLOCK) {
     return { startsAt: commitment.startsAt, endsAt: commitment.endsAt }
   }
