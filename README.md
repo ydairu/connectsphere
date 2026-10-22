@@ -1,22 +1,8 @@
 # ConnectSphere
 
-Tentative venue holds (SPM-78) last seven days. The Coordinator gets an in-app warning around 24 hours before expiry and an expiry notice; an expired hold immediately stops blocking the calendar, search and new booking requests. Booking details show **Expired** and allow a replacement while the event remains in Planning. Run `npm run test:spm78`; see the [manual checklist](docs/testing/spm-78-manual-testing.md) and [acceptance evidence](docs/evidence/spm-78-traceability.md).
+ConnectSphere is a full-stack event management app built with React, Express and Firebase. It supports account registration, role-based event requests, venue booking and availability, equipment requests and reservations, and in-app notifications. The Express API enforces request permissions; the repository's Firestore rules deny direct browser access to event requests.
 
-The hourly background task is defined in `.github/workflows/venue-hold-expiry.yml`. It needs the repository secrets `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` on the default branch. Confirm a successful scheduled or manually dispatched run before relying on notices. Run `npm run backfill:venue-holds --prefix backend` first to review older holds missing deadlines, then `npm run backfill:venue-holds --prefix backend -- --write` only after reviewing the report. The backfill reports unresolved records and does not change existing valid deadlines. The task can also be run with `npm run process:venue-holds --prefix backend`; reruns are safe. Delayed or failed scheduled runs can delay notices, but do not extend venue availability or the approval deadline.
-
-Pending venue bookings (SPM-53/SPM-80): Venue Staff see one assigned-booking card per pending venue request, with event and venue in the heading, request times, and a booking-specific **View details** link. Deciding one booking leaves other pending requests for the event in their assigned staff queues. Run `npm run test:spm53` and `npx vitest run tests/spm-80 && npx playwright test tests/spm-80`; see the [SPM-80 manual checklist](docs/testing/spm-80-manual-testing.md) and [traceability](docs/evidence/spm-80-traceability.md). Venue Staff can reject an assigned pending booking with a reason and optional alternative (SPM-34). Run `npm run test:spm34`; see the [manual checklist](docs/testing/spm-34-manual-testing.md) and [acceptance traceability](docs/evidence/spm-34-traceability.md).
-
-Venue booking approval (SPM-54): assigned Venue Staff can approve a pending request, confirming its reservation while the event stays in Planning. Approval updates calendar/search availability and notifies the Coordinator; whole-event cancellation or rejection releases the reservation. Run `npm run test:spm54`; see the [manual and implementation checklist](docs/testing/spm-54-manual-testing.md) and [test evidence and outstanding dependencies](docs/evidence/spm-54-traceability.md). Human acceptance and dependent preparation/reapproval criteria remain outstanding.
-
-Multiple venue requests (SPM-79): an assigned Coordinator can request separate venues within an event's schedule, each with its own attendee count, staff decision and tentative hold. Replacements keep the same venue need. Confirm requires an approved current booking for every need; the old event-wide venue approval action is retired. Run `npm run test:spm79`; the Firestore emulator check uses `FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 npm run test:spm79:emulator` after starting the isolated emulator. See the [manual checklist](docs/testing/spm-79-manual-testing.md) and [traceability](docs/evidence/spm-79-traceability.md). The SPM-67 safety handoff and human acceptance remain outstanding.
-
-Independent venue decisions (SPM-81): assigned Venue Staff approve or reject their own pending requests independently. The assigned Coordinator can cancel one approved booking; its reservation is released while other venues remain booked. If the event was Confirmed, it returns to Planning until the cancelled need is replaced and approved. Run `npm run test:spm81`; see the [manual checklist](docs/testing/spm-81-manual-testing.md) and [traceability](docs/evidence/spm-81-traceability.md). The isolated Firestore concurrency check uses `npm run test:spm81:emulator` under the emulator.
-
-Venue booking requests (SPM-14): assigned Coordinators open **Venue booking requests** from an event in Planning; Venue Staff use **Venue bookings** in navigation. Requests create tentative holds, not confirmed bookings. See [manual testing](docs/testing/spm-14-manual-testing.md), [implementation and API notes](docs/plans/spm-14-venue-booking.md), and [test evidence and remaining gaps](docs/evidence/spm-14-traceability.md).
-
-ConnectSphere is a full-stack event management foundation. It currently provides account registration, login, persistent sessions, Firestore-backed multi-role profiles, a protected profile page, and an authenticated Express API.
-
-Event requests are created through the API and stored in Firestore. The five-role permission model lives in `shared/permissions.js` and is enforced by the API, and Firestore security rules keep the browser out of the `eventRequests` collection. Organisers can create and directly reopen their own unsubmitted drafts for editing; the dedicated drafts list and request-submission flow are not built yet.
+The [effective requirements revision candidate](docs/requirements/effective-requirements.md) records later customer changes and is awaiting Product Owner approval as a repository checkpoint. Acceptance evidence is in [docs/evidence](docs/evidence), and manual checklists are in [docs/testing](docs/testing). See [venue hold expiry operations](docs/operations/venue-hold-expiry.md) before relying on scheduled notices.
 
 ## Technology Stack
 
@@ -26,7 +12,7 @@ Event requests are created through the API and stored in Firestore. The five-rol
 - **Database:** Firebase Cloud Firestore
 - **Server authentication:** Firebase Admin SDK
 
-## Project Structure
+## Project Structure (selected paths)
 
 ```text
 connectsphere/
@@ -68,46 +54,44 @@ connectsphere/
 
 1. A user registers or logs in through Firebase Authentication.
 2. The user's Firebase UID identifies their document at `users/{uid}` in Firestore.
-3. That document stores their name, email, roles, and creation timestamp. Organiser registration also requires `organisationName`. An `organisationId` may already exist on seeded or migrated accounts; registration does not assign one.
-4. `AuthContext` restores sessions and loads the Firestore profile before protected pages render.
-5. The frontend can send a Firebase ID token to the Express API.
+3. New registration writes their name, email, roles and creation timestamp to that document. Organiser registration also requires `organisationName`. An `organisationId` may already exist on seeded or migrated accounts; registration does not assign one.
+4. `AuthContext` restores Firebase auth state and attempts to load the Firestore profile; protected pages wait for that initial load to finish.
+5. The frontend sends a Firebase ID token with authenticated requests to the Express API.
 6. The backend verifies the token and reads the user's trusted roles from Firestore.
 
-The five roles are `organiser`, `coordinator`, `venue_staff`, `technical_staff` and `attendee`, defined in `shared/permissions.js`. A user may hold several (`roles: string[]`) and receives the union of what each role permits. Profiles written before the roles migration hold a single `role` string and are still read correctly. Frontend role checks control presentation only; protected backend operations must enforce roles through authentication middleware.
+The current code implements five roles: `organiser`, `coordinator`, `venue_staff`, `technical_staff` and `attendee`, defined in `shared/permissions.js`. A user may hold several (`roles: string[]`) and receives the union of what each role permits. Profiles written before the roles migration hold a single `role` string and are still read correctly. Frontend role checks control presentation only; backend operations enforce access. The later customer material in the requirements revision candidate adds Event Coordinator Lead and Safety Officer roles; neither is implemented in the current role model.
 
-Organisers can view and edit their organisation name on `/profile`, including adding a name to an older account. Saving requires the backend to be running. Names are trimmed and cannot be blank. Matching names do not link accounts or grant organisation access; changing a name does not alter an existing organisation ID or any event request. Shared organisation records, company-ID assignment, membership, and invitation codes remain outside this increment.
+Organisers can view and edit their organisation name on `/profile`, including adding a name to an older account. Saving uses the backend API. Names are trimmed and cannot be blank. Matching names do not link accounts or grant organisation access; changing a name does not alter an existing organisation ID or any event request. Registration does not assign organisation IDs or create shared organisation memberships.
 
 ## API
 
-All routes are under `/api` and, except the health check, require a Firebase ID token in an `Authorization: Bearer <token>` header.
+Application endpoints are under `/api` and, except the health check, require a Firebase ID token in an `Authorization: Bearer <token>` header.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/health` | Health check; no token required |
-| `GET` | `/api/profile` | The signed-in user's profile and roles |
-| `PATCH` | `/api/profile` | Event Organiser updates their own organisation name |
-| `POST` | `/api/event-requests` | Event Organiser creates a draft request |
-| `GET` | `/api/event-requests/:id` | Event Organiser loads their own unsubmitted draft |
-| `PATCH` | `/api/event-requests/:id` | Event Organiser updates their own draft |
-| `GET` | `/api/requests` | Lists the requests in the user's scope |
-| `GET` | `/api/requests/:id` | One request, reduced to the sections the user may view |
-| `PATCH` | `/api/requests/:id` | Edits the sections the user's roles permit right now |
+| Prefix | Current operations |
+| --- | --- |
+| `/api/health` | Public health check (`GET`) |
+| `/api/profile` | Read the signed-in profile (`GET`); Organiser updates their organisation name (`PATCH`) |
+| `/api/event-requests` | Create, load and edit owned drafts; submit or resubmit; perform status actions, Coordinator reassignment and venue suitability checks |
+| `/api/requests` | Scoped request list and detail, section edits and field history; event-specific venue bookings and equipment requests, including decisions |
+| `/api/venues` | Venue catalogue, detail, availability, maintenance blocks and assigned booking queue |
+| `/api/equipment` | Equipment catalogue and units, assigned requests and scoped reservations |
+| `/api/notifications` | List the signed-in user's notices and mark a notice read |
 
-`/api/requests` applies `shared/permissions.js` in `backend/src/middleware/authorise.js`: records outside a user's scope are not returned, sections a role may not view are absent from the response body rather than hidden, and a forbidden write is rejected with 403 naming each field. Status values are never editable through `PATCH`; status transitions will be separate routes.
+`/api/requests` applies `shared/permissions.js` in `backend/src/middleware/authorise.js`: records outside a user's scope are not returned, sections a role may not view are absent from the response body rather than hidden, and a forbidden section write is rejected with 403 naming each field. Its `PATCH` route does not accept status changes; actions use `POST /api/event-requests/:id/transitions`. The post-submission section editor has field-value validation for preparation, venue requirements and significant fields, but not yet for every editable field.
 
-Two route sets cover the same collection, split by status: drafts are created and edited through `/api/event-requests`, which validates field values, and everything after submission is read and edited through `/api/requests`, which applies the full role, record and status rules. This split is a team decision of 20 September 2026, recorded in `AGENTS.md`.
+Drafts are created and edited through `/api/event-requests`, which validates their fields. Post-submission section reads and edits use `/api/requests`, which applies role, record and status rules. Submission and later status actions remain under `/api/event-requests`; this route placement is recorded in `AGENTS.md`.
 
 `PATCH /api/profile` accepts only `{ "organisationName": "Example Organisation" }` with a Firebase bearer token and returns the saved name in the same shape. It updates only the authenticated organiser's profile, including for a multi-role organiser. Unauthenticated requests receive 401, non-organisers 403, and invalid names or additional fields 400. Unexpected persistence failures return 500.
 
 ## Firestore Security Rules
 
-`firestore.rules` is deployed to the Firebase project. It:
+The repository's `firestore.rules` was reported deployed and checked with signed-in client requests on 15 September 2026 (`project_context.md`). Its current source:
 
 - denies the browser all access to `eventRequests`, so every read and edit goes through the API, which uses the Admin SDK and bypasses rules;
 - allows a signed-in browser user to read and update only their own `users/{uid}` document;
 - allows a profile to be created only with the `organiser` or `attendee` role, and blocks browser-side changes to `roles`, `role`, `organisationId`, `organisationName`, and `seedTag`, so users cannot grant themselves access or bypass the profile API. The backend's Admin SDK performs the validated organisation-name update.
 
-Editing the file changes nothing until it is deployed. After deploying, run `node backend/scripts/check-firestore-rules.js --project=<projectId>` to confirm what the rules actually do:
+That dated check does not verify the rules currently deployed to any project. Editing the file changes nothing until it is deployed. After deploying, run `node backend/scripts/check-firestore-rules.js --project=<projectId>` to check the deployed rules with signed-in requests:
 
 ```bash
 firebase deploy --only firestore:rules --project <FIREBASE_PROJECT_ID>
@@ -115,46 +99,45 @@ firebase deploy --only firestore:rules --project <FIREBASE_PROJECT_ID>
 
 ## Tests
 
-The repository is an npm workspace (`frontend`, `backend`, `shared`); one `npm install` at the root installs everything. `.npmrc` sets `legacy-peer-deps` because npm 10.9's peer resolver crashes on this workspace layout; every peer dependency is already declared explicitly.
+The repository is an npm workspace (`frontend`, `backend`, `shared`); install dependencies from the root. `.npmrc` sets `legacy-peer-deps=true`.
 
 ```bash
-npm test               # everything: existing suites, tests/ Vitest suites, Playwright E2E
+npm test               # existing suites, all root Vitest suites, Playwright E2E
 npm run test:existing  # node:test suites in shared/, backend/ and the frontend's own Vitest suites
-npm run test:spm1      # SPM-1 (sign in, protected routes, roles, logout): Vitest + Playwright
-npm run test:spm2      # SPM-2 (registration): Vitest + Playwright
-npm run test:unit      # tests/**/unit
-npm run test:integration
+npm run test:vitest    # all root Vitest suites under tests/
+npm run test:unit      # selected story unit directories listed in package.json
+npm run test:integration  # selected integration directories listed in package.json
 npm run test:e2e       # Playwright, Chromium (run `npx playwright install chromium` once)
-npm run test:coverage  # tests/ Vitest suites with V8 coverage in coverage/
+npm run test:coverage  # root Vitest suites; configured V8 coverage in coverage/
 npm run lint           # ESLint over frontend/, backend/, shared/ and tests/
-npm run build
+npm run build          # frontend production build
 ```
 
-User-story suites live under `tests/` and are organised by story (`tests/spm-1`, `tests/spm-2`, with `tests/shared` for fixtures and doubles both stories use and `tests/lint` for repository-level checks). Every test name carries its `spm1_`/`spm2_` identifier. Unit and integration tests run in Vitest (React Testing Library for components, Supertest for the Express API) with the Firebase client and Admin SDKs replaced by in-memory fakes. The Playwright suites run the real React app and the real Express API in Chromium against an in-memory Firebase double (`tests/shared/firebase-double`), so no Firebase project, emulator or Java is needed.
+Story suites live under `tests/spm-*`; shared fixtures and doubles are in `tests/shared`, and repository checks are in `tests/lint`. Use the `test:spm...` scripts in `package.json` for focused story checks. `test:unit` and `test:integration` use fixed lists of directories and do not cover every story; use `test:vitest` for all root Vitest suites. Component tests use React Testing Library. Default HTTP API tests reach Express with Firebase identity and persistence replaced by mocks or in-memory stores. Playwright runs the React app and Express API in Chromium against the in-memory Firebase double, without a Firebase project or emulator.
 
-The default `npm test` command does not exercise a live Firebase project, the Firestore emulator, deployed rules, or a production database. The CI emulator job is separate. In the default suite, `firestore.rules` is checked only as source text (`tests/spm-2/integration/firestoreRules.static.test.js`); executing the rules needs a separate rules test.
+The default `npm test` command does not run lint, build, Firestore emulator tests, or tests against a live Firebase project. It does not verify deployed rules or a production database. The root Vitest suite checks `firestore.rules` only as source text in `tests/spm-2/integration/firestoreRules.static.test.js`; use the separate rule-check script described above to exercise deployed rules.
 
-The pre-existing suites are unchanged: `node:test` in `shared/`, `backend/src/` and `backend/scripts/`, and the frontend's co-located Vitest suites (`npm test --prefix frontend`). They cover shared validation and permissions, backend services and scripts, registration and profile UI behavior, session restoration, profile updates, and failure paths. API suites send real HTTP requests to the Express app with Firebase token verification and persistence replaced by mocks or in-memory equivalents.
+`test:existing` runs `node:test` files in `shared/`, `backend/src/` and `backend/scripts/`, plus the frontend's co-located Vitest suites (`npm test --prefix frontend`). The coverage command runs the root Vitest suites, but its measured source files are limited to the list in `vitest.config.js`.
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` starts three independent jobs on every push and on pull requests into `main`. `code_checks` runs lint, existing tests, root Vitest coverage, and the production build; `firestore_emulator` runs six transaction suites (SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81); `e2e` runs Playwright with one worker. Each job installs its own dependencies and the jobs can run at the same time. CI needs no Firebase secrets. Coverage, the Playwright report, and the SPM-14/SPM-58 emulator JSON results are uploaded as artifacts. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for setup, commands, failure checks, and verification limits.
+`.github/workflows/ci.yml` defines three independent jobs for pushes and pull requests into `main`. `code_checks` runs lint, existing tests, root Vitest coverage and the production build; `firestore_emulator` runs six transaction suites (SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81); `e2e` runs Playwright with one worker. These jobs need no Firebase project secrets. The workflow is configured to upload coverage, the Playwright report and the SPM-14/SPM-58 emulator JSON results. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for setup, commands, failure checks and verification limits.
 
-The same API cases can also run against the real Firebase project, using real sign-ins for the seeded accounts:
+An opt-in suite runs the SPM-42 and SPM-24 API cases against a real Firebase project and also checks simultaneous tentative venue holds (SPM-16):
 
 ```bash
 LIVE_API_PROJECT=<FIREBASE_PROJECT_ID> npm run test:api:live
 ```
 
-This needs the seed applied, plus `VITE_FIREBASE_API_KEY` and `SEED_ACCOUNT_PASSWORD`. It edits seeded requests and restores them; re-run the seed script after an interrupted run.
+This needs the seed applied, plus `VITE_FIREBASE_API_KEY`, `SEED_ACCOUNT_PASSWORD` and Admin SDK credentials. The API cases edit seeded requests and restore them; re-run the seed script after an interrupted run. The venue concurrency case creates and cleans up a temporary venue and its holds.
 
 ## Data Scripts
 
-Both scripts write to the Firebase project in the root `.env`. They print that project ID first, default to a dry run, and write only with `--write --project=<projectId>`, where the ID must match the configured project.
+The roles migration and seed scripts read the Firebase project configured in the root `.env`. They print that project ID, default to a read-only dry run, and write only with `--write --project=<projectId>`, where the ID must match the configured project.
 
-- **Roles migration** — `node backend/scripts/migrate-user-roles.js [--organisations=<file.json>]` backfills `users/{uid}`: `role` → `roles[]`, plus `organisationId`/`organisationName` for organisers, taken from an organisations file the team supplies (see the script header). It never invents an organisation and never removes `role`. Idempotent.
-- **Seed** — `node backend/scripts/seed.js` creates demonstration accounts for all five roles (plus a venue + technical staff account), two organisations, and event requests in every status. Requires `SEED_ACCOUNT_PASSWORD` for `--write`. Idempotent. Every seeded Auth user and document has an ID starting `seed-` and a `seedTag` field, so seeded data can be found and removed without touching real accounts.
-- **Security-rule check** — `node backend/scripts/check-firestore-rules.js --project=<projectId>` signs in as seeded accounts and calls Firestore directly, the way the browser can, to prove the deployed rules deny it. Read-only apart from one temporary account it creates and removes. Needs `VITE_FIREBASE_API_KEY` and `SEED_ACCOUNT_PASSWORD`.
+- **Roles migration** — `node backend/scripts/migrate-user-roles.js [--organisations=<file.json>]` backfills `users/{uid}` from `role` to `roles[]`. It can add an Organiser's `organisationId` and `organisationName` from a team-supplied mapping file (see the script header). It never invents an organisation or removes `role`. Idempotent.
+- **Seed** — `node backend/scripts/seed.js` plans demonstration accounts for the five implemented roles (including a venue + technical staff account), two organisations, and event requests in every status. With `--write`, it creates or resets the seeded data and requires `SEED_ACCOUNT_PASSWORD`. Seeded Auth user IDs and Firestore document IDs start with `seed-`; seeded Firestore documents carry `seedTag`. The script has no general cleanup mode.
+- **Security-rule check** — `node backend/scripts/check-firestore-rules.js --project=<projectId>` signs in as seeded accounts and makes client-position Firestore requests against the deployed project. It creates a temporary Auth user/profile and edits the seeded attendee's name, with cleanup and restore logic. It needs the seed applied, `VITE_FIREBASE_API_KEY` and `SEED_ACCOUNT_PASSWORD`.
 
 ## Local Setup
 
@@ -201,7 +184,7 @@ PORT=5000
 CLIENT_ORIGIN=http://localhost:5173
 ```
 
-Only variables prefixed with `VITE_` are available to the browser. Never add the Admin SDK email, private key, passwords, or other server secrets to a `VITE_` variable. If the private key contains line breaks, store them as escaped `\\n` sequences.
+Of the variables in this `.env` example, Vite exposes only those prefixed with `VITE_` to the browser. Never put the Admin SDK email, private key, passwords, or other server secrets in a `VITE_` variable. For `FIREBASE_PRIVATE_KEY`, encode line breaks as literal `\n` sequences; the backend converts them to line breaks when loading the root `.env`.
 
 ## Start the App
 
@@ -219,9 +202,9 @@ You can also run either application separately with `npm run dev:frontend` or `n
 
 ## Seed Accounts
 
-`backend/scripts/seed.js` creates these accounts for local testing and demonstrations. They all share the password in `SEED_ACCOUNT_PASSWORD`, which is never committed. The `.test` domain is reserved by RFC 6761, so no seeded address can reach a real inbox.
+With `--write --project=<projectId>`, `backend/scripts/seed.js` creates or resets these 11 accounts for testing and demonstrations. They all use the password in `SEED_ACCOUNT_PASSWORD`; keep that value out of version control.
 
-| Role | Email | Organisation |
+| Role | Email | Organisation ID |
 | --- | --- | --- |
 | Event Coordinator | `coordinator@seed.connectsphere.test` | — |
 | Event Coordinator | `coordinator-2@seed.connectsphere.test` | — |
@@ -235,8 +218,8 @@ You can also run either application separately with `npm run dev:frontend` or `n
 | Event Organiser | `organiser-a3@seed.connectsphere.test` | SEED-ORG-A |
 | Event Organiser | `organiser-b1@seed.connectsphere.test` | SEED-ORG-B |
 
-The three coordinator accounts demonstrate automatic coordinator assignment (SPM-8) by workload. The seeded requests give them 4, 2 and 1 active requests (Submitted, Under Review, Returned, Planning or Confirmed), so the next submitted request goes to `coordinator-3`, which has the fewest. Requests created outside the seed also count, so on a shared project the counts may be higher. The venue + technical account demonstrates combined permissions from two roles. The two organisations demonstrate that an Organiser sees their own organisation's events and not another's.
+The three Coordinator accounts demonstrate workload-based assignment in the current implementation. An untouched seed gives them 5, 2 and 1 active requests (Submitted, Under Review, Returned, Planning or Confirmed), so a new submission selects `coordinator-3`. Other requests in a shared project can change that choice. The venue + technical account demonstrates combined permissions, and the two organisations demonstrate organisation-scoped request visibility.
 
-The seed also creates 16 event requests covering every status in `shared/status.js`, owned by `organiser-a1`, `organiser-a2` and `organiser-b1`. `organiser-a3` owns none, to show the empty drafts list (SPM-24).
+The seed defines 17 event requests covering every status in `shared/status.js`, owned by `organiser-a1`, `organiser-a2` and `organiser-b1`. `organiser-a3` owns none, to show the empty drafts list.
 
-These are demonstration credentials sharing one password. Remove them, with the `seedTag` field and the `seed-` ID prefix, before any public deployment.
+These are shared demonstration credentials. Use them only in test or demonstration projects, and identify seeded data by its `seedTag` and `seed-` ID prefix when cleaning up.
