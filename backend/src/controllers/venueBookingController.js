@@ -1,5 +1,6 @@
-import { approveVenueBooking, listEventVenueBookings, listVenueBookingQueue, rejectVenueBooking, submitVenueBooking, VenueBookingError } from '../services/venueBookingService.js'
+import { approveVenueBooking, cancelVenueBooking, listEventVenueBookings, listVenueBookingQueue, rejectVenueBooking, submitVenueBooking, VenueBookingError } from '../services/venueBookingService.js'
 import { sendVenueError } from './venueController.js'
+import { VenueValidationError } from '../services/venueService.js'
 
 export function createVenueBookingController(getDb) {
   const handle = (operation, status = 200) => async (req, res, next) => {
@@ -11,7 +12,12 @@ export function createVenueBookingController(getDb) {
   }
   return {
     submit: handle(async (req) => ({ booking: await submitVenueBooking(req.params.id, req.body, req.user, getDb()) }), 201),
-    decide: handle(async (req) => ({ booking: await (req.body?.action === 'approve' ? approveVenueBooking : rejectVenueBooking)(req.params.id, req.params.bookingId, req.body, req.user, getDb()) })),
+    decide: handle(async (req) => {
+      const actions = new Map([['approve', approveVenueBooking], ['reject', rejectVenueBooking], ['cancel', cancelVenueBooking]])
+      const operation = actions.get(req.body?.action)
+      if (!operation) throw new VenueValidationError({ action: 'Choose Approve, Reject, or Cancel booking.' })
+      return { booking: await operation(req.params.id, req.params.bookingId, req.body, req.user, getDb()) }
+    }),
     list: handle((req) => listEventVenueBookings(req.params.id, req.user, getDb())),
     queue: handle((req) => listVenueBookingQueue(req.user, getDb())),
   }

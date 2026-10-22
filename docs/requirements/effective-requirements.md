@@ -837,6 +837,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - **Cascade trigger.** Cancelling one venue arrangement does not cancel the others; the other bookings are removed **only when the whole event is cancelled** (G8!C27).
 - **Per-venue sign-off/prep.** Each venue booking carries its own approval, availability state, and venue-preparation progress tracked per venue (G8!C50).
 
+**[User-approved team implementation decision — SPM-81, 21 Oct 2026]** The assigned Coordinator may cancel one current approved venue booking through its booking action while the event is Planning or Confirmed and has not started. A Confirmed event returns to Planning with status history; other venue bookings and equipment reservations remain. An open whole-event cancellation request blocks this individual action until resolved. The cancelled venue need remains unresolved until the Coordinator submits and obtains approval for a replacement. This status and action policy fills a gap left open by the customer; it does not change the customer-confirmed isolation rule above. Broader individual-booking management remains SPM-77.
+
 ---
 
 ## 6. Non-Functional Requirements

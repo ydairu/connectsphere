@@ -17,6 +17,7 @@ import Navbar from '../components/Navbar.jsx'
 import StatusActions, { StatusNotices } from '../components/StatusActions.jsx'
 import StatusPill from '../components/StatusPill.jsx'
 import Tabs from '../components/Tabs.jsx'
+import VenueBookingOverview from '../components/VenueBookingOverview.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getRequest, transitionRequest, updateRequest } from '../services/api.js'
 import { statusLabel } from '../utils/statusLabels.js'
@@ -415,6 +416,7 @@ function RequestDetailPage() {
             {activeTab === 'venue-details' && <>
               {renderSection('venue')}
               {renderSection('venuePreparation')}
+              {(roles?.includes(COORDINATOR) || roles?.includes(ORGANISER)) && <VenueBookingOverview user={user} eventId={id} eventStatus={request.status} canManage={roles?.includes(COORDINATOR)} />}
               {(roles?.includes(COORDINATOR) || roles?.includes(VENUE_STAFF)) && <Card className="request-form-section"><h2>Venue booking requests</h2><Link to={`/requests/${id}/venue-bookings`}>Open venue booking requests</Link></Card>}
             </>}
             {activeTab === 'equipment-required' && <>

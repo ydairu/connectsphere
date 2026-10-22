@@ -16,6 +16,11 @@ export function approveVenueBooking(user, eventId, bookingId) {
     method: 'POST', body: JSON.stringify({ action: 'approve' }),
   })
 }
+export function cancelVenueBooking(user, eventId, bookingId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/venue-bookings/${bookingId}/actions`, {
+    method: 'POST', body: JSON.stringify({ action: 'cancel' }),
+  })
+}
 export function getVenueBookingQueue(user) {
   return authenticatedRequest(user, '/api/venues/booking-requests')
 }

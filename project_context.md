@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 21 October 2026 (SPM-79 multiple venue requests; older sections retain their historical dates)
+Last reviewed: 22 October 2026 (SPM-77 individual venue booking management and CI structure; older sections retain their historical dates)
 
 ## Project Purpose
 
@@ -52,7 +52,7 @@ Tracked application routes currently include:
 - `/register`
 - protected `/profile`
 
-The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. A GitHub Actions workflow (`.github/workflows/ci.yml`) runs lint, all test suites, the production build and the Playwright E2E suites on every push and on pull requests into `main`.
+The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. The [CI workflow](.github/workflows/ci.yml) defines three independent jobs on every push and on pull requests into `main`: code checks and build, six local Firestore emulator transaction suites, and the full Playwright E2E suite. The opt-in live API harness is not part of CI. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for commands, artifacts, and verification boundaries.
 
 ## Independently Observed Implementation State
 
@@ -778,3 +778,19 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Status:** In Progress, Sprint 3. Human acceptance and independent peer review remain outstanding. SPM-81 decisions and SPM-77 booking management are separate stories.
 - **Local verification:** targeted SPM-80/SPM-53 Vitest tests passed (10 tests) and two SPM-80 Chromium journeys passed. Full `npm test` passed 128 Node, 101 frontend, 1,779 root Vitest (47 opt-in cases skipped) and 101 Chromium tests. Lint and build passed; the build retains its large-chunk warning. API tests use mocked identity and in-memory persistence; browser tests use the local Firebase double. No live Firebase, emulator or human acceptance was tested.
 - **Evidence:** `docs/evidence/spm-80-traceability.md`; manual checklist `docs/testing/spm-80-manual-testing.md`. No Firestore rules change/deployment, Git publication or deployment occurred.
+
+## SPM-81 independent venue decisions — 21 October 2026
+
+- Existing SPM-54 approval and SPM-34 rejection paths decide only the selected booking. SPM-81 adds explicit multi-venue checks and a narrow individual cancellation path on the existing booking action API. The assigned Coordinator cancels one current approved booking; only its confirmed reservation is released. The booking retains its Cancelled history and its venue need can be replaced.
+- **Team decision approved for this increment:** cancelling an approved booking on a Confirmed event returns it to Planning with status history. The action is available before the event starts and while no whole-event cancellation request is open. The remaining venue bookings and equipment reservations stay intact. Confirm needs approval of the replacement venue need.
+- **Scope:** this is the approved-booking cancellation path needed by SPM-81. Broader SPM-77 booking management, SPM-67 safety handoff, SPM-48/89 preparation integration, and human acceptance remain separate. SPM-81 stays **In Progress, Sprint 3** until all acceptance and Definition of Done checks are complete.
+- **Evidence:** `docs/evidence/spm-81-traceability.md`; Dairu's manual checklist `docs/testing/spm-81-manual-testing.md`. No Firestore rules change or deployment, live Firebase verification, or Git publication is claimed.
+- **Local verification:** lint, production build and whitespace checks passed; `npm test` passed 128 Node, 101 frontend, 1,788 root Vitest tests (49 opt-in cases skipped) and 102 Chromium browser tests. Two isolated SPM-81 Firestore emulator concurrency tests passed. HTTP tests use mocked identity and in-memory persistence; browser tests use the Firebase double. The existing build chunk-size warning remains. Human manual acceptance and live-project verification were not performed.
+- A final missing-reservation guard and test were added after the full suite; `npm run test:spm81` passed 10 unit/service/API tests and its Chromium journey, and lint passed afterward. The full suite was not rerun for that guard.
+
+## SPM-77 individual venue booking management — 22 October 2026
+
+- The event Venue Details tab now shows one current booking per venue need for Coordinators and in-scope Organisers, with separate status, period, next step and expandable earlier attempts. The existing booking GET API supplies a limited customer-facing response to Organisers; action permissions remain unchanged.
+- Approved-booking changes reuse SPM-81 cancellation followed by SPM-14 replacement. The selected venue need remains unresolved until its replacement is approved. Sibling venue bookings and equipment reservations remain intact; whole-event closure still releases active venue commitments.
+- **Status:** In Progress, Sprint 3. SPM-74 is still To Do and must supply and verify the recorded affected-booking flag for post-approval venue unavailability before the final Organiser display criterion is Done. Human acceptance and independent peer review are pending.
+- **Evidence:** `docs/evidence/spm-77-traceability.md`; manual checklist `docs/testing/spm-77-manual-testing.md`. Targeted SPM-77 Vitest passed 9 tests and its Chromium journey passed after the final small follow-ups. The earlier full local run passed 128 Node, 101 frontend, 1,797 root Vitest and 103 Chromium tests; SPM-79 and SPM-81 Firestore emulator suites passed 3 and 2 transaction tests. Lint and build passed with the existing large-chunk warning. No live-project verification, rules deployment, commit, push or PR is claimed.

@@ -23,6 +23,7 @@ import {
   SUBMIT,
 } from '../../../shared/statusTransitions.js'
 import { SIGNIFICANT_CHANGE } from '../../../shared/significantChanges.js'
+import { VENUE_BOOKING_CANCELLED } from '../../../shared/venueBooking.js'
 
 // Button wording for the SPM-9 actions in shared/requestActions.js. `confirm` is the question asked
 // before an action that closes the event, hands it back, or records a decision; other actions apply on
@@ -90,6 +91,7 @@ const ACTIONS = {
   // SPM-10: not an action anyone can take — the status_changed entry of a significant edit to a Confirmed
   // event. Labelled so a status history shows it readably; never in availableActions.
   [SIGNIFICANT_CHANGE]: { label: 'Moved back to Planning (significant change)' },
+  [VENUE_BOOKING_CANCELLED]: { label: 'Moved back to Planning (venue booking cancelled)' },
 }
 
 /** The wording for an action or a status_changed entry's action; an unknown action is shown as it is. */

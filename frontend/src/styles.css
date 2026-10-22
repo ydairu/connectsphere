@@ -277,6 +277,11 @@ a { color: inherit; }
 .booking-card details[open] summary { margin-bottom: 22px; }
 .booking-row { align-items: start; }
 .booking-row strong { min-width: 0; white-space: pre-wrap; }
+.venue-booking-overview-item { border-top: 1px solid var(--line); padding: 16px 0; }
+.venue-booking-overview-item h3 { margin: 0 0 8px; overflow-wrap: anywhere; }
+.venue-booking-overview-item p { margin: 6px 0; }
+.venue-booking-overview-item details { margin-top: 10px; }
+.venue-booking-overview-item li { margin: 6px 0; overflow-wrap: anywhere; }
 .booking-actions { display: flex; justify-content: flex-end; padding-top: 20px; }
 .booking-actions form { width: 100%; }
 .booking-actions fieldset { display: grid; gap: 12px; border: 0; margin: 0; padding: 0; }

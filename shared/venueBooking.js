@@ -1,8 +1,9 @@
-import { COORDINATOR, VENUE_STAFF, isAssignedCoordinator, rolesOf } from './permissions.js'
-import { PLANNING } from './status.js'
+import { COORDINATOR, ORGANISER, VENUE_STAFF, inScopeAs, isAssignedCoordinator, rolesOf } from './permissions.js'
+import { CANCELLED, CONFIRMED, PLANNING, REJECTED } from './status.js'
 import { chooseStaff } from './staffAssignment.js'
 import { validateAvailabilityRange } from './venueAvailability.js'
 import { checkVenueSuitability, LAYOUT } from './venueSuitability.js'
+import { eventHasStarted, hasOpenCancellation } from './cancellationRequests.js'
 
 export const BOOKING_PENDING = 'pending'
 export const BOOKING_APPROVED = 'approved'
@@ -10,6 +11,7 @@ export const BOOKING_REJECTED = 'rejected'
 export const BOOKING_REPLACED = 'replaced'
 export const BOOKING_CANCELLED = 'cancelled'
 export const BOOKING_EXPIRED = 'expired'
+export const VENUE_BOOKING_CANCELLED = 'venue_booking_cancelled'
 
 export function effectiveVenueBookingStatus(booking, now = new Date()) {
   return booking.status === BOOKING_PENDING && typeof booking.holdExpiresAt === 'string' &&
@@ -48,6 +50,42 @@ export function venueBookingReadiness(bookings, now = new Date()) {
   return { ready: needs.size > 0 && approved === needs.size, total: needs.size, approved }
 }
 
+// Keep every attempt in its venue need, but show only the latest attempt in the event overview.
+// Older records without venueNeedId are grouped by their replacement chain.
+export function currentVenueBookingGroups(bookings) {
+  const groups = new Map()
+  for (const booking of bookings) {
+    const id = venueNeedId(booking, bookings) ?? booking.id
+    if (!groups.has(id)) groups.set(id, [])
+    groups.get(id).push(booking)
+  }
+  return [...groups.entries()].map(([venueNeedId, attempts]) => {
+    const current = attempts.find((attempt) => !attempts.some((other) => other.replacesId === attempt.id))
+      ?? attempts[attempts.length - 1]
+    return { venueNeedId, current, history: attempts.filter((attempt) => attempt.id !== current.id)
+      .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '') || b.id.localeCompare(a.id)) }
+  }).sort((a, b) => (a.current.createdAt ?? '').localeCompare(b.current.createdAt ?? '') || a.venueNeedId.localeCompare(b.venueNeedId))
+}
+
+export function venueBookingStatusLabel(status) {
+  return ({ [BOOKING_PENDING]: 'Under review', [BOOKING_APPROVED]: 'Approved',
+    [BOOKING_REJECTED]: 'Rejected', [BOOKING_REPLACED]: 'Replaced',
+    [BOOKING_CANCELLED]: 'Cancelled', [BOOKING_EXPIRED]: 'Expired' })[status] ?? status
+}
+
+export function venueBookingNextStep(booking, eventStatus) {
+  if (eventStatus === CANCELLED || eventStatus === REJECTED) return 'The event is closed; no replacement is needed.'
+  switch (booking.status) {
+    case BOOKING_PENDING: return 'Await Venue Staff review.'
+    case BOOKING_APPROVED: return 'Venue booked; no booking action needed.'
+    case BOOKING_REJECTED: return 'The Coordinator will request a replacement venue.'
+    case BOOKING_EXPIRED: return 'The Coordinator will submit a new request for this venue need.'
+    case BOOKING_CANCELLED: return 'The Coordinator will arrange a replacement if the event continues.'
+    case BOOKING_REPLACED: return 'See the current request for this venue need.'
+    default: return 'Contact the Coordinator for an update.'
+  }
+}
+
 // The stored decision is preserved; a pending request becomes effectively expired at its deadline,
 // before the hourly task records the expired status.
 export function pendingVenueBookings(bookings, now = new Date()) {
@@ -61,6 +99,7 @@ export function canRequestVenue(user, event) {
 
 export function canReadVenueBooking(user, event, booking) {
   return (rolesOf(user).includes(COORDINATOR) && isAssignedCoordinator(user, event)) ||
+    inScopeAs(ORGANISER, user, event) ||
     (rolesOf(user).includes(VENUE_STAFF) && booking.assignedVenueStaffUid === user.uid)
 }
 
@@ -71,6 +110,20 @@ export function canRejectVenueBooking(user, event, booking, now = new Date()) {
 
 export function canApproveVenueBooking(user, event, booking, now = new Date()) {
   return canRejectVenueBooking(user, event, booking, now)
+}
+
+export function canCancelVenueBooking(user, event, booking, now = new Date()) {
+  return rolesOf(user).includes(COORDINATOR) && isAssignedCoordinator(user, event) &&
+    [PLANNING, CONFIRMED].includes(event.status) && booking.status === BOOKING_APPROVED &&
+    !hasOpenCancellation(event) && !eventHasStarted(event, now)
+}
+
+export function venueBookingCancellationErrors(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { request: 'A cancellation action is required.' }
+  const errors = {}
+  for (const key of Object.keys(input)) if (key !== 'action') errors[key] = 'This field cannot be set.'
+  if (input.action !== 'cancel') errors.action = 'Choose Cancel booking.'
+  return errors
 }
 
 export function venueBookingApprovalErrors(input) {
