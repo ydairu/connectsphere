@@ -1,18 +1,25 @@
 # SPM-61 acceptance criteria and verification
 
-Operational source: Product Backlog workbook, SPM-61, Sprint 4. The criteria below are taken from a summary of the workbook row. They were not re-read from the workbook for this increment, so check them against it before acceptance.
+Operational source: Product Backlog workbook, `01_Product Backlog`, SPM-61 (Sprint 4, To Do). Read on 25 October 2026. The criteria below are quoted from that row.
 
-SPM-25 ("the Organiser is notified" on return) and SPM-45 ("the Organiser is not notified of a rejection") recorded these notices as missing. This increment adds them, so it also closes those two gaps.
+**Workbook note to correct:** the row's Notes say "Return notification already delivered in SPM-25", and the `03_Sprint Backlog` task says "Return is already sent by SPM-25". Neither was true. SPM-25 recorded "the Organiser is notified" as Not met (project_context.md, item 15), and `return_for_clarification` wrote no notification. SPM-61 adds it. It also closes SPM-45's recorded gap, "the Organiser is not notified of a rejection".
 
-| Acceptance criterion (summarised) | Implementation | Automated evidence |
+| Backlog acceptance criterion | Implementation | Automated evidence |
 |---|---|---|
-| Approving a request (Under Review → Planning) notifies the Organiser. | `statusChangeNotifications()` in `shared/notifications.js` returns a `request_approved` notice for the owner. `transitionEventRequest` in `backend/src/services/statusTransitionService.js` writes it in the status-change transaction. | `tests/spm-61/unit/organiserStatusNotifications.test.js`, `tests/spm-61/integration/organiserStatusNotificationsApi.test.js` |
-| Rejecting a request from Under Review or Planning notifies the Organiser with the reason. | `request_rejected` carries the required reason and says which stage it was rejected at. | Unit and API suites (both stages) |
-| Confirming an event notifies the Organiser, with a link to the confirmed arrangements. | `request_confirmed`. The Notifications page links it as "View arrangements" to the event page, whose Event Status tab shows "Your event arrangements" (SPM-64). | Unit and API suites; `tests/spm-61/integration/organiserNotificationsPage.test.jsx`; `tests/spm-61/e2e/spm61.organiserNotifications.spec.js` |
-| Returning a request notifies the Organiser with the event name, the Coordinator's message and an edit link. | `request_returned` carries the clarification message. The page shows it as "Message from the coordinator" and links "Edit request" to the event page, where the owner edits a returned request. | Unit, API, page and E2E suites |
-| Only the owning Organiser is notified. | One notice, addressed to `ownerUid`. Same-organisation colleagues, staff and Coordinators are not notified, and the user who acted is never notified (`addressed()`). | Unit and API suites |
-| The notice names the right event when the Organiser has several. | Each notice stores `eventRequestId` and `eventTitle`, and its message names the event. | Unit and API suites |
-| A refused action, or one by an unassigned Coordinator, sends nothing. | Every refusal throws before the transaction writes anything, so no notice is written. | API suite: unassigned Coordinator (404), other roles (403), missing reason or message (400), wrong status and Confirm before arrangements (409) |
+| Notification triggers: event request approved, rejected, returned for clarification, event confirmed. | `statusChangeNotifications()` in `shared/notifications.js` returns a notice for `approve`, `reject`, `return_for_clarification` and `confirm`, and nothing for any other action. `transitionEventRequest` in `backend/src/services/statusTransitionService.js` writes it in the status-change transaction. | `tests/spm-61/unit/organiserStatusNotifications.test.js`; `tests/spm-61/integration/organiserStatusNotificationsApi.test.js` |
+| Notification contents: event name, decision type, reason (for rejection/return), link to the request. | Each notice stores `eventTitle`, a `type` (`request_approved`, `request_rejected`, `request_returned`, `request_confirmed`) and a message naming the event and decision. It also stores `reason` (the rejection reason or clarification message) and `eventRequestId`, which the Notifications page turns into a link to `/requests/:id`. | Unit, API and page suites |
+| Approve: the Organiser is notified that the request has been approved and planning will proceed. | "“…” has been approved and moved to Planning. The event coordinator will now arrange the venue and equipment." | Unit and API suites |
+| Return with a message: the notification contains the clarification request and a link to edit and resubmit. | The `request_returned` notice carries the message. The page shows it as "Message from the coordinator" with an **Edit request** link to the event page, where the owner edits and resubmits a returned request. | Unit, API and page suites; `tests/spm-61/e2e/spm61.organiserNotifications.spec.js` |
+| Reject with a reason: the notification states the rejection and the reason. | The `request_rejected` notice carries the reason and says whether the request was rejected during review or during planning. | Unit and API suites (both stages); page suite |
+| An Organiser with several requests: the notification identifies which event the decision applies to. | Each notice has its own `eventRequestId` and `eventTitle`, and its message names the event. | Unit and API suites |
+| Confirm: the Organiser is notified that the event is confirmed, with a link to view the confirmed arrangements. | The `request_confirmed` notice has a **View arrangements** link to the event page. Its Event Status tab shows "Your event arrangements" (SPM-64). | Unit, API and page suites; E2E suite |
+
+These rules come from the `03_Sprint Backlog` tasks, not from the acceptance criteria:
+
+| Sprint Backlog task | Implementation | Automated evidence |
+|---|---|---|
+| Notify the owning Organiser. | One notice, addressed to `ownerUid`. Same-organisation colleagues, staff and Coordinators are not notified, and the user who acted is never notified (`addressed()`). | Unit and API suites |
+| Send each notification in the same transaction as the status change, and none for refused actions. | Every refusal throws before the transaction writes anything. | API suite: unassigned Coordinator (404), other roles (403), missing reason or message (400), wrong status and Confirm before arrangements (409) |
 
 In-app is the only channel, as for SPM-47 and SPM-63 (effective-requirements.md §4.20, team decision pending). No Firestore rule change or data migration is needed: notices use the existing `notifications` collection and `GET /api/notifications`.
 
@@ -27,4 +34,4 @@ In-app is the only channel, as for SPM-47 and SPM-63 (effective-requirements.md 
 
 HTTP tests use mocked identity and in-memory persistence; Playwright uses the local Firebase double. Neither verifies the deployed Firebase project. Firestore rules were neither edited nor deployed.
 
-Human acceptance has not been run. Keep SPM-61 In Progress until the criteria are checked against the workbook and accepted.
+The criteria were checked against the workbook row on 25 October 2026, and every one is covered. Human acceptance and peer review have not been done, so keep SPM-61 In Progress until they are.
