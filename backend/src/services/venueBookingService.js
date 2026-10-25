@@ -37,7 +37,7 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
     const previousAttempt = eventBookings.find((b) => b.submissionKey === value.submissionKey)
     if (previousAttempt) {
       if (Object.keys(value).some((key) => previousAttempt[key] !== value[key])) throw new VenueBookingError(409, 'This submission reference was already used. Reload before submitting again.')
-      return presentBooking(previousAttempt)
+      return presentBooking(previousAttempt, false, false, now)
     }
     if (!canRequestVenue(user, event)) throw new VenueBookingError(409, 'Venue requests can only be submitted while the event is in Planning.')
     const period = eventPeriod(event)
@@ -104,7 +104,7 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
     tx.update(eventRef, { assignedStaffUids: [...new Set([...(event.assignedStaffUids ?? []), assignee.uid])], updatedAt: at })
     tx.set(eventRef.collection('activity').doc(), { type: 'venue_booking_requested', bookingRequestId: ref.id,
       replacesId: old?.id ?? null, actor: { uid: user.uid, role: COORDINATOR }, assignedVenueStaffUid: assignee.uid, at })
-    return presentBooking({ id: ref.id, ...booking })
+    return presentBooking({ id: ref.id, ...booking }, false, false, now)
   })
 }
 
@@ -149,7 +149,7 @@ export async function rejectVenueBooking(eventId, bookingId, input, user, db = g
     tx.set(eventRef.collection('activity').doc(), { type: 'venue_booking_rejected', bookingRequestId: bookingId,
       reason: value.reason, suggestedAlternative: value.suggestedAlternative, actor: { uid: user.uid, role: VENUE_STAFF }, at })
     addNotifications(tx, db, venueBookingRejectedNotifications(event, booking, user, { reason: value.reason, at }))
-    return presentBooking({ ...booking, ...rejection })
+    return presentBooking({ ...booking, ...rejection }, false, false, now)
   })
 }
 
@@ -208,7 +208,7 @@ export async function approveVenueBooking(eventId, bookingId, input, user, db = 
     tx.set(eventRef.collection('activity').doc(), { type: 'venue_booking_approved', bookingRequestId: bookingId,
       actor: { uid: user.uid, role: VENUE_STAFF }, at })
     addNotifications(tx, db, venueBookingApprovedNotifications(event, booking, user, { at }))
-    return presentBooking({ ...booking, ...approval })
+    return presentBooking({ ...booking, ...approval }, false, false, decisionNow)
   })
 }
 
@@ -256,7 +256,7 @@ export async function cancelVenueBooking(eventId, bookingId, input, user, db = g
       actor: { uid: user.uid, role: COORDINATOR }, at })
     if (event.status === CONFIRMED) recordStatusChange(tx, eventRef, { action: VENUE_BOOKING_CANCELLED,
       fromStatus: CONFIRMED, toStatus: PLANNING, actor: userActor(user), at })
-    return presentBooking({ ...booking, status: BOOKING_CANCELLED, cancelledAt: at, updatedAt: at })
+    return presentBooking({ ...booking, status: BOOKING_CANCELLED, cancelledAt: at, updatedAt: at }, false, false, now)
   })
 }
 
