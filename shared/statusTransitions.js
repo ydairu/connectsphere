@@ -28,6 +28,7 @@ import {
   CONFIRMED,
   DRAFT,
   PLANNING,
+  PREPARATION,
   REJECTED,
   RETURNED,
   SUBMITTED,
@@ -42,6 +43,7 @@ export const START_REVIEW = 'start_review'
 export const RETURN_FOR_CLARIFICATION = 'return_for_clarification'
 export const APPROVE = 'approve'
 export const CONFIRM = 'confirm'
+export const START_PREPARATION = 'start_preparation'
 export const REJECT = 'reject'
 export const COMPLETE = 'complete'
 export const CANCEL = 'cancel'
@@ -59,6 +61,7 @@ export { NOT_PERMITTED }
 export const ARRANGEMENTS_NOT_APPROVED = 'arrangements_not_approved'
 export const EVENT_NOT_ENDED = 'event_not_ended'
 export const INSUFFICIENT_INFORMATION = 'insufficient_information'
+export const SAFETY_APPROVAL_REQUIRED = 'safety_approval_required'
 export { EVENT_STARTED }
 
 // --- Guards ---------------------------------------------------------------------------------------
@@ -125,32 +128,40 @@ const TRANSITIONS = Object.freeze({
     actor: isAssignedCoordinator,
     guard: (request) => (arrangementsApproved(request) ? null : ARRANGEMENTS_NOT_APPROVED),
   },
+  // SPM-91/92 owns the persisted safety decision. Until its server-side verifier is wired in, the
+  // context defaults to false and neither UI nor API can start preparation.
+  [START_PREPARATION]: {
+    from: [CONFIRMED],
+    to: PREPARATION,
+    actor: isAssignedCoordinator,
+    guard: (_request, _now, context) => context.safetyApproved === true ? null : SAFETY_APPROVAL_REQUIRED,
+  },
   // "Given an event is Under Review or Planning and its essential requirements cannot be fulfilled, when
   // the assigned Event Coordinator rejects it, then its status changes to Rejected."
   [REJECT]: { from: [UNDER_REVIEW, PLANNING], to: REJECTED, actor: isAssignedCoordinator },
-  // "Given a Confirmed event that has taken place, when marked complete, then it moves to Completed."
+  // SPM-88: completion follows Preparation, once the event has ended.
   [COMPLETE]: {
-    from: [CONFIRMED],
+    from: [PREPARATION],
     to: COMPLETED,
     actor: isAssignedCoordinator,
     guard: (request, now) => (eventHasEnded(request, now) ? null : EVENT_NOT_ENDED),
   },
-  // "Given a Confirmed event, when ... the Coordinator cancels it directly, then it moves to Cancelled."
+  // Coordinator may cancel a Confirmed or Preparation event before it starts.
   // Coordinator-initiated cancellation is "for a stated reason" (Clarification 2): the API requires one.
-  // SPM-63: "only a Confirmed event, up to its start date/time." While an Organiser's request is open
+  // SPM-88 extends SPM-63's Confirmed rule to Preparation. While an Organiser's request is open
   // (pending, or returned for more information), the Coordinator decides it instead (SPM-47).
   [CANCEL]: {
-    from: [CONFIRMED],
+    from: [CONFIRMED, PREPARATION],
     to: CANCELLED,
     actor: isAssignedCoordinator,
     guard: (request, now) =>
       eventHasStarted(request, now) ? EVENT_STARTED : hasOpenCancellation(request) ? CANCELLATION_REQUEST_PENDING : null,
   },
-  // "Given a Confirmed event, when a cancellation request is approved ..., then it moves to Cancelled."
+  // An approved cancellation request can close Confirmed or Preparation.
   // SPM-47: "when the event's start date/time passes before a decision, then it can no longer be approved."
   // Requesting, returning and refusing are in shared/cancellationRequests.js; they do not change the status.
   [APPROVE_CANCELLATION]: {
-    from: [CONFIRMED],
+    from: [CONFIRMED, PREPARATION],
     to: CANCELLED,
     actor: isAssignedCoordinator,
     guard: (request, now) =>
@@ -172,7 +183,7 @@ export function targetStatus(action) {
  * Checks run in this order: action exists, request is not terminal, request is at an allowed status,
  * user is a permitted actor, guard passes. A multi-role user is permitted if any of their roles is.
  */
-export function canTransition(user, request, action, now = new Date()) {
+export function canTransition(user, request, action, now = new Date(), context = {}) {
   if (!Object.hasOwn(TRANSITIONS, action)) return { allowed: false, reason: UNKNOWN_ACTION }
   // "Given an event in Completed, Cancelled or Rejected, when any user attempts a status change, then it
   // is not allowed." Also true by construction — no action lists a terminal status in `from`.
@@ -182,13 +193,13 @@ export function canTransition(user, request, action, now = new Date()) {
   if (!transition.from.includes(request.status)) return { allowed: false, reason: WRONG_STATUS }
   if (!transition.actor(user, request)) return { allowed: false, reason: NOT_PERMITTED }
 
-  const refusal = transition.guard?.(request, now)
+  const refusal = transition.guard?.(request, now, context)
   if (refusal) return { allowed: false, reason: refusal }
 
   return { allowed: true, from: request.status, to: transition.to }
 }
 
 /** Actions this user may perform on this request now, in table order. Drives the UI only. */
-export function availableActions(user, request, now = new Date()) {
-  return ACTIONS.filter((action) => canTransition(user, request, action, now).allowed)
+export function availableActions(user, request, now = new Date(), context = {}) {
+  return ACTIONS.filter((action) => canTransition(user, request, action, now, context).allowed)
 }

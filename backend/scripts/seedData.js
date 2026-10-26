@@ -22,6 +22,7 @@ import {
   CANCELLED,
   COMPLETED,
   CONFIRMED,
+  PREPARATION,
   DRAFT,
   PLANNING,
   REJECTED,
@@ -160,10 +161,9 @@ export const SEED_REQUESTS = Object.freeze([
   eventRequest({ slug: 'a1-returned', coordinator, status: RETURNED, owner: organiserA1, title: 'A1 returned for clarification', createdAt: '2026-09-04T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-planning', coordinator, status: PLANNING, owner: organiserA1, title: 'A1 planning (all staff assigned)', assigned: bothStaffTeams, createdAt: '2026-09-05T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, approvals: bothArrangementsApproved, reservedEquipment: a1ConfirmedReservedEquipment, createdAt: '2026-09-06T10:00:00+08:00' }),
-  // SPM-27 demo: a Confirmed event that has already taken place (1 Oct 2026), so its Coordinator can mark it
-  // completed. No venue booking or hold, so it clashes with nothing seeded. Counts towards Seed Coordinator's
-  // workload (5), which keeps coordinator-3 the next to be assigned.
-  eventRequest({ slug: 'a1-confirmed-past', coordinator, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (event held, ready to complete)', assigned: bothStaffTeams, approvals: bothArrangementsApproved, preferredDateTime: '2026-10-01T09:00:00+08:00', createdAt: '2026-09-06T11:00:00+08:00' }),
+  // SPM-88/SPM-27 demo: a Preparation event that has already taken place (1 Oct 2026), ready for manual
+  // completion. Keep its stable id for existing test and walkthrough references.
+  eventRequest({ slug: 'a1-confirmed-past', coordinator, status: PREPARATION, owner: organiserA1, title: 'A1 preparation (event held, ready to complete)', assigned: bothStaffTeams, approvals: bothArrangementsApproved, preferredDateTime: '2026-10-01T09:00:00+08:00', createdAt: '2026-09-06T11:00:00+08:00' }),
   eventRequest({ slug: 'a1-completed', coordinator, status: COMPLETED, owner: organiserA1, title: 'A1 completed', assigned: bothStaffTeams, createdAt: '2026-09-07T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-cancelled', coordinator: coordinator2, status: CANCELLED, owner: organiserA1, title: 'A1 cancelled', assigned: bothStaffTeams, createdAt: '2026-09-08T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-rejected', coordinator, status: REJECTED, owner: organiserA1, title: 'A1 rejected', createdAt: '2026-09-09T10:00:00+08:00' }),

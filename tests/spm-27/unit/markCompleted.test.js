@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ATTENDEE, COORDINATOR, ORGANISER, SECTIONS, TECHNICAL_STAFF, VENUE_STAFF, canEdit } from '../../../shared/permissions.js'
 import { allAvailableActions, completionNotice } from '../../../shared/requestActions.js'
-import { CANCELLED, COMPLETED, CONFIRMED, PLANNING, REJECTED, SUBMITTED, UNDER_REVIEW } from '../../../shared/status.js'
+import { CANCELLED, COMPLETED, CONFIRMED, PLANNING, PREPARATION, REJECTED, SUBMITTED, UNDER_REVIEW } from '../../../shared/status.js'
 import {
   ACTIONS,
   COMPLETE,
@@ -31,7 +31,7 @@ const owner = { uid: 'org-1', roles: [ORGANISER] }
 const assigned = { uid: 'coord-1', roles: [COORDINATOR] }
 const otherCoordinator = { uid: 'coord-2', roles: [COORDINATOR] }
 
-function event(status = CONFIRMED, overrides = {}) {
+function event(status = PREPARATION, overrides = {}) {
   return {
     id: 'req-1',
     status,
@@ -43,12 +43,12 @@ function event(status = CONFIRMED, overrides = {}) {
   }
 }
 
-describe('SPM-27 — only a Confirmed event whose date has passed', () => {
-  // AC: "Given a Confirmed event whose date has passed, when the Event Coordinator selects Mark as Completed,
+describe('SPM-27/SPM-88 — only a Preparation event whose date has passed', () => {
+  // Updated by SPM-88: "Given a Preparation event whose date has passed, when the Coordinator marks it complete,
   // then the event status changes to Completed."
-  it('spm27_assigned_coordinator_may_complete_a_confirmed_event_once_it_has_ended', () => {
+  it('spm27_assigned_coordinator_may_complete_a_preparation_event_once_it_has_ended', () => {
     for (const now of [AT_END, AFTER]) {
-      expect(canTransition(assigned, event(), COMPLETE, now)).toEqual({ allowed: true, from: CONFIRMED, to: COMPLETED })
+      expect(canTransition(assigned, event(), COMPLETE, now)).toEqual({ allowed: true, from: PREPARATION, to: COMPLETED })
       expect(availableActions(assigned, event(), now)).toContain(COMPLETE)
     }
   })
@@ -67,13 +67,13 @@ describe('SPM-27 — only a Confirmed event whose date has passed', () => {
       { preferredDateTime: START, durationHours: null },
       { preferredDateTime: START, durationHours: 0 },
     ]) {
-      expect(eventHasEnded(event(CONFIRMED, { core }), AFTER)).toBe(false)
-      expect(canTransition(assigned, event(CONFIRMED, { core }), COMPLETE, AFTER).reason).toBe(EVENT_NOT_ENDED)
+      expect(eventHasEnded(event(PREPARATION, { core }), AFTER)).toBe(false)
+      expect(canTransition(assigned, event(PREPARATION, { core }), COMPLETE, AFTER).reason).toBe(EVENT_NOT_ENDED)
     }
   })
 
-  it('spm27_complete_is_not_available_unless_the_event_is_confirmed', () => {
-    for (const status of [SUBMITTED, UNDER_REVIEW, PLANNING]) {
+  it('spm27_complete_is_not_available_unless_the_event_is_in_preparation', () => {
+    for (const status of [SUBMITTED, UNDER_REVIEW, PLANNING, CONFIRMED]) {
       expect(canTransition(assigned, event(status), COMPLETE, AFTER).reason, status).toBe(WRONG_STATUS)
     }
   })

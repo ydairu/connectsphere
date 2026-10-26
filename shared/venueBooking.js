@@ -1,5 +1,5 @@
 import { COORDINATOR, ORGANISER, VENUE_STAFF, inScopeAs, isAssignedCoordinator, rolesOf } from './permissions.js'
-import { CANCELLED, CONFIRMED, PLANNING, REJECTED } from './status.js'
+import { CANCELLED, CONFIRMED, PLANNING, PREPARATION, REJECTED } from './status.js'
 import { chooseStaff } from './staffAssignment.js'
 import { validateAvailabilityRange } from './venueAvailability.js'
 import { checkVenueSuitability, LAYOUT } from './venueSuitability.js'
@@ -114,7 +114,7 @@ export function canApproveVenueBooking(user, event, booking, now = new Date()) {
 
 export function canCancelVenueBooking(user, event, booking, now = new Date()) {
   return rolesOf(user).includes(COORDINATOR) && isAssignedCoordinator(user, event) &&
-    [PLANNING, CONFIRMED].includes(event.status) && booking.status === BOOKING_APPROVED &&
+    [PLANNING, CONFIRMED, PREPARATION].includes(event.status) && booking.status === BOOKING_APPROVED &&
     !hasOpenCancellation(event) && !eventHasStarted(event, now)
 }
 

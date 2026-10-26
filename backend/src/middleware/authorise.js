@@ -64,12 +64,12 @@ function outOfScope(user, res) {
  * `reservedEquipment` (SPM-62) lists the reserved equipment types and quantities, never unit ids, to anyone
  * who may view the equipment section; null when nothing is reserved.
  */
-export function presentRequest(user, request, { coordinatorName = null, ownerNames, venueBookingReadiness = null } = {}) {
+export function presentRequest(user, request, { coordinatorName = null, ownerNames, venueBookingReadiness = null, safetyApproved = false } = {}) {
   const current = { ...request, venueBookingReadiness }
   return {
     request: projectRequest(user, request),
     editableSections: SECTIONS.filter((section) => canEdit(user, request, section)),
-    availableActions: allAvailableActions(user, current),
+    availableActions: allAvailableActions(user, current, new Date(), { safetyApproved }),
     arrangements: arrangementsSummary(user, current),
     venueBookingReadiness: venueBookingReadiness && viewableSectionsFor(user, request).includes('venue') ? venueBookingReadiness : null,
     cancellationRequest: cancellationSummary(user, request),

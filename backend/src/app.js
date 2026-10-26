@@ -25,6 +25,8 @@ export function createApp({
   getVenueDb = getAdminDb,
   getEquipmentDb = getAdminDb,
   getNotificationDb = getEventRequestDb,
+  // SPM-91/92 supplies this server-side decision. False keeps Start Preparation unavailable until then.
+  verifySafetyApproval = async () => false,
 } = {}) {
   const app = express()
 
@@ -38,10 +40,10 @@ export function createApp({
 
   app.use('/api/health', healthRoutes)
   app.use('/api/equipment', createEquipmentRoutes({ authenticate, getDb: getEquipmentDb }))
-  app.use('/api/event-requests', createEventRequestRoutes({ authenticate, getDb: getEventRequestDb, getUserDb, getVenueDb }))
+  app.use('/api/event-requests', createEventRequestRoutes({ authenticate, getDb: getEventRequestDb, getUserDb, getVenueDb, verifySafetyApproval }))
   app.use('/api/notifications', createNotificationRoutes({ authenticate, getDb: getNotificationDb }))
   app.use('/api/profile', profileRoutes)
-  app.use('/api/requests', createRequestRoutes({ authenticate, store: eventRequestStore, getUserDb, getEventRequestDb }))
+  app.use('/api/requests', createRequestRoutes({ authenticate, store: eventRequestStore, getUserDb, getEventRequestDb, verifySafetyApproval }))
   app.use('/api/venues', createVenueRoutes({ authenticate, getDb: getVenueDb, getBookingDb: getEventRequestDb }))
 
   app.use((_req, res) => {

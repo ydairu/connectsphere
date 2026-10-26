@@ -11,7 +11,7 @@ import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { EQUIPMENT_RESERVATIONS_COLLECTION, EQUIPMENT_RESERVED, EQUIPMENT_RESERVATION_RELEASED, RESERVATION_STATUS } from '../../../shared/equipmentReservation.js'
 import { EQUIPMENT_REQUESTS_COLLECTION, EQUIPMENT_REQUEST_STATUS } from '../../../shared/equipmentRequest.js'
-import { PREPARATION_EQUIPMENT_NOT_RESERVED } from '../../../shared/preparation.js'
+import { PREPARATION_NOT_STARTED_YET } from '../../../shared/preparation.js'
 import { REJECTED } from '../../../shared/status.js'
 import { createFakeFirestoreEventRequestStore } from '../../shared/firebase-double/fakeFirestoreEventRequestStore.js'
 import { approvalFixture, coordinator, organiser, otherCoordinator, secondTech, tech, venueStaff } from '../../spm-56/fixtures.js'
@@ -149,18 +149,18 @@ describe('SPM-62 — effects of a reservation (integration)', () => {
     for (const hidden of ['proj-1', 'proj-2', 'P-1', 'P-2']) expect(body).not.toContain(hidden)
   })
 
-  it('spm62_api_equipment_preparation_opens_on_the_reservation', async () => {
+  it('spm88_api_equipment_preparation_waits_for_Preparation_even_after_reservation', async () => {
     const { id, assignee } = await approvedRequest([{ equipmentTypeId: 'projector', quantity: 1 }])
     // Approved: the technical sign-off is set, but nothing is reserved yet.
     const before = await patch(assignee, { equipmentPreparation: { status: 'in_progress' } })
     expect(before.status).toBe(403)
-    expect((await view(assignee)).body.preparation.equipmentPreparation).toEqual({ editable: false, readOnlyReason: PREPARATION_EQUIPMENT_NOT_RESERVED })
+    expect((await view(assignee)).body.preparation.equipmentPreparation).toEqual({ editable: false, readOnlyReason: PREPARATION_NOT_STARTED_YET })
 
     await act(id, 'reserve', { user: assignee })
 
     const after = await patch(assignee, { equipmentPreparation: { status: 'in_progress' } })
-    expect(after.status).toBe(200)
-    expect(after.body.request.equipmentPreparation.status).toBe('in_progress')
+    expect(after.status).toBe(403)
+    expect((await view(assignee)).body.preparation.equipmentPreparation).toEqual({ editable: false, readOnlyReason: PREPARATION_NOT_STARTED_YET })
   })
 
   it('spm62_api_a_significant_change_does_not_release_the_reservation', async () => {

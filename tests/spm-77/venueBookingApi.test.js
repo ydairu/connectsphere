@@ -3,7 +3,9 @@ import request from 'supertest'
 import { createApp } from '../../backend/src/app.js'
 import { createAuthenticate } from '../../backend/src/middleware/authenticate.js'
 import { createFakeFirestoreEventRequestStore } from '../shared/firebase-double/fakeFirestoreEventRequestStore.js'
-import { CONFIRMED } from '../../shared/status.js'
+import { CONFIRMED, PLANNING, PREPARATION } from '../../shared/status.js'
+import { STATUS_CHANGED } from '../../backend/src/services/statusHistory.js'
+import { VENUE_BOOKING_CANCELLED } from '../../shared/venueBooking.js'
 import { coordinator, fixture, input, organiser, secondStaff, staff } from '../spm-14/fixtures.js'
 
 let db, app
@@ -71,6 +73,17 @@ describe('SPM-77 booking API', () => {
     expect((await list(organiser)).body.bookings.map((booking) => booking.status)).toEqual(expect.arrayContaining(['cancelled', 'pending', 'approved']))
     expect((await request(app).get('/api/requests/event').set(auth(coordinator))).body.availableActions).not.toContain('confirm')
     expect((await request(app).post('/api/event-requests/event/transitions').set(auth(coordinator)).send({ action: 'confirm' })).status).toBe(409)
+  })
+
+  it('returns a Preparation event to Planning when its approved booking is cancelled', async () => {
+    const hall = (await create()).body.booking
+    expect((await action(hall.id, staff, 'approve')).status).toBe(200)
+    db.store.get('event').status = PREPARATION
+    expect((await action(hall.id, coordinator, 'cancel')).status).toBe(200)
+    expect(db.store.get('event').status).toBe(PLANNING)
+    expect([...db.collectionData('eventRequests/event/activity').values()]).toContainEqual(expect.objectContaining({
+      type: STATUS_CHANGED, action: VENUE_BOOKING_CANCELLED, fromStatus: PREPARATION, toStatus: PLANNING,
+    }))
   })
 
   it('releases both venue reservations only on whole-event cancellation', async () => {

@@ -4,15 +4,15 @@
 import { describe, expect, it } from 'vitest'
 
 import { SEED_ACCOUNTS, SEED_REQUESTS, SEED_VENUE_AVAILABILITY } from '../../../backend/scripts/seedData.js'
-import { CONFIRMED } from '../../../shared/status.js'
+import { PREPARATION } from '../../../shared/status.js'
 import { CANCEL, COMPLETE, availableActions, eventHasEnded } from '../../../shared/statusTransitions.js'
 
 const NOW = new Date('2026-10-18T00:00:00.000Z')
 const past = SEED_REQUESTS.find((request) => request.id === 'seed-req-a1-confirmed-past')
 
-describe('Seed data — past Confirmed event for SPM-27', () => {
-  it('spm27_seed_past_event_is_confirmed_owned_by_a1_and_assigned_to_seed_coordinator', () => {
-    expect(past).toMatchObject({ status: CONFIRMED, ownerUid: SEED_ACCOUNTS.organiserA1.uid, assignedCoordinatorUid: SEED_ACCOUNTS.coordinator.uid })
+describe('Seed data — past Preparation event for SPM-27', () => {
+  it('spm27_seed_past_event_is_in_preparation_owned_by_a1_and_assigned_to_seed_coordinator', () => {
+    expect(past).toMatchObject({ status: PREPARATION, ownerUid: SEED_ACCOUNTS.organiserA1.uid, assignedCoordinatorUid: SEED_ACCOUNTS.coordinator.uid })
     expect(past.core.preferredDateTime).toBe('2026-10-01T09:00:00+08:00')
     expect(past.arrangementApprovals).toMatchObject({ venue: { decision: 'approved' }, technical: { decision: 'approved' } })
   })

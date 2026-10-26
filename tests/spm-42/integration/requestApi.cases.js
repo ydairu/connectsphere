@@ -171,9 +171,9 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     })
 
     it('Venue+technical dual-role account PATCHes a venue field and an equipment field', async () => {
-      // SPM-48: the combined roles' sections are venue and equipment preparation, on an event whose
-      // sign-offs are approved. Seeded without preparation, so it reads as the defaults.
-      const response = await patch('venueTechnicalStaff', A1_CONFIRMED, {
+      // SPM-88: staff preparation sections unlock only in Preparation.
+      const preparationId = 'seed-req-a1-confirmed-past'
+      const response = await patch('venueTechnicalStaff', preparationId, {
         venuePreparation: { status: 'in_progress' },
         equipmentPreparation: { notes: 'Projector tested' },
       })
@@ -182,11 +182,11 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
       expect(response.json.request.equipmentPreparation.notes).toBe('Projector tested')
       expect(response.json.editableSections).toEqual(['venuePreparation', 'equipmentPreparation'])
 
-      const persisted = await get('coordinator3', A1_CONFIRMED)
+      const persisted = await get('coordinator', preparationId)
       expect(persisted.json.request.venuePreparation.status, 'venue preparation persisted').toBe('in_progress')
       expect(persisted.json.request.equipmentPreparation.notes, 'equipment preparation persisted').toBe('Projector tested')
 
-      const restored = await patch('venueTechnicalStaff', A1_CONFIRMED, {
+      const restored = await patch('venueTechnicalStaff', preparationId, {
         venuePreparation: { status: 'not_started', notes: '' },
         equipmentPreparation: { status: 'not_started', notes: '' },
       })

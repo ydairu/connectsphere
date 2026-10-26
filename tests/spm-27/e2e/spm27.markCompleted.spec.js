@@ -1,9 +1,9 @@
-// SPM-27 end-to-end in Chromium: the assigned Coordinator marks a Confirmed event that has taken place as
+// SPM-27 end-to-end in Chromium: the assigned Coordinator marks a Preparation event that has taken place as
 // Completed; it is labelled Completed under Closed events, and the request page records who completed it and
 // when. Firebase is the in-memory double; the API and app are real.
 //
 // Set-up through the real API: the Coordinator moves the seeded Planning event's date into the past (an edit
-// their role may make at Planning), staff approve it, then the Coordinator confirms it. The order matters: a
+// their role may make at Planning), staff approve it, then the Coordinator confirms it and starts Preparation. The order matters: a
 // date change at Planning is a significant change (SPM-10) and clears the sign-offs, so the date moves first.
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
@@ -36,10 +36,12 @@ test.describe('SPM-27 — Coordinator marks an event Completed (E2E)', () => {
     await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, 'approve_technical')
     await actAs(page.request, ROLE_USERS.coordinator, 'confirm')
+    expect((await page.request.post(`${DOUBLE_ORIGIN}/__double__/safety-approvals/${planning.id}`)).ok()).toBeTruthy()
+    await actAs(page.request, ROLE_USERS.coordinator, 'start_preparation')
 
     await signIn(page, ROLE_USERS.coordinator)
     await page.goto(`/requests/${planning.id}`)
-    await expect(statusPill(page)).toHaveText('Confirmed')
+    await expect(statusPill(page)).toHaveText('Preparation')
     await page.getByRole('button', { name: 'Mark as completed' }).click()
     await expect(page.getByText(/A completed event cannot change status again/)).toBeVisible()
     await page.getByRole('group', { name: 'Confirm status change' }).getByRole('button', { name: 'Mark as completed' }).click()
@@ -66,10 +68,12 @@ test.describe('SPM-27 — Coordinator marks an event Completed (E2E)', () => {
     await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, 'approve_technical')
     await actAs(page.request, ROLE_USERS.coordinator, 'confirm')
+    expect((await page.request.post(`${DOUBLE_ORIGIN}/__double__/safety-approvals/${planning.id}`)).ok()).toBeTruthy()
+    await actAs(page.request, ROLE_USERS.coordinator, 'start_preparation')
 
     await signIn(page, ROLE_USERS.coordinator)
     await page.goto(`/requests/${planning.id}`)
-    await expect(statusPill(page)).toHaveText('Confirmed')
+    await expect(statusPill(page)).toHaveText('Preparation')
     await expect(page.getByRole('button', { name: 'Cancel event' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Mark as completed' })).toHaveCount(0)
   })

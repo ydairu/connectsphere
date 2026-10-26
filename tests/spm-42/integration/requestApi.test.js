@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
-import { PLANNING, SUBMITTED } from '../../../shared/status.js'
+import { PLANNING, PREPARATION, SUBMITTED } from '../../../shared/status.js'
 import { SEED_ACCOUNTS } from '../../../backend/scripts/seedData.js'
 import { startInMemoryApi } from '../../shared/helpers/requestApiServer.js'
 import { registerSpm42ApiCases } from './requestApi.cases.js'
@@ -30,8 +30,6 @@ const OWN_PLANNING_REQUEST = {
   organisationId: 'TEST-ORG',
   organisationName: 'Test Organisation',
   assignedStaffUids: [ORGANISER_VENUE.uid],
-  // SPM-48: venue sign-off approved, so the venue role may update venue preparation.
-  arrangementApprovals: { venue: { decision: 'approved' } },
   core: { title: 'Own request at planning' },
   venue: { layoutPreference: 'theatre' },
   equipment: { requirements: [] },
@@ -39,6 +37,8 @@ const OWN_PLANNING_REQUEST = {
   internal: { planningNotes: '' },
   createdAt: '2026-09-12T10:00:00+08:00',
 }
+
+const OWN_PREPARATION_REQUEST = { ...OWN_PLANNING_REQUEST, id: 'test-req-own-preparation', status: PREPARATION }
 
 // Not a seeded account: a self-registered Organiser who has no organisationId yet.
 const SELF_REGISTERED_ORGANISER = {
@@ -69,7 +69,7 @@ let api
 beforeAll(async () => {
   api = await startInMemoryApi({
     extraAccounts: [ORGANISER_VENUE, SELF_REGISTERED_ORGANISER],
-    extraRequests: [OWN_PLANNING_REQUEST, OWN_SUBMITTED_WITHOUT_ORGANISATION_ID],
+    extraRequests: [OWN_PLANNING_REQUEST, OWN_PREPARATION_REQUEST, OWN_SUBMITTED_WITHOUT_ORGANISATION_ID],
   })
 })
 
@@ -102,9 +102,9 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     expect(response.json.forbiddenFields).toEqual(['core.title'])
   })
 
-  it('Organiser who is also venue staff PATCHes the venue section of their own request at planning', async () => {
+  it('Organiser who is also venue staff PATCHes their preparation section at Preparation', async () => {
     // SPM-48: the venue role's section is venue preparation; the requested venue is read-only.
-    const response = await patchAs(ORGANISER_VENUE.uid, OWN_PLANNING_REQUEST.id, { venuePreparation: { status: 'in_progress' } })
+    const response = await patchAs(ORGANISER_VENUE.uid, OWN_PREPARATION_REQUEST.id, { venuePreparation: { status: 'in_progress' } })
     expect(response.status).toBe(200)
     expect(response.json.editableSections).toEqual(['venuePreparation'])
   })

@@ -33,7 +33,7 @@ import {
   cancellationSummary,
 } from '../../../shared/requestActions.js'
 import { NOT_PERMITTED } from '../../../shared/requestActors.js'
-import { CONFIRMED, PLANNING, STATUSES, UNDER_REVIEW } from '../../../shared/status.js'
+import { CONFIRMED, PLANNING, PREPARATION, STATUSES, UNDER_REVIEW } from '../../../shared/status.js'
 import { APPROVE_CANCELLATION, canTransition } from '../../../shared/statusTransitions.js'
 
 const START = '2026-11-20T01:00:00.000Z'
@@ -66,8 +66,8 @@ describe('SPM-47 — only the owning Organiser requests, and only before the eve
     expect(allAvailableActions(owner, event(), BEFORE)).toEqual([REQUEST_CANCELLATION])
   })
 
-  it('spm47_request_cancellation_is_not_available_unless_the_event_is_confirmed', () => {
-    for (const status of STATUSES.filter((value) => value !== CONFIRMED)) {
+  it('spm47_request_cancellation_is_not_available_outside_confirmed_or_preparation', () => {
+    for (const status of STATUSES.filter((value) => ![CONFIRMED, PREPARATION].includes(value))) {
       expect(canRequestCancellation(owner, event(status), BEFORE).reason).toBe(NOT_CONFIRMED)
       expect(allAvailableActions(owner, event(status), BEFORE)).not.toContain(REQUEST_CANCELLATION)
     }

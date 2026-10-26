@@ -2,9 +2,7 @@ import { CORE, EQUIPMENT, EQUIPMENT_PREPARATION, INTERNAL, REGISTRATION, VENUE, 
 import {
   PREPARATION_EVENT_CLOSED,
   PREPARATION_NOTES_MAX_LENGTH,
-  PREPARATION_NOT_IN_PLANNING,
-  PREPARATION_EQUIPMENT_NOT_RESERVED,
-  PREPARATION_SIGN_OFF_PENDING,
+  PREPARATION_NOT_STARTED_YET,
   PREPARATION_STATUSES,
   PREPARATION_STATUS_LABELS,
 } from '../../../shared/preparation.js'
@@ -82,18 +80,12 @@ export const SECTION_ORDER = Object.freeze([CORE, VENUE, EQUIPMENT, REGISTRATION
 
 // SPM-48: why a preparation section is read-only for the staff who edit it. The reason comes from the API
 // (`preparation` in the response), which takes it from shared/preparation.js.
-const SIGN_OFF_NAME = { [VENUE_PREPARATION]: 'venue', [EQUIPMENT_PREPARATION]: 'technical' }
-
 export function preparationReadOnlyText(section, reason) {
   switch (reason) {
     case PREPARATION_EVENT_CLOSED:
       return 'This event is closed.'
-    case PREPARATION_SIGN_OFF_PENDING:
-      return `Available once the ${SIGN_OFF_NAME[section] ?? ''} sign-off is approved.`
-    case PREPARATION_NOT_IN_PLANNING:
-      return 'Available once the event is in Planning.'
-    case PREPARATION_EQUIPMENT_NOT_RESERVED:
-      return 'Available once the equipment is reserved.'
+    case PREPARATION_NOT_STARTED_YET:
+      return 'Available once the event is in Preparation.'
     default:
       return null
   }

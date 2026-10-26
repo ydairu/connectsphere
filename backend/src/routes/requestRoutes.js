@@ -18,7 +18,7 @@ import { presentRequest } from '../middleware/authorise.js'
 // Route split by status (AGENTS.md §6, team decision of 20 Sep 2026): drafts are
 // created and edited through /api/event-requests, which validates field values; everything after
 // submission goes through these routes, which evaluate role, record scope and the status gate.
-export function createRequestRoutes({ authenticate, store, getUserDb, getEventRequestDb }) {
+export function createRequestRoutes({ authenticate, store, getUserDb, getEventRequestDb, verifySafetyApproval = async () => false }) {
   const controller = createRequestController(
     store,
     createCoordinatorNameLoader(getUserDb),
@@ -46,7 +46,8 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
     async (req, res, next) => {
       try {
         const venueBookingReadiness = await loadVenueBookingReadiness(req.params.id, getEventRequestDb())
-        res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName, ownerNames: req.ownerNames, venueBookingReadiness })
+        const safetyApproved = await verifySafetyApproval(req.eventRequest, getEventRequestDb()) === true
+        res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName, ownerNames: req.ownerNames, venueBookingReadiness, safetyApproved })
         next()
       } catch (error) { next(error) }
     }, controller.sendOne)

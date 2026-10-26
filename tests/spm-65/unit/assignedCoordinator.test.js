@@ -14,7 +14,7 @@ import {
   isAssignedCoordinator,
   projectRequest,
 } from '../../../shared/permissions.js'
-import { DRAFT, PLANNING, SUBMITTED } from '../../../shared/status.js'
+import { DRAFT, PLANNING, PREPARATION, SUBMITTED } from '../../../shared/status.js'
 
 const coordinatorA = { uid: 'u-coord-a', roles: [COORDINATOR] }
 const coordinatorB = { uid: 'u-coord-b', roles: [COORDINATOR] }
@@ -67,8 +67,8 @@ describe('SPM-65 — coordinator record scope', () => {
 
   it('A coordinator holding a second role keeps that role\'s scope (SPM-42 union)', () => {
     const coordinatorStaff = { uid: 'u-coord-staff', roles: [COORDINATOR, VENUE_STAFF] }
-    // SPM-48: the venue role's section is venue preparation, editable once the venue sign-off is approved.
-    const staffAssigned = request({ status: PLANNING, assignedStaffUids: [coordinatorStaff.uid], arrangementApprovals: { venue: { decision: 'approved' } } })
+    // SPM-88: the venue role's section is editable in Preparation.
+    const staffAssigned = request({ status: PREPARATION, assignedStaffUids: [coordinatorStaff.uid] })
     expect(inScope(coordinatorStaff, staffAssigned), 'in scope as venue staff').toBe(true)
     expect(canEdit(coordinatorStaff, staffAssigned, 'venuePreparation')).toBe(true)
     expect(canEdit(coordinatorStaff, staffAssigned, 'internal'), 'not as coordinator: not assigned').toBe(false)

@@ -23,6 +23,7 @@ const SUBMITTED_ID = 'seed-req-a1-submitted'
 const RETURNED_ID = 'seed-req-a1-returned'
 const PLANNING_ID = 'seed-req-a1-planning'
 const CONFIRMED_ID = 'seed-req-a1-confirmed'
+const PREPARATION_ID = 'seed-req-a1-confirmed-past'
 const SEEDED_IDS = SEED_FIELD_HISTORY[PLANNING_ID].map((entry) => entry.id)
 
 let db
@@ -100,11 +101,9 @@ describe('SPM-28 AC1/AC2 — an entry per changed field, after submission', () =
     ])
   })
 
-  it('Venue Staff at Confirmed, on their section', async () => {
-    // SPM-48: Venue Staff's section is venue preparation, editable on the Confirmed event whose venue
-    // sign-off is approved. The seed stores no preparation, so the old value is the default.
-    expect((await patch(venueStaff, CONFIRMED_ID, { venuePreparation: { status: 'in_progress' } })).status).toBe(200)
-    expect(recorded(CONFIRMED_ID)).toEqual([
+  it('Venue Staff at Preparation, on their section', async () => {
+    expect((await patch(venueStaff, PREPARATION_ID, { venuePreparation: { status: 'in_progress' } })).status).toBe(200)
+    expect(recorded(PREPARATION_ID)).toEqual([
       expect.objectContaining({ field: 'venuePreparation.status', oldValue: 'not_started', newValue: 'in_progress', actor: expect.objectContaining({ role: VENUE_STAFF }) }),
     ])
   })

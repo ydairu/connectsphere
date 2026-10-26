@@ -15,6 +15,7 @@ import {
   CANCELLED,
   CONFIRMED,
   PLANNING,
+  PREPARATION,
   REJECTED,
   RETURNED,
   SUBMITTED,
@@ -243,7 +244,8 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
   })
 
   it('spm9_complete_is_refused_before_the_event_has_taken_place', async () => {
-    const response = await act(coordinator3, 'a1-confirmed', COMPLETE)
+    db.store.get('seed-req-a1-confirmed-past').core.preferredDateTime = '2099-11-20T09:00:00+08:00'
+    const response = await act(coordinator, 'a1-confirmed-past', COMPLETE)
     expect(response.status).toBe(409)
     expect(response.json.reason).toBe(EVENT_NOT_ENDED)
   })

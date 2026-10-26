@@ -10,11 +10,9 @@
 // canUpdateVenuePreparation / canUpdateEquipmentPreparation below. Preparation is internal: Organisers and
 // Attendees never receive it, nor its change history (effective-requirements.md §7, SPM-48).
 //
-// This file must not import permissions.js or arrangements.js: permissions.js imports this file, and a
-// circular import fails at module load. Sign-off is read through arrangementDecisions.js instead.
+// This file must not import permissions.js: permissions.js imports this file.
 
-import { ARRANGEMENT_APPROVED, VENUE_ARRANGEMENT, arrangementDecision } from './arrangementDecisions.js'
-import { CANCELLED, COMPLETED, CONFIRMED, PLANNING, REJECTED } from './status.js'
+import { CANCELLED, COMPLETED, CONFIRMED, PLANNING, PREPARATION, REJECTED } from './status.js'
 
 // --- Sections and values --------------------------------------------------------------------------
 
@@ -55,35 +53,20 @@ export function preparationSection(request, section) {
 
 // --- When it may be edited ------------------------------------------------------------------------
 
-const PREPARATION_EDITABLE_STATUSES = Object.freeze([PLANNING, CONFIRMED])
 const CLOSED_STATUSES = Object.freeze([COMPLETED, CANCELLED, REJECTED])
 
-// TEMPORARY (SPM-48): venue preparation uses SPM-9 sign-off until SPM-54 (approved booking) is built.
-// Equipment preparation uses the reservation (SPM-62).
-
 /**
- * May the venue preparation section be updated on this request now? Planning or Confirmed, with the venue
- * sign-off approved (SPM-48 AC3, AC5). Who may update it is decided separately, by SECTION_ACCESS.
+ * SPM-88 replaces the temporary arrangement condition. Who may update is decided by SECTION_ACCESS.
  */
 export function canUpdateVenuePreparation(request) {
-  return PREPARATION_EDITABLE_STATUSES.includes(request?.status) && arrangementDecision(request, VENUE_ARRANGEMENT) === ARRANGEMENT_APPROVED
+  return request?.status === PREPARATION
 }
 
 /**
- * May the equipment preparation section be updated on this request now? Planning or Confirmed, with the
- * event's equipment reserved (SPM-62, replacing the SPM-48 temporary technical sign-off). `reservedEquipment`
- * is the event-level record written on reservation and removed when the reservation is released; it is read
- * here directly because this file cannot import equipmentReservation.js (it imports permissions.js).
- * [Team decision, 18 Oct 2026 — SPM-62, pending PO confirmation] An event with nothing reserved has no
- * equipment to prepare, so the section stays read-only.
+ * SPM-88 replaces the temporary reservation condition. Who may update is decided by SECTION_ACCESS.
  */
 export function canUpdateEquipmentPreparation(request) {
-  return PREPARATION_EDITABLE_STATUSES.includes(request?.status) && hasReservedEquipment(request)
-}
-
-function hasReservedEquipment(request) {
-  const items = request?.reservedEquipment?.items
-  return Array.isArray(items) && items.length > 0
+  return request?.status === PREPARATION
 }
 
 // Used by shared/permissions.js: a preparation section is editable only while its condition holds.
@@ -94,9 +77,7 @@ export const PREPARATION_CONDITIONS = Object.freeze({
 
 // Why a preparation section is read-only, for the staff role that edits it.
 export const PREPARATION_EVENT_CLOSED = 'event_closed'
-export const PREPARATION_SIGN_OFF_PENDING = 'sign_off_pending'
-export const PREPARATION_NOT_IN_PLANNING = 'not_in_planning'
-export const PREPARATION_EQUIPMENT_NOT_RESERVED = 'equipment_not_reserved'
+export const PREPARATION_NOT_STARTED_YET = 'preparation_not_started_yet'
 
 /**
  * Why `section` cannot be updated on this request now, or null if its condition holds. Derived from the
@@ -105,15 +86,14 @@ export const PREPARATION_EQUIPMENT_NOT_RESERVED = 'equipment_not_reserved'
 export function preparationReadOnlyReason(section, request) {
   if (!isPreparationSection(section) || PREPARATION_CONDITIONS[section](request)) return null
   if (CLOSED_STATUSES.includes(request?.status)) return PREPARATION_EVENT_CLOSED
-  if (!PREPARATION_EDITABLE_STATUSES.includes(request?.status)) return PREPARATION_NOT_IN_PLANNING
-  return section === EQUIPMENT_PREPARATION ? PREPARATION_EQUIPMENT_NOT_RESERVED : PREPARATION_SIGN_OFF_PENDING
+  return PREPARATION_NOT_STARTED_YET
 }
 
 // --- When it is shown -----------------------------------------------------------------------------
 
 // [Team decision, 7 Oct 2026] Display rule only: preparation is shown from Planning onwards, the closed
 // statuses included. Writes are still decided by the conditions above, whatever is shown.
-const PREPARATION_DISPLAY_STATUSES = Object.freeze([PLANNING, CONFIRMED, COMPLETED, CANCELLED, REJECTED])
+const PREPARATION_DISPLAY_STATUSES = Object.freeze([PLANNING, CONFIRMED, PREPARATION, COMPLETED, CANCELLED, REJECTED])
 
 export function preparationShown(request) {
   return PREPARATION_DISPLAY_STATUSES.includes(request?.status)

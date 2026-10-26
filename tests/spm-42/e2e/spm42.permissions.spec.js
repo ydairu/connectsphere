@@ -13,7 +13,7 @@ async function signIn(page, account) {
 }
 
 const A1_PLANNING = 'seed-req-a1-planning'
-const A1_CONFIRMED = 'seed-req-a1-confirmed'
+const A1_PREPARATION = 'seed-req-a1-confirmed-past'
 const A1_SUBMITTED = 'seed-req-a1-submitted'
 const A1_DRAFT = 'seed-req-a1-draft'
 const A2_DRAFT = 'seed-req-a2-draft'
@@ -28,10 +28,9 @@ test.describe('SPM-42 — View and edit information according to my role’s per
     await page.getByRole('tab', { name: 'Venue Details' }).click()
 
     await expect(page.getByRole('heading', { name: 'Venue', exact: true })).toBeVisible()
-    // SPM-48: the requested venue is read-only to Venue Staff; their section is venue preparation, which
-    // waits here for the venue sign-off.
+    // SPM-88: the requested venue is read-only to Venue Staff; their preparation section waits for Preparation.
     await expect(page.getByLabel('Layout preference')).toHaveCount(0)
-    await expect(page.getByText('Available once the venue sign-off is approved.')).toBeVisible()
+    await expect(page.getByText('Available once the event is in Preparation.')).toBeVisible()
     // Absent from the page, because it is absent from the response — not hidden by the interface.
     await expect(page.getByRole('heading', { name: 'Equipment and technical support' })).toHaveCount(0)
     await expect(page.getByText('projector')).toHaveCount(0)
@@ -54,8 +53,8 @@ test.describe('SPM-42 — View and edit information according to my role’s per
   test('spm42_dual_role_account_edits_venue_and_equipment_on_one_event', async ({ page }) => {
     expect(DUAL_ROLE_STAFF.roles).toEqual([VENUE_STAFF, TECHNICAL_STAFF])
     await signIn(page, DUAL_ROLE_STAFF)
-    // SPM-48: the combined roles edit venue and equipment preparation, on the event whose sign-offs are approved.
-    await page.goto(`/requests/${A1_CONFIRMED}`)
+    // SPM-88: the combined roles edit both preparation sections on a Preparation event.
+    await page.goto(`/requests/${A1_PREPARATION}`)
 
     await page.getByRole('tab', { name: 'Venue Details' }).click()
     await page.getByLabel('Venue preparation status').selectOption('in_progress')
