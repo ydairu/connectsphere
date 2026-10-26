@@ -24,10 +24,11 @@ export function createDouble() {
   // users/{uid} profiles live in the database too, so SPM-8's coordinator selection on submit sees them.
   // reset() replaces the whole database: seeded requests and their seeded field history (SPM-28), no other
   // activity entries, no assignment lock.
-  const state = { accounts: new Map(), db: null, profiles: null, nextUid: 1 }
+  const state = { accounts: new Map(), db: null, profiles: null, approvedSafetyEvents: new Set(), nextUid: 1 }
 
   function reset() {
     state.accounts.clear()
+    state.approvedSafetyEvents.clear()
     state.db = createFakeFirestore({
       eventRequests: Object.fromEntries(SEED_REQUESTS.map(({ id, ...request }) => [id, request])),
       venues: Object.fromEntries(SEED_VENUES.map(({ id, ...venue }) => [id, venue])),
@@ -92,6 +93,12 @@ export function createDouble() {
   router.post('/reset', (_req, res) => {
     reset()
     res.status(204).end()
+  })
+  // Test-only SPM-91/92 stand-in. No production request can set this; the real verifier remains fail-closed.
+  router.post('/safety-approvals/:id', (req, res) => {
+    if (!state.db.collectionData('eventRequests').has(req.params.id)) return res.status(404).json({ message: 'Event not found' })
+    state.approvedSafetyEvents.add(req.params.id)
+    return res.status(204).end()
   })
   // Signs in one more seeded account (SEED_ACCOUNTS key) until the next reset, for a spec that needs an
   // account outside ALL_TEST_USERS without changing every other spec's users — e.g. SPM-48 needs the
@@ -209,6 +216,7 @@ export function createDouble() {
     getVenueDb: () => state.db,
     // SPM-37: equipment types and units start empty after every reset.
     getEquipmentDb: () => state.db,
+    verifySafetyApproval: async (request) => state.approvedSafetyEvents.has(request.id),
   })
 
   reset()

@@ -17,6 +17,7 @@ import {
   CONFIRMED,
   DRAFT,
   PLANNING,
+  PREPARATION,
   REJECTED,
   RETURNED,
   SUBMITTED,
@@ -38,13 +39,13 @@ function seededRandom(seed) {
 const counts = (entries) => new Map(Object.entries(entries))
 
 describe('SPM-8 — active assigned events', () => {
-  test('Submitted, Under Review, Returned, Planning and Confirmed count; Draft, Completed, Cancelled and Rejected do not', () => {
-    assert.deepEqual([...ACTIVE_ASSIGNMENT_STATUSES].sort(), [CONFIRMED, PLANNING, RETURNED, SUBMITTED, UNDER_REVIEW].sort())
+  test('Submitted through Preparation count; Draft and terminal statuses do not', () => {
+    assert.deepEqual([...ACTIVE_ASSIGNMENT_STATUSES].sort(), [CONFIRMED, PLANNING, PREPARATION, RETURNED, SUBMITTED, UNDER_REVIEW].sort())
 
-    const requests = [SUBMITTED, UNDER_REVIEW, RETURNED, PLANNING, CONFIRMED, DRAFT, COMPLETED, CANCELLED, REJECTED].map(
+    const requests = [SUBMITTED, UNDER_REVIEW, RETURNED, PLANNING, CONFIRMED, PREPARATION, DRAFT, COMPLETED, CANCELLED, REJECTED].map(
       (status) => ({ status, assignedCoordinatorUid: 'A' }),
     )
-    assert.equal(countActiveAssignments(requests).get('A'), 5)
+    assert.equal(countActiveAssignments(requests).get('A'), 6)
   })
 
   test('requests with no coordinator are not counted against anyone', () => {

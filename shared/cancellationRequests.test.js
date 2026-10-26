@@ -17,7 +17,7 @@ import {
 } from './cancellationRequests.js'
 import { COORDINATOR, ORGANISER } from './permissions.js'
 import { NOT_PERMITTED } from './requestActors.js'
-import { CONFIRMED, STATUSES } from './status.js'
+import { CONFIRMED, PREPARATION, STATUSES, registrationEligibleStatus } from './status.js'
 
 const owner = { uid: 'org-1', roles: [ORGANISER] }
 const colleague = { uid: 'org-2', roles: [ORGANISER] }
@@ -33,8 +33,9 @@ describe('SPM-9 — requesting cancellation', () => {
     assert.deepEqual(canRequestCancellation(owner, requestAt(CONFIRMED)), { allowed: true })
   })
 
-  test('only a Confirmed event — before confirmation an unfulfillable event is rejected, not cancelled', () => {
-    for (const status of STATUSES.filter((status) => status !== CONFIRMED)) {
+  test('only a Confirmed or Preparation event can request cancellation', () => {
+    assert.deepEqual(canRequestCancellation(owner, requestAt(PREPARATION)), { allowed: true })
+    for (const status of STATUSES.filter((status) => !registrationEligibleStatus(status))) {
       assert.equal(canRequestCancellation(owner, requestAt(status)).reason, NOT_CONFIRMED, status)
     }
   })

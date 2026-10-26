@@ -245,6 +245,7 @@ a { color: inherit; }
 .status-under_review { color: #7b4d12; background: #fbf1df; }
 .status-planning { color: #5a3a8c; background: #f1ebfb; }
 .status-confirmed { color: #1f6b4f; background: #e6f5ee; }
+.status-preparation { color: #155d75; background: #e5f4f8; }
 .status-returned_for_clarification { color: #8a4a12; background: #fdefe2; }
 .status-completed { color: #35414a; background: #eaeef1; }
 .status-cancelled, .status-rejected { color: #8c2f39; background: #fbeaec; }

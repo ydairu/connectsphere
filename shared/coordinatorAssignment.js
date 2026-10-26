@@ -10,10 +10,10 @@
 // The load-based rule below is SPM-8's business rule: fewest active assigned events, random tie-break,
 // never the submitter. It is pending ratification in effective-requirements.md §5.
 
-import { CONFIRMED, PLANNING, RETURNED, SUBMITTED, UNDER_REVIEW } from './status.js'
+import { CONFIRMED, PLANNING, PREPARATION, RETURNED, SUBMITTED, UNDER_REVIEW } from './status.js'
 
 // Statuses that count towards a coordinator's workload. Draft, Completed, Cancelled and Rejected do not.
-export const ACTIVE_ASSIGNMENT_STATUSES = Object.freeze([SUBMITTED, UNDER_REVIEW, RETURNED, PLANNING, CONFIRMED])
+export const ACTIVE_ASSIGNMENT_STATUSES = Object.freeze([SUBMITTED, UNDER_REVIEW, RETURNED, PLANNING, CONFIRMED, PREPARATION])
 
 /**
  * Active assigned events per coordinator, as a Map of uid → count. Requests at other statuses, or with no

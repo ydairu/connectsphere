@@ -14,7 +14,7 @@ import {
   visibleChangeHistory,
 } from '../../../shared/changeHistory.js'
 import { ATTENDEE, COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
-import { CONFIRMED, DRAFT, PLANNING, RETURNED, SUBMITTED } from '../../../shared/status.js'
+import { CONFIRMED, DRAFT, PLANNING, PREPARATION, RETURNED, SUBMITTED } from '../../../shared/status.js'
 import { EMPTY_VALUE, fieldLabel, formatHistoryValue } from '../../../frontend/src/utils/changeHistory.js'
 
 const owner = { uid: 'org-1', name: 'Owner', roles: [ORGANISER], organisationId: 'ORG-A' }
@@ -40,13 +40,6 @@ function request(overrides = {}) {
     internal: { planningNotes: 'Hold Hall B' },
     ...overrides,
   }
-}
-
-// SPM-48: staff edit their preparation section only once the matching sign-off is approved.
-// SPM-62: equipment preparation also needs the event's equipment reserved.
-const signOffsApproved = {
-  arrangementApprovals: { venue: { decision: 'approved' }, technical: { decision: 'approved' } },
-  reservedEquipment: { equipmentRequestId: 'eq-1', items: [{ equipmentTypeId: 'projector', equipmentTypeName: 'Projector', quantity: 1 }] },
 }
 
 const withSection = (base, section, fields) => ({ ...base, [section]: { ...base[section], ...fields } })
@@ -137,19 +130,19 @@ describe('SPM-28 — what an edit records', () => {
 
   it.each([
     ['the owner at Returned', owner, RETURNED, 'core', ORGANISER],
-    ['venue staff at Planning', venue, PLANNING, 'venuePreparation', VENUE_STAFF],
-    ['technical staff at Confirmed', technical, CONFIRMED, 'equipmentPreparation', TECHNICAL_STAFF],
+    ['venue staff at Preparation', venue, PREPARATION, 'venuePreparation', VENUE_STAFF],
+    ['technical staff at Preparation', technical, PREPARATION, 'equipmentPreparation', TECHNICAL_STAFF],
     ['the coordinator on internal planning', coordinator, PLANNING, 'internal', COORDINATOR],
   ])('actor role: %s', (_label, user, status, section, role) => {
-    expect(editingRole(user, request({ status, ...signOffsApproved }), section)).toBe(role)
+    expect(editingRole(user, request({ status }), section)).toBe(role)
   })
 
   it('actor role for a multi-role user is the role that permits that section', () => {
     const organiserVenue = { uid: owner.uid, name: 'Both', roles: [ORGANISER, VENUE_STAFF], organisationId: 'ORG-A' }
-    const planning = request({ assignedStaffUids: [owner.uid], ...signOffsApproved })
-    expect(editingRole(organiserVenue, planning, 'venuePreparation')).toBe(VENUE_STAFF)
+    const preparation = request({ status: PREPARATION, assignedStaffUids: [owner.uid] })
+    expect(editingRole(organiserVenue, preparation, 'venuePreparation')).toBe(VENUE_STAFF)
     expect(editingRole(organiserVenue, request({ status: RETURNED }), 'core')).toBe(ORGANISER)
-    expect(editingRole(venue, planning, 'core')).toBeNull()
+    expect(editingRole(venue, preparation, 'core')).toBeNull()
   })
 })
 

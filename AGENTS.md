@@ -126,12 +126,12 @@ The customer did not prescribe password length, complexity, expiry, history, loc
   - **SPM-48 behaviour change:** staff no longer edit `venue` or `equipment`. This is a team decision of 7 Oct 2026, pending PO confirmation, with an open question in effective-requirements.md §7.
   - **Preparation is internal:** Organisers and Attendees never receive either preparation section or its history.
   - **Preparation is shown from Planning onwards.**
-- **[TEMPORARY] SPM-48 preparation condition.**
-  - **Rule:** a preparation section is editable only at Planning or Confirmed. Venue preparation needs the SPM-9 venue sign-off approved in `arrangementApprovals`. Equipment preparation needs the event's equipment reserved (`reservedEquipment`, SPM-62), no longer the technical sign-off.
+- **SPM-88 local preparation condition (story not Done).**
+  - **Rule:** a preparation section is editable only when the event is in Preparation. Starting that status requires a server-verified safety approval; the production verifier currently fails closed until SPM-91/92 supplies the real decision.
   - **Where it lives:** `canUpdateVenuePreparation` / `canUpdateEquipmentPreparation` in `shared/preparation.js`, applied through `SECTION_CONDITIONS` in `editableSectionsFor`.
   - **Do not:** restate the condition anywhere else, in a route or in the UI. The page gets the reason from the API's `preparation` field.
-  - **Replacing it:** when SPM-54 (approved booking) exists, replace only `canUpdateVenuePreparation`. SPM-62 has replaced `canUpdateEquipmentPreparation`.
-  - **Import order:** `shared/preparation.js` must not import `permissions.js` or `arrangements.js`, because both would make a circular import. Read sign-off through `shared/arrangementDecisions.js`. For the same reason it reads `reservedEquipment` directly rather than importing `shared/equipmentReservation.js`.
+  - **Dependencies:** SPM-91/92 must also gate Confirm behind safety approval. SPM-87 must supply the significant-change return to Planning and safety re-review; until then significant edits in Preparation return 409 without a write. SPM-19 must provide registration in Confirmed and Preparation.
+  - **Import order:** `shared/preparation.js` must not import `permissions.js`, because `permissions.js` imports it.
 - **Equipment reservations (SPM-62, SPM-57).**
   - **Reserving** is the `reserve` action on SPM-56's `POST /api/requests/:id/equipment-requests/:requestId/actions`, by the request's assigned Technical Support Staff member, on an Approved request at Planning or Confirmed.
   - **Records:** one `equipmentReservations` document per reserved type, belonging to the event and never to a venue booking. The event gets `reservedEquipment` (types and quantities only, never unit ids).

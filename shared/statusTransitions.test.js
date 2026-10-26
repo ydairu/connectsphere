@@ -20,6 +20,8 @@ import {
   RESUBMIT,
   RETURN_FOR_CLARIFICATION,
   START_REVIEW,
+  START_PREPARATION,
+  SAFETY_APPROVAL_REQUIRED,
   SUBMIT,
   TERMINAL_STATUS,
   TERMINAL_STATUSES,
@@ -41,6 +43,7 @@ import {
   CONFIRMED,
   DRAFT,
   PLANNING,
+  PREPARATION,
   REJECTED,
   RETURNED,
   STATUSES,
@@ -98,9 +101,12 @@ const LIFECYCLE = [
   [CONFIRM, PLANNING, CONFIRMED, assigned],
   [REJECT, UNDER_REVIEW, REJECTED, assigned],
   [REJECT, PLANNING, REJECTED, assigned],
-  [COMPLETE, CONFIRMED, COMPLETED, assigned],
+  [START_PREPARATION, CONFIRMED, PREPARATION, assigned],
+  [COMPLETE, PREPARATION, COMPLETED, assigned],
   [CANCEL, CONFIRMED, CANCELLED, assigned],
+  [CANCEL, PREPARATION, CANCELLED, assigned],
   [APPROVE_CANCELLATION, CONFIRMED, CANCELLED, assigned],
+  [APPROVE_CANCELLATION, PREPARATION, CANCELLED, assigned],
 ]
 
 const ALLOWED_FROM = new Map()
@@ -109,10 +115,10 @@ for (const [action, from] of LIFECYCLE) ALLOWED_FROM.set(action, [...(ALLOWED_FR
 // --- tests ----------------------------------------------------------------------------------------
 
 describe('SPM-9 — valid statuses', () => {
-  test('the nine statuses in the criteria all exist, and only three are terminal', () => {
+  test('the ten statuses in SPM-88 exist, and only three are terminal', () => {
     assert.deepEqual(
       [...STATUSES].sort(),
-      [DRAFT, SUBMITTED, UNDER_REVIEW, RETURNED, PLANNING, CONFIRMED, COMPLETED, CANCELLED, REJECTED].sort(),
+      [DRAFT, SUBMITTED, UNDER_REVIEW, RETURNED, PLANNING, CONFIRMED, PREPARATION, COMPLETED, CANCELLED, REJECTED].sort(),
     )
     assert.deepEqual([...TERMINAL_STATUSES].sort(), [CANCELLED, COMPLETED, REJECTED].sort())
   })
@@ -126,7 +132,8 @@ describe('SPM-9 — valid statuses', () => {
 describe('SPM-9 — each transition the criteria name', () => {
   for (const [action, from, to, actor] of LIFECYCLE) {
     test(`${action}: ${from} → ${to} by ${actor.uid}`, () => {
-      assert.deepEqual(canTransition(actor, requestAt(from, GUARD_SETUP[action]), action, NOW), { allowed: true, from, to })
+      assert.deepEqual(canTransition(actor, requestAt(from, GUARD_SETUP[action]), action, NOW,
+        action === START_PREPARATION ? { safetyApproved: true } : {}), { allowed: true, from, to })
     })
   }
 })
@@ -263,7 +270,7 @@ describe('SPM-9 — confirm guard: mandatory venue and technical arrangements', 
 })
 
 describe('SPM-9 — completion guard: the event has taken place', () => {
-  const at = (iso, hours) => requestAt(CONFIRMED, { core: { preferredDateTime: iso, durationHours: hours } })
+  const at = (iso, hours) => requestAt(PREPARATION, { core: { preferredDateTime: iso, durationHours: hours } })
 
   test('refused before the event ends, allowed exactly at and after its end', () => {
     // NOW is 12:00. 09:00 + 3.5h ends 12:30 (not yet); 09:00 + 3h ends exactly at NOW; 08:00 + 3h ended at 11:00.
@@ -317,8 +324,26 @@ describe('SPM-9 — availableActions', () => {
     assert.deepEqual(availableActions(assigned, requestAt(UNDER_REVIEW), NOW), [RETURN_FOR_CLARIFICATION, APPROVE, REJECT])
     assert.deepEqual(availableActions(assigned, requestAt(PLANNING), NOW), [REJECT])
     // The fixture's event has ended: it can be completed, and (SPM-63) no longer cancelled.
-    assert.deepEqual(availableActions(assigned, requestAt(CONFIRMED), NOW), [COMPLETE])
+    assert.deepEqual(availableActions(assigned, requestAt(CONFIRMED), NOW), [])
     assert.deepEqual(availableActions(assigned, requestAt(CONFIRMED, upcoming), NOW), [CANCEL])
+    assert.deepEqual(availableActions(assigned, requestAt(PREPARATION), NOW), [COMPLETE])
+    assert.deepEqual(availableActions(assigned, requestAt(PREPARATION, upcoming), NOW), [CANCEL])
     assert.deepEqual(availableActions(owner, requestAt(RETURNED), NOW), [RESUBMIT])
+  })
+})
+
+describe('SPM-88 — entering Preparation', () => {
+  test('safety approval must be supplied by the server, even for an assigned Coordinator', () => {
+    const event = requestAt(CONFIRMED)
+    assert.equal(canTransition(assigned, event, START_PREPARATION, NOW).reason, SAFETY_APPROVAL_REQUIRED)
+    assert.deepEqual(availableActions(assigned, event, NOW), [])
+    assert.deepEqual(canTransition(assigned, event, START_PREPARATION, NOW, { safetyApproved: true }),
+      { allowed: true, from: CONFIRMED, to: PREPARATION })
+    assert.deepEqual(availableActions(assigned, event, NOW, { safetyApproved: true }), [START_PREPARATION])
+    assert.equal(canTransition(otherCoordinator, event, START_PREPARATION, NOW, { safetyApproved: true }).reason, NOT_PERMITTED)
+  })
+
+  test('completion cannot skip Preparation', () => {
+    assert.equal(canTransition(assigned, requestAt(CONFIRMED), COMPLETE, NOW).reason, WRONG_STATUS)
   })
 })

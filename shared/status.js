@@ -23,6 +23,13 @@ export const PLANNING = 'planning'
 // "Approved and confirmed are the same thing. There is no separate approved state."
 // — customer-rulings.md, Event status lifecycle. Do not add an APPROVED constant.
 export const CONFIRMED = 'confirmed'
+export const PREPARATION = 'preparation'
+
+// SPM-88: registration can remain available through both public event stages. Registration dates,
+// capacity and whether registration is enabled are checked by the registration workflow (SPM-19).
+export function registrationEligibleStatus(status) {
+  return status === CONFIRMED || status === PREPARATION
+}
 
 export const COMPLETED = 'completed'
 
@@ -45,6 +52,7 @@ export const STATUSES = Object.freeze([
   UNDER_REVIEW,
   PLANNING,
   CONFIRMED,
+  PREPARATION,
   COMPLETED,
   CANCELLED,
   REJECTED,

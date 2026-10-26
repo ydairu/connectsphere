@@ -45,7 +45,7 @@ const card = (title) => screen.getByRole('heading', { name: title }).closest('.r
 
 describe('SPM-48 — Venue Staff', () => {
   const venueStaff = (overrides = {}) => ({
-    request: { id: 'req-1', status: 'confirmed', core: CORE, venue: VENUE, venuePreparation: { status: 'in_progress', notes: 'Chairs ordered' } },
+    request: { id: 'req-1', status: 'preparation', core: CORE, venue: VENUE, venuePreparation: { status: 'in_progress', notes: 'Chairs ordered' } },
     editableSections: ['venuePreparation'],
     preparation: { venuePreparation: { editable: true, readOnlyReason: null } },
     ...overrides,
@@ -78,19 +78,19 @@ describe('SPM-48 — Venue Staff', () => {
     expect(await screen.findByText('Changes saved.')).toBeTruthy()
   })
 
-  it('before the venue sign-off: read-only, with the reason, and nothing to save', async () => {
+  it('before Preparation: read-only, with the reason, and nothing to save', async () => {
     showRequest(
       venueStaff({
         request: { id: 'req-1', status: 'planning', core: CORE, venue: VENUE, venuePreparation: { status: 'not_started', notes: '' } },
         editableSections: [],
-        preparation: { venuePreparation: { editable: false, readOnlyReason: 'sign_off_pending' } },
+        preparation: { venuePreparation: { editable: false, readOnlyReason: 'preparation_not_started_yet' } },
       }),
       ['venue_staff'],
     )
     await screen.findByRole('heading', { name: 'Venue preparation' })
     const venuePreparation = card('Venue preparation')
     expect(within(venuePreparation).getByText('Read only')).toBeTruthy()
-    expect(within(venuePreparation).getByText('Available once the venue sign-off is approved.')).toBeTruthy()
+    expect(within(venuePreparation).getByText('Available once the event is in Preparation.')).toBeTruthy()
     expect(within(venuePreparation).getByText('Not Started')).toBeTruthy()
     expect(screen.queryByLabelText('Venue preparation status')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
@@ -115,7 +115,7 @@ describe('SPM-48 — Technical Support Staff', () => {
   it('see an editable Equipment preparation card and no Venue preparation card', async () => {
     showRequest(
       {
-        request: { id: 'req-1', status: 'planning', core: CORE, equipment: EQUIPMENT, equipmentPreparation: { status: 'not_started', notes: '' } },
+        request: { id: 'req-1', status: 'preparation', core: CORE, equipment: EQUIPMENT, equipmentPreparation: { status: 'not_started', notes: '' } },
         editableSections: ['equipmentPreparation'],
         preparation: { equipmentPreparation: { editable: true, readOnlyReason: null } },
       },
@@ -127,16 +127,16 @@ describe('SPM-48 — Technical Support Staff', () => {
     expect(screen.queryByLabelText('Equipment required (one per line)')).toBeNull()
   })
 
-  it('before the technical sign-off: read-only, with the reason', async () => {
+  it('before Preparation: read-only, with the reason', async () => {
     showRequest(
       {
         request: { id: 'req-1', status: 'planning', core: CORE, equipment: EQUIPMENT, equipmentPreparation: { status: 'not_started', notes: '' } },
         editableSections: [],
-        preparation: { equipmentPreparation: { editable: false, readOnlyReason: 'sign_off_pending' } },
+        preparation: { equipmentPreparation: { editable: false, readOnlyReason: 'preparation_not_started_yet' } },
       },
       ['technical_staff'],
     )
-    expect(await screen.findByText('Available once the technical sign-off is approved.')).toBeTruthy()
+    expect(await screen.findByText('Available once the event is in Preparation.')).toBeTruthy()
     expect(screen.queryByLabelText('Equipment preparation status')).toBeNull()
   })
 })

@@ -20,6 +20,7 @@ import {
   RESUBMIT,
   RETURN_FOR_CLARIFICATION,
   START_REVIEW,
+  START_PREPARATION,
   SUBMIT,
 } from '../../../shared/statusTransitions.js'
 import { SIGNIFICANT_CHANGE } from '../../../shared/significantChanges.js'
@@ -40,6 +41,7 @@ const ACTIONS = {
   },
   [APPROVE]: { label: 'Approve for planning' },
   [CONFIRM]: { label: 'Confirm event' },
+  [START_PREPARATION]: { label: 'Start Preparation' },
   [REJECT]: {
     label: 'Reject request',
     confirm:
@@ -57,7 +59,7 @@ const ACTIONS = {
   },
   [REQUEST_CANCELLATION]: {
     label: 'Request cancellation',
-    confirm: 'Ask the event coordinator to cancel this event? The event stays confirmed until they decide.',
+    confirm: 'Ask the event coordinator to cancel this event? The event stays active until they decide.',
   },
   [APPROVE_CANCELLATION]: {
     label: 'Approve cancellation',
@@ -65,17 +67,17 @@ const ACTIONS = {
   },
   [REFUSE_CANCELLATION]: {
     label: 'Refuse cancellation',
-    confirm: 'Refuse the organiser’s cancellation request? The event stays confirmed.',
+    confirm: 'Refuse the organiser’s cancellation request? The event stays active.',
   },
   [RETURN_CANCELLATION]: {
     label: 'Return cancellation request',
-    confirm: 'Return the organiser’s cancellation request for more information? The event stays confirmed.',
+    confirm: 'Return the organiser’s cancellation request for more information? The event stays active.',
     reasonLabel: 'Message to the organiser',
     reasonPrompt: 'Enter a message to the organiser to continue.',
   },
   [RESUBMIT_CANCELLATION]: {
     label: 'Resubmit cancellation request',
-    confirm: 'Send your updated cancellation request to the event coordinator? The event stays confirmed until they decide.',
+    confirm: 'Send your updated cancellation request to the event coordinator? The event stays active until they decide.',
     reasonLabel: 'Updated reason',
   },
   [APPROVE_VENUE]: { label: 'Approve venue arrangement' },

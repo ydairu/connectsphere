@@ -22,7 +22,7 @@
 // history, so a refused request is not lost when the Organiser asks again.
 
 import { NOT_PERMITTED, isAssignedCoordinator, isOwningOrganiser } from './requestActors.js'
-import { CONFIRMED } from './status.js'
+import { registrationEligibleStatus } from './status.js'
 
 export const CANCELLATION_PENDING = 'pending'
 // SPM-47: "when the assigned Coordinator needs more information, then they can return it with a message,
@@ -65,7 +65,7 @@ export function hasOpenCancellation(request) {
  * and no request already open.
  */
 export function canRequestCancellation(user, request, now = new Date()) {
-  if (request.status !== CONFIRMED) return { allowed: false, reason: NOT_CONFIRMED }
+  if (!registrationEligibleStatus(request.status)) return { allowed: false, reason: NOT_CONFIRMED }
   if (!isOwningOrganiser(user, request)) return { allowed: false, reason: NOT_PERMITTED }
   if (hasPendingCancellation(request)) return { allowed: false, reason: CANCELLATION_ALREADY_PENDING }
   if (hasOpenCancellation(request)) return { allowed: false, reason: CANCELLATION_REQUEST_RETURNED }
@@ -75,7 +75,7 @@ export function canRequestCancellation(user, request, now = new Date()) {
 
 /** May this user resubmit a returned request now? The owning Organiser, before the event starts. */
 export function canResubmitCancellation(user, request, now = new Date()) {
-  if (request.status !== CONFIRMED) return { allowed: false, reason: NOT_CONFIRMED }
+  if (!registrationEligibleStatus(request.status)) return { allowed: false, reason: NOT_CONFIRMED }
   if (!isOwningOrganiser(user, request)) return { allowed: false, reason: NOT_PERMITTED }
   if (request.cancellationRequest?.status !== CANCELLATION_RETURNED) return { allowed: false, reason: CANCELLATION_NOT_RETURNED }
   if (eventHasStarted(request, now)) return { allowed: false, reason: EVENT_STARTED }
@@ -84,7 +84,7 @@ export function canResubmitCancellation(user, request, now = new Date()) {
 
 /** May this user return the pending request for more information now? The assigned Coordinator, before the event starts. */
 export function canReturnCancellation(user, request, now = new Date()) {
-  if (request.status !== CONFIRMED) return { allowed: false, reason: NOT_CONFIRMED }
+  if (!registrationEligibleStatus(request.status)) return { allowed: false, reason: NOT_CONFIRMED }
   if (!isAssignedCoordinator(user, request)) return { allowed: false, reason: NOT_PERMITTED }
   if (!hasPendingCancellation(request)) return { allowed: false, reason: NO_PENDING_CANCELLATION }
   if (eventHasStarted(request, now)) return { allowed: false, reason: EVENT_STARTED }
@@ -97,7 +97,7 @@ export function canReturnCancellation(user, request, now = new Date()) {
  * with nothing the Coordinator can do about it.
  */
 export function canRefuseCancellation(user, request) {
-  if (request.status !== CONFIRMED) return { allowed: false, reason: NOT_CONFIRMED }
+  if (!registrationEligibleStatus(request.status)) return { allowed: false, reason: NOT_CONFIRMED }
   if (!isAssignedCoordinator(user, request)) return { allowed: false, reason: NOT_PERMITTED }
   if (!hasOpenCancellation(request)) return { allowed: false, reason: NO_PENDING_CANCELLATION }
   return { allowed: true }

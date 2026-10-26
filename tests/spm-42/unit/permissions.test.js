@@ -11,6 +11,7 @@ import {
   DRAFT,
   SUBMITTED,
   PLANNING,
+  PREPARATION,
   CONFIRMED,
   COMPLETED,
   CANCELLED,
@@ -121,7 +122,7 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
 
   it('Venue staff PATCHes an equipment field', () => {
     // SPM-48: Venue Staff edit venue preparation only; the requested venue and equipment are read-only.
-    const planning = request({ status: PLANNING, ...bothSignOffsApproved })
+    const planning = request({ status: PREPARATION, ...bothSignOffsApproved })
     const patch = { venuePreparation: { status: 'in_progress' }, equipment: { projector: false } }
     expect(forbiddenFields(venueStaff, planning, patch)).toEqual(['equipment.projector'])
   })
@@ -136,12 +137,12 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
 
   it('Venue+technical dual-role account PATCHes a venue field and an equipment field', () => {
     // SPM-48: the combined roles edit both preparation sections.
-    const planning = request({ status: PLANNING, ...bothSignOffsApproved })
+    const planning = request({ status: PREPARATION, ...bothSignOffsApproved })
     const patch = { venuePreparation: { status: 'ready' }, equipmentPreparation: { notes: 'Projector tested' } }
     expect(forbiddenFields(dualStaff, planning, patch)).toEqual([])
   })
 
-  it('Organiser+venue-staff dual-role account edits its own request while it is in planning', () => {
+  it('Organiser+venue-staff dual-role account edits only preparation while it is in Preparation', () => {
     // Regression for the multi-role leak — effective-requirements.md, SPM-42: combined permissions are
     // "the union of what each assigned role independently permits, evaluated per role". Every
     // dimension is satisfied by *some* role here: the organiser role has scope (same organisation) and
@@ -149,7 +150,7 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     // roles before the gate would unlock core; evaluating per role must not.
     const organiserVenueStaff = { uid: 'u-org-venue', roles: [ORGANISER, VENUE_STAFF], organisationId: ORG_ACME }
     const ownPlanning = request({
-      status: PLANNING,
+      status: PREPARATION,
       ownerUid: organiserVenueStaff.uid,
       assignedStaffUids: [organiserVenueStaff.uid],
       ...bothSignOffsApproved,
@@ -194,13 +195,14 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
       expect(forbiddenFields(dualStaff, finished, { venuePreparation: { status: 'ready' }, equipmentPreparation: { status: 'ready' } }), status).toEqual(['venuePreparation.status', 'equipmentPreparation.status'])
     }
     const confirmed = request({ status: CONFIRMED, assignedStaffUids: [venueStaff.uid], ...bothSignOffsApproved })
-    expect(canEdit(venueStaff, confirmed, VENUE_PREPARATION), 'confirmed stays editable for assigned staff').toBe(true)
+    expect(canEdit(venueStaff, confirmed, VENUE_PREPARATION), 'Confirmed stays read-only for preparation').toBe(false)
+    expect(canEdit(venueStaff, { ...confirmed, status: PREPARATION }, VENUE_PREPARATION)).toBe(true)
   })
 
   // Attendees see confirmed events only. Team decision, proposed by Shaun (14 Sep 2026) and ratified
   // 20 Sep 2026.
   it('Attendee requests an event with registration enabled before it is confirmed or after it has finished', () => {
-    for (const status of STATUSES.filter((s) => s !== CONFIRMED)) {
+    for (const status of STATUSES.filter((s) => s !== CONFIRMED && s !== PREPARATION)) {
       const notConfirmed = request({ status, registration: { enabled: true } })
       expect(inScope(attendee, notConfirmed), status).toBe(false)
       expect(projectRequest(attendee, notConfirmed), `${status}: no body at all`).toBe(null)

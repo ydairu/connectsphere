@@ -27,6 +27,7 @@ import {
   CONFIRMED,
   DRAFT,
   PLANNING,
+  PREPARATION,
   REJECTED,
   RETURNED,
   SUBMITTED,
@@ -171,13 +172,13 @@ describe('SPM-9 — each status change records previous status, new status, who 
     })
   }
 
-  test('Confirmed → Completed once the event has taken place', async () => {
-    const db = fakeDb(readyRequest(CONFIRMED, { core: { ...readyRequest(DRAFT).core, preferredDateTime: '2026-09-30T09:00:00+08:00' } }))
+  test('Preparation → Completed once the event has taken place', async () => {
+    const db = fakeDb(readyRequest(PREPARATION, { core: { ...readyRequest(DRAFT).core, preferredDateTime: '2026-09-30T09:00:00+08:00' } }))
 
     const updated = await transitionEventRequest('request-1', COMPLETE, assigned, db, NOW)
 
     assert.equal(updated.status, COMPLETED)
-    assert.equal(statusChangesOf(db)[0].fromStatus, CONFIRMED)
+    assert.equal(statusChangesOf(db)[0].fromStatus, PREPARATION)
     assert.equal(statusChangesOf(db)[0].toStatus, COMPLETED)
   })
 
@@ -252,9 +253,9 @@ describe('SPM-9 — refused status changes leave the request and its history unc
   })
 
   test('complete is refused before the event has taken place', async () => {
-    const db = fakeDb(readyRequest(CONFIRMED))
+    const db = fakeDb(readyRequest(PREPARATION))
     await assertRefused(transitionEventRequest('request-1', COMPLETE, assigned, db, NOW), EVENT_NOT_ENDED)
-    assert.equal(db.store.get('request-1').status, CONFIRMED)
+    assert.equal(db.store.get('request-1').status, PREPARATION)
   })
 
   test('an unknown action is refused', async () => {

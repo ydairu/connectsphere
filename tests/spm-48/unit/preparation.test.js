@@ -24,9 +24,7 @@ import {
   DEFAULT_PREPARATION,
   PREPARATION_EVENT_CLOSED,
   PREPARATION_NOTES_MAX_LENGTH,
-  PREPARATION_NOT_IN_PLANNING,
-  PREPARATION_EQUIPMENT_NOT_RESERVED,
-  PREPARATION_SIGN_OFF_PENDING,
+  PREPARATION_NOT_STARTED_YET,
   PREPARATION_STATUSES,
   PREPARATION_STATUS_LABELS,
   canUpdateEquipmentPreparation,
@@ -43,6 +41,7 @@ import {
   CONFIRMED,
   DRAFT,
   PLANNING,
+  PREPARATION,
   REJECTED,
   RETURNED,
   STATUSES,
@@ -61,8 +60,7 @@ const attendee = { uid: 'att-1', name: 'Attendee', roles: [ATTENDEE] }
 
 const decision = (value) => (value ? { decision: value } : undefined)
 
-// SPM-62: equipment preparation needs the event's equipment reserved (`reserved`), not the technical sign-off.
-function request({ status = PLANNING, venueDecision = 'approved', technicalDecision = 'approved', reserved = true, ...overrides } = {}) {
+function request({ status = PREPARATION, venueDecision = 'approved', technicalDecision = 'approved', reserved = true, ...overrides } = {}) {
   return {
     id: 'req-1',
     status,
@@ -95,46 +93,44 @@ describe('SPM-48 AC2 — status values and defaults', () => {
   })
 })
 
-describe('SPM-48 AC3/AC4/AC5 — the temporary conditions at every status and sign-off state', () => {
-  const OPEN = [PLANNING, CONFIRMED]
+describe('SPM-88 — preparation editing follows status only', () => {
   const SIGN_OFFS = [['approved', true], ['rejected', false], [null, false]]
 
   for (const status of STATUSES) {
     for (const [value, approved] of SIGN_OFFS) {
-      const expected = OPEN.includes(status) && approved
+      const expected = status === PREPARATION
       it(`${status}, sign-off ${value ?? 'not decided'}: ${expected ? 'may' : 'may not'} update`, () => {
         expect(canUpdateVenuePreparation(request({ status, venueDecision: value, technicalDecision: 'approved' }))).toBe(expected)
-        // SPM-62: the equipment condition is the reservation; `approved` here stands for "equipment reserved".
         expect(canUpdateEquipmentPreparation(request({ status, reserved: approved, technicalDecision: null }))).toBe(expected)
       })
     }
   }
 
-  it('each section depends only on its own sign-off', () => {
+  it('neither section uses the old sign-off or reservation condition', () => {
     const venueOnly = request({ venueDecision: 'approved', technicalDecision: 'approved', reserved: false })
     expect(canUpdateVenuePreparation(venueOnly)).toBe(true)
-    expect(canUpdateEquipmentPreparation(venueOnly)).toBe(false)
+    expect(canUpdateEquipmentPreparation(venueOnly)).toBe(true)
   })
 
-  it('no arrangementApprovals at all is not approved', () => {
+  it('Planning and Confirmed stay read-only even with approved arrangements', () => {
     expect(canUpdateVenuePreparation({ status: PLANNING })).toBe(false)
     expect(canUpdateEquipmentPreparation({ status: CONFIRMED })).toBe(false)
   })
 
   it('read-only reasons follow the same conditions', () => {
     expect(preparationReadOnlyReason(VENUE_PREPARATION, request())).toBeNull()
-    expect(preparationReadOnlyReason(VENUE_PREPARATION, request({ venueDecision: null }))).toBe(PREPARATION_SIGN_OFF_PENDING)
-    expect(preparationReadOnlyReason(EQUIPMENT_PREPARATION, request({ status: CONFIRMED, reserved: false }))).toBe(PREPARATION_EQUIPMENT_NOT_RESERVED)
+    expect(preparationReadOnlyReason(VENUE_PREPARATION, request({ status: PLANNING }))).toBe(PREPARATION_NOT_STARTED_YET)
+    expect(preparationReadOnlyReason(EQUIPMENT_PREPARATION, request({ status: CONFIRMED, reserved: false }))).toBe(PREPARATION_NOT_STARTED_YET)
     for (const status of [COMPLETED, CANCELLED, REJECTED]) {
       expect(preparationReadOnlyReason(VENUE_PREPARATION, request({ status })), status).toBe(PREPARATION_EVENT_CLOSED)
     }
-    expect(preparationReadOnlyReason(VENUE_PREPARATION, request({ status: UNDER_REVIEW }))).toBe(PREPARATION_NOT_IN_PLANNING)
+    expect(preparationReadOnlyReason(VENUE_PREPARATION, request({ status: UNDER_REVIEW }))).toBe(PREPARATION_NOT_STARTED_YET)
     expect(preparationReadOnlyReason(CORE, request())).toBeNull()
   })
 
   it('[Team decision] shown from Planning onwards, closed statuses included', () => {
     const shown = STATUSES.filter((status) => preparationShown({ status }))
-    expect(shown.sort()).toEqual([CANCELLED, COMPLETED, CONFIRMED, PLANNING, REJECTED].sort())
+    expect(shown.sort()).toEqual([CANCELLED, COMPLETED, CONFIRMED, PLANNING, PREPARATION, REJECTED].sort())
   })
 })
 
@@ -171,8 +167,8 @@ describe('SPM-48 AC1/AC6/AC7 — who may edit which section (shared/permissions.
     expect(canEdit(coordinator, request(), EQUIPMENT)).toBe(true)
   })
 
-  it('the condition applies to the staff role: before sign-off, Venue Staff edit nothing', () => {
-    expect(forbiddenFields(venue, request({ venueDecision: null }), { venuePreparation: { status: 'ready' } })).toEqual(['venuePreparation.status'])
+  it('the status condition applies to the staff role before Preparation', () => {
+    expect(forbiddenFields(venue, request({ status: CONFIRMED }), { venuePreparation: { status: 'ready' } })).toEqual(['venuePreparation.status'])
   })
 })
 
@@ -206,8 +202,8 @@ describe('SPM-48 AC8 — preparation is projected out for Organisers and Attende
 describe('SPM-48 — what the page is told (preparationEditing)', () => {
   it('each staff role gets its own section, editable or with the reason', () => {
     expect(preparationEditing(venue, request())).toEqual({ venuePreparation: { editable: true, readOnlyReason: null } })
-    expect(preparationEditing(technical, request({ reserved: false }))).toEqual({
-      equipmentPreparation: { editable: false, readOnlyReason: PREPARATION_EQUIPMENT_NOT_RESERVED },
+    expect(preparationEditing(technical, request({ status: CONFIRMED, reserved: false }))).toEqual({
+      equipmentPreparation: { editable: false, readOnlyReason: PREPARATION_NOT_STARTED_YET },
     })
     expect(preparationEditing(both, request({ status: COMPLETED }))).toEqual({
       venuePreparation: { editable: false, readOnlyReason: PREPARATION_EVENT_CLOSED },

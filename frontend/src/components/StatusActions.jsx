@@ -15,7 +15,7 @@ const CANCELLATION_TEXT = {
   pending: 'Cancellation requested — awaiting the event coordinator’s decision.',
   returned: 'Cancellation request returned — the event coordinator needs more information.',
   approved: 'Cancellation request approved.',
-  refused: 'Cancellation request refused. The event remains confirmed.',
+  refused: 'Cancellation request refused. The event remains active.',
 }
 
 // The wording is shared with the SPM-64 arrangements summary (utils/eventArrangements.js), so one page never

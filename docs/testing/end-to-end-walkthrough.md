@@ -1,6 +1,6 @@
 # End-to-end manual walkthrough
 
-One event from creation to cancellation, plus the equipment rejection path and completing a past event, using the seeded accounts. Labels in **bold** are the exact text of buttons, links, fields and messages in the frontend code. ⚠️ marks something the current UI cannot do, or does in a way a tester should know about.
+One event from creation to cancellation, plus the equipment rejection path and completing a past event, using the seeded accounts. Labels in **bold** are the exact text of buttons, links, fields and messages in the frontend code. ⚠️ marks something the current UI cannot do, or does in a way a tester should know about. For the separate Preparation review, use `docs/testing/spm-88-manual-testing.md`.
 
 This is a manual checklist. It has not been run in a browser as written; record what you see.
 
@@ -57,14 +57,14 @@ This is a manual checklist. It has not been run in a browser as written; record 
    - [ ] As B1's Coordinator, `coordinator-2@…`, open `/requests/seed-req-b1-planning`: the card shows the same rejection details and a form headed **Submit a revised request** with "This replaces the rejected request." Submitting it ("Equipment request sent to … for review.") sends it back to `technical-staff@…` for review. Until a revision is approved, **Confirm event** is not offered.
    - [ ] ⚠️ B1's Organiser (`organiser-b1@…`) sees **Technical arrangement: Rejected** in the existing arrangements summary, but no equipment request, reason or alternative.
 
-6. **Venue sign-off, then both staff update preparation**
+6. **Venue sign-off; preparation remains read-only**
    - [ ] As the Venue Staff member named in step 3 (`venue-staff@…`), open `/requests/<id>`. ⚠️ There is no booking approval (SPM-54 is not built); the venue sign-off is the generic action below, and the booking stays `pending` with its hold.
    - [ ] **Status actions** → **Approve venue arrangement** → **Your decision has been recorded.**; **Venue arrangement: Approved**.
-   - [ ] **Venue preparation**: **Venue preparation status** In Progress (options Not Started / In Progress / Ready), **Venue preparation notes** → **Save changes** → **Changes saved.**
-   - [ ] As the Technical Support member from step 5: **Equipment preparation** → **Equipment preparation status**, **Equipment preparation notes** → **Save changes** → **Changes saved.** (This dual-role account may see Venue preparation too. Preparation unlocks when the sign-off is approved, before anything is reserved.)
+   - [ ] **Venue preparation** and **Equipment preparation** remain read-only in Planning and Confirmed. They unlock only when the event enters Preparation.
 
 7. **Confirm; significant change; re-confirm; confirm again**
    - [ ] As the Coordinator, **Confirm event** → **Status changed to Confirmed.**
+   - [ ] ⚠️ **Start Preparation** is unavailable in the live app until SPM-91/92 supplies the safety approval and server verifier. The current Confirm action also awaits SPM-91/92's safety-before-Confirmed gate. The SPM-88 browser double can exercise Start Preparation with a test-only approval.
    - [ ] **Event details** → **Expected attendees** `35` → **Save changes** → **Confirm significant change**: "You changed Expected attendees. Saving resets the venue and technical sign-offs to Awaiting approval and moves the event back to Planning. It cannot be confirmed again until both sign-offs are approved. Assigned venue and technical staff will be notified."
    - [ ] **Save and reset sign-offs** → **Changes saved.**; status **Planning**; both arrangements **Awaiting approval**; both preparation sections read-only.
    - [ ] As the Technical Support member: the request is still **Approved**, with "A significant change to the event cleared the technical sign-off. Re-confirm to approve it again (until SPM-87 removes the automatic reset)." → **Re-confirm approval** → "Approval re-confirmed. The technical arrangement is approved again." and a **Re-confirmed by** row.
@@ -72,10 +72,10 @@ This is a manual checklist. It has not been run in a browser as written; record 
    - [ ] As the Coordinator, **Confirm event** → **Status changed to Confirmed.**
 
 8. **Complete and cancel**
-   - [ ] **Mark as completed** (seeded past event): as `coordinator@…` (Seed Coordinator), open `/requests/seed-req-a1-confirmed-past` ("A1 confirmed (event held, ready to complete)", held on 1 Oct 2026). **Status actions** → **Mark as completed** → "Mark this event as completed? A completed event cannot change status again." → **Mark as completed** → **Status changed to Completed.**; an **Event completed** card with **Marked completed on**. (The action appears only once a Confirmed event has ended; **Cancel event** is not offered for it, because it has started.)
+   - [ ] **Mark as completed** (seeded past event): as `coordinator@…` (Seed Coordinator), open `/requests/seed-req-a1-confirmed-past` ("A1 preparation (event held, ready to complete)", held on 1 Oct 2026). **Status actions** → **Mark as completed** → "Mark this event as completed? A completed event cannot change status again." → **Mark as completed** → **Status changed to Completed.**; an **Event completed** card with **Marked completed on**. The action appears only once a Preparation event has ended.
    - [ ] **Direct cancel** (our event, as its Coordinator): **Cancel event** → "Cancel this event? A cancelled event cannot change status again." → **Reason (required)** → **Cancel event** → **Status changed to Cancelled.**; **Event cancelled** card with **Reason**; the equipment request becomes **Closed**; the room's tentative hold is released.
    - [ ] **Cancel at the Organiser's request** (`seed-req-a1-confirmed`, "A1 confirmed (registration open)"):
-     - As `organiser-a1@…`: **Request cancellation** → "Ask the event coordinator to cancel this event? The event stays confirmed until they decide." → **Reason (required)** → **Request cancellation** → **Your decision has been recorded.** and "Cancellation requested — awaiting the event coordinator’s decision."
+     - As `organiser-a1@…`: **Request cancellation** → "Ask the event coordinator to cancel this event? The event stays active until they decide." → **Reason (required)** → **Request cancellation** → **Your decision has been recorded.** and "Cancellation requested — awaiting the event coordinator’s decision."
      - As `coordinator-3@…`: **Approve cancellation** → confirm → **Status changed to Cancelled.**; **Event cancelled** with "Cancelled at the organiser’s request." Its seeded confirmed hall booking is not released, by design.
 
 9. **Change history and notifications**

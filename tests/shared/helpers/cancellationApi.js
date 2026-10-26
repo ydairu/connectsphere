@@ -1,4 +1,4 @@
-// Shared harness for the SPM-47, SPM-63 and SPM-61 API suites. Real HTTP against the real Express app, the
+// Shared harness for the SPM-47, SPM-63, SPM-61 and SPM-88 API suites. Real HTTP against the real Express app, the
 // authenticate middleware and the shared rule modules. Mocked: Firebase token verification (a test token
 // names the uid) and persistence (backend/src/testing/fakeFirestore.js, holding the seeded requests and
 // profiles). This is not database verification.
@@ -6,7 +6,7 @@
 // The seeded Confirmed event (seed-req-a1-confirmed) is moved to start 30 days after the real current time,
 // because the API uses the real clock and cancellation is allowed only before the start date/time.
 
-import { SEED_ACCOUNTS, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
+import { SEED_ACCOUNTS, SEED_EQUIPMENT_REQUESTS, SEED_EQUIPMENT_RESERVATIONS, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
@@ -18,7 +18,7 @@ const DAY = 24 * 60 * 60 * 1000
 
 export const CONFIRMED_ID = 'seed-req-a1-confirmed'
 
-export function createCancellationApi() {
+export function createCancellationApi({ verifySafetyApproval = async () => false, includeReservations = false } = {}) {
   let db
   let server
   let baseUrl
@@ -37,6 +37,7 @@ export function createCancellationApi() {
       authenticate,
       eventRequestStore: createFakeFirestoreEventRequestStore(() => db),
       getEventRequestDb: () => db,
+      verifySafetyApproval,
     })
     await new Promise((resolve) => {
       server = app.listen(0, '127.0.0.1', resolve)
@@ -49,6 +50,10 @@ export function createCancellationApi() {
   function reset() {
     db = createFakeFirestore({
       eventRequests: Object.fromEntries(SEED_REQUESTS.map(({ id, ...request }) => [id, request])),
+      ...(includeReservations ? {
+        equipmentRequests: Object.fromEntries(SEED_EQUIPMENT_REQUESTS.map(({ id, ...request }) => [id, request])),
+        equipmentReservations: Object.fromEntries(SEED_EQUIPMENT_RESERVATIONS.map(({ id, ...reservation }) => [id, reservation])),
+      } : {}),
       users: Object.fromEntries(Object.values(SEED_ACCOUNTS).map(({ uid, ...profile }) => [uid, profile])),
     })
     setStart(CONFIRMED_ID, new Date(Date.now() + 30 * DAY))
@@ -77,8 +82,10 @@ export function createCancellationApi() {
   const stored = (id = CONFIRMED_ID) => db.store.get(id)
   const activity = (id = CONFIRMED_ID) => [...db.collectionData(`eventRequests/${id}/activity`).values()]
   const allNotifications = () => [...db.collectionData(NOTIFICATIONS_COLLECTION).values()]
+  const reservations = () => [...db.collectionData('equipmentReservations').values()]
+  const transactions = () => db.transactions
   /** Writes a document directly, e.g. an approved venue booking so an event can be confirmed. */
   const putDocument = (collection, id, data) => db.collectionData(collection).set(id, data)
 
-  return { start, stop, reset, setStart, call, act, view, list, notificationsOf, stored, activity, allNotifications, putDocument }
+  return { start, stop, reset, setStart, call, act, view, list, notificationsOf, stored, activity, allNotifications, reservations, transactions, putDocument }
 }

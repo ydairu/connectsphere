@@ -35,7 +35,7 @@ import {
   canResubmitCancellation,
   canReturnCancellation,
 } from '../../../shared/cancellationRequests.js'
-import { COORDINATOR, inScope, rolesOf } from '../../../shared/permissions.js'
+import { COORDINATOR, TECHNICAL_STAFF, VENUE_STAFF, inScope, rolesOf } from '../../../shared/permissions.js'
 import {
   MAX_REASON_LENGTH,
   REASON_ACCEPTED_ACTIONS,
@@ -52,6 +52,8 @@ import {
   CANCEL,
   CONFIRM,
   COMPLETE,
+  SAFETY_APPROVAL_REQUIRED,
+  START_PREPARATION,
   EVENT_NOT_ENDED,
   INSUFFICIENT_INFORMATION,
   NOT_PERMITTED,
@@ -64,7 +66,7 @@ import {
   WRONG_STATUS,
   canTransition,
 } from '../../../shared/statusTransitions.js'
-import { cancellationNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
+import { cancellationNotifications, preparationStartedNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError, submitDraftEventRequest } from './eventRequestService.js'
@@ -72,6 +74,7 @@ import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
 import { loadVenueBookingReadiness, prepareVenueHoldRelease } from './venueBookingService.js'
 import { prepareEquipmentRequestClose } from './equipmentRequestService.js'
+import { USERS_COLLECTION } from './assignedCoordinatorService.js'
 
 export const REASON_REQUIRED = 'reason_required'
 export const REASON_INVALID = 'reason_invalid'
@@ -89,13 +92,14 @@ const MESSAGES = Object.freeze({
   [ARRANGEMENTS_NOT_APPROVED]: 'All mandatory venue and technical arrangements must be approved before confirmation.',
   [EVENT_NOT_ENDED]: 'An event can be marked complete only after it has taken place.',
   [INSUFFICIENT_INFORMATION]: 'The request is missing required details or has invalid ones. Complete them, or return it for clarification.',
+  [SAFETY_APPROVAL_REQUIRED]: 'A valid safety approval is required before preparation can start.',
   [CANCELLATION_REQUEST_PENDING]: 'The organiser has an open cancellation request. Decide that request instead.',
   [NO_PENDING_CANCELLATION]: 'There is no pending cancellation request.',
   [CANCELLATION_ALREADY_PENDING]: 'A cancellation request is already awaiting the coordinator’s decision.',
   [CANCELLATION_REQUEST_RETURNED]: 'The coordinator returned your cancellation request. Update and resubmit it instead.',
   [CANCELLATION_NOT_RETURNED]: 'There is no returned cancellation request to resubmit.',
   [EVENT_STARTED]: 'The event’s start date/time has passed, so it can no longer be cancelled.',
-  [NOT_CONFIRMED]: 'Only a confirmed event can be cancelled.',
+  [NOT_CONFIRMED]: 'Only a Confirmed or Preparation event can be cancelled.',
   [NOT_AT_PLANNING]: 'Arrangements are approved or rejected while the event is in planning.',
   [NOT_ASSIGNED_STAFF]: 'Only staff assigned to this event can decide this arrangement.',
   [ARRANGEMENT_NOT_REQUIRED]: 'This event did not request equipment or technical support.',
@@ -163,6 +167,15 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     const existing = { id, ...snapshot.data() }
     requireRequestScope(user, existing)
 
+    // SPM-91/92 must provide this server-side verifier. It is never read from the HTTP request body.
+    // Without it, Start Preparation fails closed, including for old Confirmed records.
+    const safetyApproved = action === START_PREPARATION && typeof options.verifySafetyApproval === 'function'
+      ? await options.verifySafetyApproval(existing, db, tx) === true
+      : false
+    const preparationRecipients = action === START_PREPARATION
+      ? await assignedPreparationRecipients(tx, db, existing, user)
+      : []
+
     // The reason is checked only after the action itself is allowed, so a refusal names the real cause.
     const reasonFor = () => normaliseReason(action, options.reason)
     const at = now.toISOString()
@@ -212,7 +225,7 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       addActivity(tx, docRef, { type: ARRANGEMENT_DECIDED, arrangement, decision, actor, at })
     } else {
       const readiness = action === CONFIRM ? await loadVenueBookingReadiness(id, db, now, tx) : null
-      const decision = canTransition(user, readiness ? { ...existing, venueBookingReadiness: readiness } : existing, action, now)
+      const decision = canTransition(user, readiness ? { ...existing, venueBookingReadiness: readiness } : existing, action, now, { safetyApproved })
       refuse(decision)
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }
@@ -273,6 +286,9 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     // Attendee Registration does not exist yet (shared/notifications.js).
     const noticeReason = action === APPROVE_CANCELLATION ? existing.cancellationRequest?.reason ?? null : reasonFor()
     addNotifications(tx, db, cancellationNotifications(action, existing, user, { reason: noticeReason, at }))
+    if (action === START_PREPARATION) {
+      addNotifications(tx, db, preparationStartedNotifications(existing, user, { recipientUids: preparationRecipients, at }))
+    }
     // SPM-61 — the owning Organiser is notified of approval, rejection, confirmation and return, with the
     // rejection reason or clarification message. A refused action threw above, so it notifies no one.
     addNotifications(tx, db, statusChangeNotifications(action, existing, user, { reason: noticeReason, at }))
@@ -280,6 +296,13 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     tx.update(docRef, update)
     return { ...existing, ...update }
   })
+}
+
+async function assignedPreparationRecipients(tx, db, request, actor) {
+  const uids = [...new Set(request.assignedStaffUids ?? [])].filter((uid) => uid && uid !== actor.uid)
+  const profiles = await Promise.all(uids.map((uid) => tx.get(db.collection(USERS_COLLECTION).doc(uid))))
+  return uids.filter((_uid, index) => profiles[index].exists &&
+    rolesOf(profiles[index].data()).some((role) => role === VENUE_STAFF || role === TECHNICAL_STAFF))
 }
 
 // The action named must match the request's status: "resubmit" on a draft is refused rather than silently

@@ -58,7 +58,7 @@ test.describe('SPM-10 — Edit event information and flag significant changes fo
     await page.getByRole('tab', { name: 'Venue Details' }).click()
     const card = page.locator('.request-form-section', { has: page.getByRole('heading', { name: 'Venue preparation' }) })
     await expect(card.getByText('Read only')).toBeVisible()
-    await expect(card.getByText('Available once the venue sign-off is approved.')).toBeVisible()
+    await expect(card.getByText('Available once the event is in Preparation.')).toBeVisible()
     await expect(page.getByLabel('Venue preparation status')).toHaveCount(0)
   })
 })

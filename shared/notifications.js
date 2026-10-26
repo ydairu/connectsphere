@@ -1,4 +1,4 @@
-// In-app notifications for cancellation — SPM-47 and SPM-63.
+// In-app notifications for event actions, including cancellation, status changes and preparation.
 //
 // Pure functions: no Firebase, no I/O. The backend writes the notifications this module returns into the
 // `notifications` collection in the same transaction as the action (backend/src/services/notificationService.js),
@@ -24,10 +24,11 @@
 //   equipment request rejected       the assigned Coordinator, with the reason    (SPM-36)
 //   approve / reject / confirm /     the owning Organiser only, with the rejection reason or the
 //   return for clarification         clarification message                        (SPM-61)
+//   start preparation                assigned Venue and Technical Support Staff   (SPM-88)
 // The user who acted is never notified of their own action.
 
 import { REFUSE_CANCELLATION, REQUEST_CANCELLATION, RESUBMIT_CANCELLATION, RETURN_CANCELLATION } from './requestActions.js'
-import { PLANNING, UNDER_REVIEW } from './status.js'
+import { PLANNING, PREPARATION, UNDER_REVIEW } from './status.js'
 import { APPROVE, APPROVE_CANCELLATION, CANCEL, CONFIRM, REJECT, RETURN_FOR_CLARIFICATION } from './statusTransitions.js'
 
 export const NOTIFICATIONS_COLLECTION = 'notifications'
@@ -37,6 +38,7 @@ export const CANCELLATION_RESUBMITTED_NOTICE = 'cancellation_resubmitted'
 export const CANCELLATION_RETURNED_NOTICE = 'cancellation_returned'
 export const CANCELLATION_REFUSED_NOTICE = 'cancellation_refused'
 export const EVENT_CANCELLED_NOTICE = 'event_cancelled'
+export const PREPARATION_STARTED_NOTICE = 'preparation_started'
 // SPM-10: a significant change reset the sign-off (and, from Confirmed, moved the event back to Planning).
 export const SIGNIFICANT_CHANGE_NOTICE = 'significant_change'
 // SPM-56: the assigned Technical Support Staff member approved the event's equipment request (or re-confirmed it).
@@ -79,7 +81,8 @@ export function cancellationNotifications(action, request, actor, { reason = nul
   } else if (action === RETURN_CANCELLATION) {
     notify([request.ownerUid], CANCELLATION_RETURNED_NOTICE, `The event coordinator needs more information about your cancellation request for “${title}”.`)
   } else if (action === REFUSE_CANCELLATION) {
-    notify([request.ownerUid], CANCELLATION_REFUSED_NOTICE, `Your cancellation request for “${title}” was refused. The event remains confirmed.`)
+    notify([request.ownerUid], CANCELLATION_REFUSED_NOTICE,
+      `Your cancellation request for “${title}” was refused. The event remains ${request.status === PREPARATION ? 'in Preparation' : 'Confirmed'}.`)
   } else if (action === CANCEL || action === APPROVE_CANCELLATION) {
     const message =
       action === APPROVE_CANCELLATION
@@ -103,6 +106,17 @@ function addressed(notices, request, actor, title, at) {
       return true
     })
     .map((notice) => ({ ...notice, eventRequestId: request.id, eventTitle: title, createdAt: at, readAt: null }))
+}
+
+/** SPM-88: assigned Venue and Technical Support Staff learn that preparation has started. */
+export function preparationStartedNotifications(request, actor, { recipientUids = [], at }) {
+  const title = titleOf(request)
+  return addressed(recipientUids.map((uid) => ({
+    recipientUid: uid,
+    type: PREPARATION_STARTED_NOTICE,
+    message: `Preparation has started for “${title}”. You can update your assigned preparation section.`,
+    reason: null,
+  })), request, actor, title, at)
 }
 
 // The stage a request was rejected at, as SPM-45 shows it on the event page.

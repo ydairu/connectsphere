@@ -8,7 +8,7 @@ import { eventPeriod } from '../../../shared/venueSuitability.js'
 import { checkVenueHoldInTransaction, venueBookingLockPath, VenueValidationError } from './venueService.js'
 import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
-import { CONFIRMED, PLANNING } from '../../../shared/status.js'
+import { CONFIRMED, PLANNING, PREPARATION } from '../../../shared/status.js'
 
 export const BOOKINGS = 'venueBookingRequests'
 export class VenueBookingError extends Error {
@@ -247,15 +247,16 @@ export async function cancelVenueBooking(eventId, bookingId, input, user, db = g
     tx.update(bookingRef, { status: BOOKING_CANCELLED, cancelledAt: at, cancelledByUid: user.uid, updatedAt: at })
     tx.update(holdRef, { lifecycleStatus: 'removed', removedAt: at, removedByUid: user.uid })
     tx.set(lockRef, { venueId: booking.venueId, updatedAt: at })
-    const eventUpdate = { ...(event.status === CONFIRMED ? { status: PLANNING } : {}), updatedAt: at }
+    const returnsToPlanning = event.status === CONFIRMED || event.status === PREPARATION
+    const eventUpdate = { ...(returnsToPlanning ? { status: PLANNING } : {}), updatedAt: at }
     if (event.arrangementApprovals?.venue) {
       eventUpdate.arrangementApprovals = Object.fromEntries(Object.entries(event.arrangementApprovals).filter(([key]) => key !== 'venue'))
     }
     tx.update(eventRef, eventUpdate)
     tx.set(eventRef.collection('activity').doc(), { type: VENUE_BOOKING_CANCELLED, bookingRequestId: bookingId,
       actor: { uid: user.uid, role: COORDINATOR }, at })
-    if (event.status === CONFIRMED) recordStatusChange(tx, eventRef, { action: VENUE_BOOKING_CANCELLED,
-      fromStatus: CONFIRMED, toStatus: PLANNING, actor: userActor(user), at })
+    if (returnsToPlanning) recordStatusChange(tx, eventRef, { action: VENUE_BOOKING_CANCELLED,
+      fromStatus: event.status, toStatus: PLANNING, actor: userActor(user), at })
     return presentBooking({ ...booking, status: BOOKING_CANCELLED, cancelledAt: at, updatedAt: at }, false, false, now)
   })
 }

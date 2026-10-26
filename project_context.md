@@ -1,6 +1,14 @@
 # ConnectSphere Project Context
 
-Last reviewed: 25 October 2026 (SPM-61 Organiser status notifications; older sections retain their historical dates)
+Last reviewed: 26 October 2026 (SPM-88 local increment and SPM-61 Organiser notifications; older sections retain their historical dates)
+
+## Current SPM-88 state (26 October 2026)
+
+The local code now has a separate `Preparation` status and an assigned-Coordinator `start_preparation` action. The action checks a server-side safety verifier, records the status change, and sends one in-app notice to each assigned Venue or Technical Support Staff member in the same transaction. The default verifier returns false because SPM-91/92 has not supplied a persisted safety decision or verifier. Start Preparation therefore remains unavailable in the live application. The in-memory API and browser double inject a test-only approval.
+
+Staff preparation sections are editable only in Preparation. Completion requires Preparation and an ended event. Direct cancellation and approved Organiser cancellation requests work before a Preparation event starts, with the existing reservation release. Cancelling an approved venue booking returns Preparation to Planning. Attendees can read eligible Confirmed and Preparation events, but registration itself is still SPM-19 scope. Significant section edits in Preparation return 409 without writing until SPM-87 supplies the required re-review and safety invalidation path. The existing Confirm action still lacks SPM-91/92's safety checkpoint, so the customer-confirmed safety-before-Confirmed sequence is not yet complete.
+
+SPM-88 is **In Progress / not Done** in the Product Backlog. Local tests cover the implemented parts; no live Firebase verification or human acceptance has been performed. See `docs/testing/spm-88-manual-testing.md`. The earlier dated sections below describe their historical increments and may mention SPM-48's old temporary preparation gate.
 
 ## Project Purpose
 

@@ -14,8 +14,8 @@ import {
 } from '../../../shared/equipmentRequest.js'
 import { chooseUnits, reservedEquipmentRecord, reservedEquipmentSummary } from '../../../shared/equipmentReservation.js'
 import { ATTENDEE, COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
-import { PREPARATION_EQUIPMENT_NOT_RESERVED, canUpdateEquipmentPreparation, preparationReadOnlyReason, EQUIPMENT_PREPARATION } from '../../../shared/preparation.js'
-import { CANCELLED, CONFIRMED, PLANNING, UNDER_REVIEW } from '../../../shared/status.js'
+import { PREPARATION_NOT_STARTED_YET, canUpdateEquipmentPreparation, preparationReadOnlyReason, EQUIPMENT_PREPARATION } from '../../../shared/preparation.js'
+import { CANCELLED, CONFIRMED, PLANNING, PREPARATION, UNDER_REVIEW } from '../../../shared/status.js'
 
 const { AVAILABLE, DAMAGED } = EQUIPMENT_UNIT_STATUS
 
@@ -92,12 +92,13 @@ describe('SPM-62 — what is shown (unit)', () => {
 })
 
 describe('SPM-62 — equipment preparation uses the reservation (unit)', () => {
-  it('spm62_equipment_preparation_opens_on_a_reservation_not_on_the_technical_sign_off', () => {
+  it('spm88_equipment_preparation_opens_only_in_preparation', () => {
     const signedOffOnly = { status: PLANNING, arrangementApprovals: { technical: { decision: 'approved' } } }
     const reserved = { status: CONFIRMED, reservedEquipment: { items: [{ equipmentTypeId: 'projector', quantity: 1 }] } }
     expect(canUpdateEquipmentPreparation(signedOffOnly)).toBe(false)
-    expect(preparationReadOnlyReason(EQUIPMENT_PREPARATION, signedOffOnly)).toBe(PREPARATION_EQUIPMENT_NOT_RESERVED)
-    expect(canUpdateEquipmentPreparation(reserved)).toBe(true)
+    expect(preparationReadOnlyReason(EQUIPMENT_PREPARATION, signedOffOnly)).toBe(PREPARATION_NOT_STARTED_YET)
+    expect(canUpdateEquipmentPreparation(reserved)).toBe(false)
+    expect(canUpdateEquipmentPreparation({ ...reserved, status: PREPARATION })).toBe(true)
     expect(canUpdateEquipmentPreparation({ ...reserved, status: CANCELLED })).toBe(false)
   })
 })

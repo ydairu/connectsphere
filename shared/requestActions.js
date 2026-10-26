@@ -71,8 +71,8 @@ export function arrangementAction(action) {
 }
 
 /** Every action this user may take on this request now: transitions, then cancellation, then sign-off. */
-export function allAvailableActions(user, request, now = new Date()) {
-  const actions = [...availableActions(user, request, now)]
+export function allAvailableActions(user, request, now = new Date(), context = {}) {
+  const actions = [...availableActions(user, request, now, context)]
   if (canRequestCancellation(user, request, now).allowed) actions.push(REQUEST_CANCELLATION)
   if (canResubmitCancellation(user, request, now).allowed) actions.push(RESUBMIT_CANCELLATION)
   if (canRefuseCancellation(user, request).allowed) actions.push(REFUSE_CANCELLATION)

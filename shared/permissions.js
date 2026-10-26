@@ -16,7 +16,7 @@
 //     venuePreparation: { status, notes }, equipmentPreparation: { status, notes } (SPM-48) }
 // Section data lives under its section key, so a field's section is its top-level key.
 
-import { DRAFT, RETURNED, PLANNING, CONFIRMED, COMPLETED, CANCELLED, REJECTED } from './status.js'
+import { DRAFT, RETURNED, PREPARATION, COMPLETED, CANCELLED, REJECTED, registrationEligibleStatus } from './status.js'
 import {
   EQUIPMENT_PREPARATION,
   PREPARATION_CONDITIONS,
@@ -76,7 +76,7 @@ const SECTION_ACCESS = Object.freeze({
 const FINISHED_STATUSES = Object.freeze([COMPLETED, CANCELLED, REJECTED])
 
 // "Venue / Technical staff — planning onwards" — plan, "State gate" — up to, not past, a finished event.
-const STAFF_EDITABLE_STATUSES = Object.freeze([PLANNING, CONFIRMED])
+const STAFF_EDITABLE_STATUSES = Object.freeze([PREPARATION])
 
 // Record conditions on individual sections, applied after each role's scope and state gate, whoever holds
 // the edit right. SPM-48: a preparation section is editable only while its condition in
@@ -170,9 +170,9 @@ function roleInScope(role, user, request) {
     case TECHNICAL_STAFF:
       return (request.assignedStaffUids ?? []).includes(user.uid)
     case ATTENDEE:
-      // Confirmed events only — team decision, proposed by Shaun (14 Sep 2026) and ratified 20 Sep 2026.
-      // The registration condition is kept as it was; how registration works is deferred (SPM-42 section).
-      return request.status === CONFIRMED && request.registration?.enabled === true
+      // SPM-88 extends the original Confirmed-only viewing rule to Preparation. Registration itself
+      // remains SPM-19 scope.
+      return registrationEligibleStatus(request.status) && request.registration?.enabled === true
     default:
       return false
   }
@@ -187,8 +187,7 @@ function roleInScope(role, user, request) {
  *  - Organisers see their own organisation's events only, by company ID. — Clarification 1
  *  - Coordinator: events assigned to them, never drafts. — SPM-65 team decision of 1 Oct 2026
  *  - Venue/technical staff: assigned events, never drafts. — plan, "Role capability"
- *  - Attendee: confirmed events with registration enabled. — plan, "Role capability", narrowed to
- *    confirmed by team decision of 20 Sep 2026 (effective-requirements.md, SPM-42)
+ *  - Attendee: Confirmed or Preparation events with registration enabled (SPM-88).
  */
 export function inScope(user, request) {
   return rolesOf(user).some((role) => roleInScope(role, user, request))
