@@ -66,7 +66,7 @@ import {
   WRONG_STATUS,
   canTransition,
 } from '../../../shared/statusTransitions.js'
-import { cancellationNotifications, preparationStartedNotifications } from '../../../shared/notifications.js'
+import { cancellationNotifications, preparationStartedNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError, submitDraftEventRequest } from './eventRequestService.js'
@@ -289,6 +289,9 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     if (action === START_PREPARATION) {
       addNotifications(tx, db, preparationStartedNotifications(existing, user, { recipientUids: preparationRecipients, at }))
     }
+    // SPM-61 — the owning Organiser is notified of approval, rejection, confirmation and return, with the
+    // rejection reason or clarification message. A refused action threw above, so it notifies no one.
+    addNotifications(tx, db, statusChangeNotifications(action, existing, user, { reason: noticeReason, at }))
 
     tx.update(docRef, update)
     return { ...existing, ...update }

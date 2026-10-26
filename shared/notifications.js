@@ -1,4 +1,4 @@
-// In-app notifications for cancellation — SPM-47 and SPM-63.
+// In-app notifications for event actions, including cancellation, status changes and preparation.
 //
 // Pure functions: no Firebase, no I/O. The backend writes the notifications this module returns into the
 // `notifications` collection in the same transaction as the action (backend/src/services/notificationService.js),
@@ -22,11 +22,14 @@
 //   venue booking rejected           the assigned Coordinator                    (SPM-34)
 //   venue hold warning / expiry      the current assigned Coordinator            (SPM-78)
 //   equipment request rejected       the assigned Coordinator, with the reason    (SPM-36)
+//   approve / reject / confirm /     the owning Organiser only, with the rejection reason or the
+//   return for clarification         clarification message                        (SPM-61)
+//   start preparation                assigned Venue and Technical Support Staff   (SPM-88)
 // The user who acted is never notified of their own action.
 
 import { REFUSE_CANCELLATION, REQUEST_CANCELLATION, RESUBMIT_CANCELLATION, RETURN_CANCELLATION } from './requestActions.js'
-import { APPROVE_CANCELLATION, CANCEL } from './statusTransitions.js'
-import { PREPARATION } from './status.js'
+import { PLANNING, PREPARATION, UNDER_REVIEW } from './status.js'
+import { APPROVE, APPROVE_CANCELLATION, CANCEL, CONFIRM, REJECT, RETURN_FOR_CLARIFICATION } from './statusTransitions.js'
 
 export const NOTIFICATIONS_COLLECTION = 'notifications'
 
@@ -46,6 +49,11 @@ export const VENUE_HOLD_WARNING_NOTICE = 'venue_hold_warning'
 export const VENUE_HOLD_EXPIRED_NOTICE = 'venue_hold_expired'
 // SPM-36: the assigned Technical Support Staff member rejected the event's equipment request.
 export const EQUIPMENT_REQUEST_REJECTED_NOTICE = 'equipment_request_rejected'
+// SPM-61: the assigned Coordinator changed the status of the Organiser's request.
+export const REQUEST_APPROVED_NOTICE = 'request_approved'
+export const REQUEST_REJECTED_NOTICE = 'request_rejected'
+export const REQUEST_CONFIRMED_NOTICE = 'request_confirmed'
+export const REQUEST_RETURNED_NOTICE = 'request_returned'
 
 function titleOf(request) {
   const title = request.core?.title
@@ -109,6 +117,34 @@ export function preparationStartedNotifications(request, actor, { recipientUids 
     message: `Preparation has started for “${title}”. You can update your assigned preparation section.`,
     reason: null,
   })), request, actor, title, at)
+}
+
+// The stage a request was rejected at, as SPM-45 shows it on the event page.
+const REJECTED_DURING = Object.freeze({ [UNDER_REVIEW]: 'during review', [PLANNING]: 'during planning' })
+
+/**
+ * SPM-61 — the notice for the owning Organiser when `actor` approves, rejects, confirms or returns their
+ * request, or [] for any other action. `request` is the record before the action; `reason` is the rejection
+ * reason or the clarification message. Colleagues in the same organisation are not notified.
+ */
+export function statusChangeNotifications(action, request, actor, { reason = null, at }) {
+  const title = titleOf(request)
+  const notice = (type, message) => addressed([{ recipientUid: request.ownerUid, type, message, reason }], request, actor, title, at)
+
+  if (action === APPROVE) {
+    return notice(REQUEST_APPROVED_NOTICE, `“${title}” has been approved and moved to Planning. The event coordinator will now arrange the venue and equipment.`)
+  }
+  if (action === REJECT) {
+    const during = REJECTED_DURING[request.status]
+    return notice(REQUEST_REJECTED_NOTICE, `“${title}” has been rejected${during ? ` ${during}` : ''}.`)
+  }
+  if (action === CONFIRM) {
+    return notice(REQUEST_CONFIRMED_NOTICE, `“${title}” is confirmed. Its required venue and technical arrangements have been approved.`)
+  }
+  if (action === RETURN_FOR_CLARIFICATION) {
+    return notice(REQUEST_RETURNED_NOTICE, `The event coordinator returned “${title}” for clarification. Update the request and resubmit it.`)
+  }
+  return []
 }
 
 const STATUS_NAMES = Object.freeze({ planning: 'Planning', confirmed: 'Confirmed' })

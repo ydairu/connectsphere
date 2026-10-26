@@ -1,4 +1,4 @@
-// Shared harness for the SPM-47 and SPM-63 API suites. Real HTTP against the real Express app, the
+// Shared harness for the SPM-47, SPM-63, SPM-61 and SPM-88 API suites. Real HTTP against the real Express app, the
 // authenticate middleware and the shared rule modules. Mocked: Firebase token verification (a test token
 // names the uid) and persistence (backend/src/testing/fakeFirestore.js, holding the seeded requests and
 // profiles). This is not database verification.
@@ -84,6 +84,8 @@ export function createCancellationApi({ verifySafetyApproval = async () => false
   const allNotifications = () => [...db.collectionData(NOTIFICATIONS_COLLECTION).values()]
   const reservations = () => [...db.collectionData('equipmentReservations').values()]
   const transactions = () => db.transactions
+  /** Writes a document directly, e.g. an approved venue booking so an event can be confirmed. */
+  const putDocument = (collection, id, data) => db.collectionData(collection).set(id, data)
 
-  return { start, stop, reset, setStart, call, act, view, list, notificationsOf, stored, activity, allNotifications, reservations, transactions }
+  return { start, stop, reset, setStart, call, act, view, list, notificationsOf, stored, activity, allNotifications, reservations, transactions, putDocument }
 }
