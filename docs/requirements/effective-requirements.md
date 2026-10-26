@@ -802,6 +802,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Implemented, pending ratification — SPM-63/SPM-47, 3 Oct 2026 — historical record]** A minimal in-app channel for cancellation only: each notification is a document in the top-level `notifications` collection, one per recipient, written in the same transaction; each user reads their own via `GET /api/notifications` and marks read with `POST /api/notifications/:id/read`. No email, SMS, delivery preference or unread badge.
 
+**[Implemented — SPM-61, 25 Oct 2026]** The same channel now tells the owning Organiser, and nobody else, when the assigned Coordinator approves, rejects (with the reason), confirms or returns (with the clarification message) their request, in the status-change transaction. This closes the SPM-25 return-notice and SPM-45 rejection-notice gaps recorded in §4.4 and §4.6.
+
 > **Week 7 / CL3 effects.** New notifiable events are now enumerated by CL3: assignment (new Coordinator + Organiser) and reassignment (new + previous Coordinator + Organiser) (G8!C43, C14); hold expiry (Coordinator informed, G8!C11); venue-becomes-unavailable (Organiser informed with next action; attendees silent until a replacement/material change is confirmed, G8!C7); Lead deactivation handover (G8!C22). "Notify other Leads" applies only when they own the queue/scope and is explicitly optional (G8!C43). Channels/preferences remain a team decision.
 
 ---

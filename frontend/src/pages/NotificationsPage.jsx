@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { listNotifications, markNotificationRead } from '../services/api.js'
+import { REQUEST_CONFIRMED_NOTICE, REQUEST_RETURNED_NOTICE } from '../../../shared/notifications.js'
 
 // The signed-in user's in-app notifications. Venue booking rejections link to the booking; other notices
 // link to the event. The API returns only the user's own.
@@ -13,6 +14,21 @@ import { listNotifications, markNotificationRead } from '../services/api.js'
 function formatDateTime(value) {
   const date = new Date(value ?? '')
   return Number.isNaN(date.getTime()) ? null : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+// SPM-61: a returned request is edited on its event page, and a confirmed event's arrangements are shown
+// there, so both link to it under a label that says what the Organiser will find.
+function linkFor(notification) {
+  if (notification.bookingRequestId) {
+    return {
+      to: `/requests/${notification.eventRequestId}/venue-bookings?bookingId=${encodeURIComponent(notification.bookingRequestId)}`,
+      label: 'View booking',
+    }
+  }
+  const to = `/requests/${notification.eventRequestId}`
+  if (notification.type === REQUEST_RETURNED_NOTICE) return { to, label: 'Edit request' }
+  if (notification.type === REQUEST_CONFIRMED_NOTICE) return { to, label: 'View arrangements' }
+  return { to, label: 'View event' }
 }
 
 function NotificationsPage() {
@@ -77,12 +93,14 @@ function NotificationsPage() {
             {notifications.map((notification) => {
               const when = formatDateTime(notification.createdAt)
               const unread = notification.readAt == null
+              const link = linkFor(notification)
+              const reasonLabel = notification.type === REQUEST_RETURNED_NOTICE ? 'Message from the coordinator' : 'Reason'
               return (
                 <li key={notification.id}>
                   <Card className="request-item">
                     <div className="request-item-main">
                       <h2>{notification.message}</h2>
-                      {notification.reason && <p>Reason: {notification.reason}</p>}
+                      {notification.reason && <p>{reasonLabel}: {notification.reason}</p>}
                       <p className="request-meta">{[unread ? 'Unread' : 'Read', when].filter(Boolean).join(' · ')}</p>
                     </div>
                     <div className="request-item-actions">
@@ -91,9 +109,7 @@ function NotificationsPage() {
                           Mark as read
                         </Button>
                       )}
-                      <Link className="button button-secondary button-small" to={notification.bookingRequestId
-                        ? `/requests/${notification.eventRequestId}/venue-bookings?bookingId=${encodeURIComponent(notification.bookingRequestId)}`
-                        : `/requests/${notification.eventRequestId}`}>{notification.bookingRequestId ? 'View booking' : 'View event'}</Link>
+                      <Link className="button button-secondary button-small" to={link.to}>{link.label}</Link>
                     </div>
                   </Card>
                 </li>

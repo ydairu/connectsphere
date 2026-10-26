@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 22 October 2026 (SPM-77 individual venue booking management and CI structure; older sections retain their historical dates)
+Last reviewed: 25 October 2026 (SPM-61 Organiser status notifications; older sections retain their historical dates)
 
 ## Project Purpose
 
@@ -802,3 +802,13 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Decision (team, 22 Oct 2026, pending PO confirmation):** the event's venues are its current venue requests; every venue is checked against the event's own date and time, as in SPM-13, not against the period typed on a request.
 - **Status:** In Progress, Sprint 3. Human acceptance and independent peer review are pending.
 - **Local verification:** lint passed; `npx vitest run` passed 1,818 tests (49 opt-in cases skipped), including 20 new SPM-76 unit, API and page tests; the Node and frontend suites passed; `npx playwright test` passed 104 Chromium tests, including the new SPM-76 journey (the Planning event with two requested venues, the hall suitable and the breakout room failing on capacity). API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. The production build and live Firebase were not run. No commit, push or PR is claimed.
+
+## SPM-61 notify the Organiser of status changes — 25 October 2026
+
+- **Built:** when the assigned Coordinator approves, rejects, confirms or returns a request, the owning Organiser gets an in-app notice. The notice is written in the status-change transaction, through `statusChangeNotifications()` in `shared/notifications.js`, called from `transitionEventRequest`. A rejection carries its reason and stage, and a return carries the clarification message. Same-organisation colleagues, staff and Coordinators are not notified. A refused action writes nothing. On the Notifications page, a return links to "Edit request" and a confirmation links to "View arrangements", both on the event page.
+- **Closes:** SPM-25's "the Organiser is notified" (item 15) and SPM-45's "the Organiser is not notified of a rejection" (item 19).
+- **Criteria source:** checked against the workbook's SPM-61 row on 25 Oct 2026; every acceptance criterion is covered (`docs/evidence/spm-61-traceability.md`). The row's note "Return notification already delivered in SPM-25" is wrong and should be corrected in the workbook.
+- **Status:** In Progress, Sprint 4. Human acceptance is pending.
+- **Evidence:** `docs/evidence/spm-61-traceability.md`; `npm run test:spm61`. Local verification passed lint, the build, 128 Node tests, 101 frontend tests and the SPM-61 Vitest and Chromium tests.
+- **Failures not caused by SPM-61:** five root Vitest tests (SPM-14, SPM-34, SPM-54, SPM-76) fail on `main` too, probably because of fixture dates. One SPM-58 Chromium test timed out in the full run and passed on rerun.
+- **Not verified:** API tests use mocked identity and in-memory persistence, and browser tests use the Firebase double. There was no live-project check, and Firestore rules were neither edited nor deployed.
