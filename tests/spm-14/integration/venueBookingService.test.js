@@ -44,13 +44,13 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
   })
   it('returns only assigned staff bookings and projects the event', async () => {
     await submit()
-    expect((await listVenueBookingQueue(staff, db)).bookings).toHaveLength(1)
-    expect((await listVenueBookingQueue(secondStaff, db)).bookings).toEqual([])
-    const result = await listEventVenueBookings('event', staff, db)
+    expect((await listVenueBookingQueue(staff, db, now)).bookings).toHaveLength(1)
+    expect((await listVenueBookingQueue(secondStaff, db, now)).bookings).toEqual([])
+    const result = await listEventVenueBookings('event', staff, db, now)
     expect(result.event.internal).toBeUndefined()
     expect(result.event.equipment).toBeUndefined()
     expect(result.bookings[0].assignedVenueStaffUid).toBeUndefined()
-    await expect(listEventVenueBookings('event', secondStaff, db)).rejects.toMatchObject({ status: 404 })
+    await expect(listEventVenueBookings('event', secondStaff, db, now)).rejects.toMatchObject({ status: 404 })
   })
   it('refuses missing staff, wrong actor, wrong scope and non-Planning without writes', async () => {
     await expect(submit({}, 'event', organiser)).rejects.toMatchObject({ status: 403 })
@@ -113,7 +113,7 @@ describe('SPM-14 transactions (in-memory, not database concurrency)', () => {
     await transitionEventRequest('event', action, coordinator, db, now, { reason: 'Unable to proceed' })
     expect(values('venueAvailability')[0].lifecycleStatus).toBe('removed')
     expect(db.collectionData('venueAvailability').get('confirmed').lifecycleStatus).toBe('removed')
-    expect((await listVenueBookingQueue(staff, db)).bookings).toEqual([])
+    expect((await listVenueBookingQueue(staff, db, now)).bookings).toEqual([])
   })
   it('does not release a hold merely because cancellation was requested', async () => {
     await submit()

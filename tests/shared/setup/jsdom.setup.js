@@ -3,7 +3,12 @@
 // any Firebase project. Each test starts from an empty fake and a clean DOM.
 
 import { afterEach, beforeEach, vi } from 'vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
+
+// findBy*/waitFor give up after 1000 ms by default. The mocked API answers at once, but role queries
+// over a whole page under `--coverage` on a loaded machine (or CI runner) can take longer, so pages
+// that load in several steps failed intermittently. This only lengthens the wait, not what is asserted.
+configure({ asyncUtilTimeout: 5000 })
 
 vi.mock('firebase/auth', async () => (await import('../mocks/firebaseClientMock.js')).authModule)
 vi.mock('firebase/firestore', async () => (await import('../mocks/firebaseClientMock.js')).firestoreModule)
