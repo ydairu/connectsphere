@@ -49,6 +49,7 @@ import {
 import {
   APPROVE_CANCELLATION,
   ARRANGEMENTS_NOT_APPROVED,
+  PRIMARY_VENUE_REQUIRED,
   CANCEL,
   CONFIRM,
   COMPLETE,
@@ -72,7 +73,10 @@ import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError, submitDraftEventRequest } from './eventRequestService.js'
 import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
-import { loadVenueBookingReadiness, prepareVenueHoldRelease } from './venueBookingService.js'
+import { prepareVenueHoldRelease } from './venueBookingService.js'
+import { loadVenueBookingState } from './primaryVenueService.js'
+import { primaryVenueFromBooking } from '../../../shared/primaryVenue.js'
+import { recordPrimaryVenueChange } from './primaryVenueHistory.js'
 import { prepareEquipmentRequestClose } from './equipmentRequestService.js'
 import { USERS_COLLECTION } from './assignedCoordinatorService.js'
 
@@ -90,6 +94,7 @@ const MESSAGES = Object.freeze({
   [WRONG_STATUS]: 'This action is not available at the request’s current status.',
   [NOT_PERMITTED]: 'You are not permitted to perform this action on this request.',
   [ARRANGEMENTS_NOT_APPROVED]: 'All mandatory venue and technical arrangements must be approved before confirmation.',
+  [PRIMARY_VENUE_REQUIRED]: 'Choose one current approved primary venue before confirming this event.',
   [EVENT_NOT_ENDED]: 'An event can be marked complete only after it has taken place.',
   [INSUFFICIENT_INFORMATION]: 'The request is missing required details or has invalid ones. Complete them, or return it for clarification.',
   [SAFETY_APPROVAL_REQUIRED]: 'A valid safety approval is required before preparation can start.',
@@ -224,11 +229,17 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       }
       addActivity(tx, docRef, { type: ARRANGEMENT_DECIDED, arrangement, decision, actor, at })
     } else {
-      const readiness = action === CONFIRM ? await loadVenueBookingReadiness(id, db, now, tx) : null
-      const decision = canTransition(user, readiness ? { ...existing, venueBookingReadiness: readiness } : existing, action, now, { safetyApproved })
+      const bookingState = action === CONFIRM ? await loadVenueBookingState(id, existing, db, now, tx) : null
+      const decision = canTransition(user, bookingState ? { ...existing, ...bookingState } : existing, action, now, { safetyApproved })
       refuse(decision)
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }
+      if (action === CONFIRM && bookingState.primaryVenueReadiness.automaticBooking) {
+        update.primaryVenue = primaryVenueFromBooking(bookingState.primaryVenueReadiness.automaticBooking,
+          bookingState.primaryVenueReadiness.automaticBooking.venueLocation)
+        recordPrimaryVenueChange(tx, docRef, existing.primaryVenue, update.primaryVenue,
+          { type: 'system', name: 'System', role: null }, at)
+      }
       // Read release data before status/history writes; only actual terminal actions release holds (SPM-14)
       // and close Pending Review and Approved equipment requests (SPM-17, SPM-56). Both read first, then both
       // write, because a transaction may not read after it has written. Closing returns the event's summary
@@ -240,6 +251,10 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
         : null
       if (releaseHolds) releaseHolds()
       if (closeEquipmentRequests) Object.assign(update, closeEquipmentRequests())
+      if (terminal && existing.primaryVenue) {
+        update.primaryVenue = null
+        recordPrimaryVenueChange(tx, docRef, existing.primaryVenue, null, { ...actor, role: COORDINATOR }, at)
+      }
       // SPM-25: the clarification message is kept as record metadata for the Organiser, and every earlier
       // one is kept with it, so a second return does not overwrite the first.
       if (action === RETURN_FOR_CLARIFICATION) {

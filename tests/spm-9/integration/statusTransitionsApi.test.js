@@ -270,7 +270,16 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
 
     expect((await act(coordinator, 'a1-planning', CONFIRM)).json.reason).toBe(ARRANGEMENTS_NOT_APPROVED)
     expect((await act(venueStaff, 'a1-planning', APPROVE_VENUE)).status).toBe(409)
-    db.collectionData('venueBookingRequests').set('venue-approved', { eventRequestId: 'seed-req-a1-planning', status: 'approved' })
+    db.collectionData('venueBookingRequests').set('venue-approved', {
+      eventRequestId: 'seed-req-a1-planning', venueNeedId: 'venue-approved', venueId: 'hall', venueName: 'Hall',
+      startsAt: '2026-11-20T09:00:00+08:00', endsAt: '2026-11-20T13:00:00+08:00',
+      holdId: 'confirmed-hall', status: 'approved', createdAt: '2026-10-01T00:00:00Z',
+    })
+    db.collectionData('venueAvailability').set('confirmed-hall', {
+      eventRequestId: 'seed-req-a1-planning', bookingRequestId: 'venue-approved', venueId: 'hall',
+      startsAt: '2026-11-20T09:00:00+08:00', endsAt: '2026-11-20T13:00:00+08:00',
+      status: 'confirmed_booking', lifecycleStatus: 'active',
+    })
     expect((await act(technicalStaff, 'a1-planning', APPROVE_TECHNICAL)).status).toBe(200)
 
     // Each role sees only the sign-off for the section it may view, and not who decided.

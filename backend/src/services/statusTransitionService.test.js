@@ -320,7 +320,12 @@ describe('SPM-9 — approved venue bookings and technical sign-off unlock Confir
 
     await assertRefused(transitionEventRequest('request-1', CONFIRM, assigned, db, NOW), ARRANGEMENTS_NOT_APPROVED)
     await assertRefused(transitionEventRequest('request-1', APPROVE_VENUE, venueStaff, db, NOW), VENUE_BOOKINGS_DECIDE)
-    db.collectionData('venueBookingRequests').set('venue-1', { eventRequestId: 'request-1', status: 'approved' })
+    db.collectionData('venueBookingRequests').set('venue-1', { eventRequestId: 'request-1', status: 'approved',
+      venueNeedId: 'venue-1', venueId: 'hall', venueName: 'Hall', holdId: 'hold-1',
+      startsAt: '2026-11-20T09:00:00+08:00', endsAt: '2026-11-20T12:00:00+08:00' })
+    db.collectionData('venueAvailability').set('hold-1', { eventRequestId: 'request-1', bookingRequestId: 'venue-1',
+      venueId: 'hall', status: 'confirmed_booking', lifecycleStatus: 'active',
+      startsAt: '2026-11-20T09:00:00+08:00', endsAt: '2026-11-20T12:00:00+08:00' })
     await assertRefused(transitionEventRequest('request-1', CONFIRM, assigned, db, NOW), ARRANGEMENTS_NOT_APPROVED)
     await transitionEventRequest('request-1', APPROVE_TECHNICAL, technicalStaff, db, NOW)
 
@@ -351,7 +356,12 @@ describe('SPM-9 — approved venue bookings and technical sign-off unlock Confir
     assert.equal(db.store.get('request-1').status, PLANNING)
     await assertRefused(transitionEventRequest('request-1', CONFIRM, assigned, db, NOW), ARRANGEMENTS_NOT_APPROVED)
 
-    db.collectionData('venueBookingRequests').set('venue-2', { eventRequestId: 'request-1', replacesId: 'venue-1', status: 'approved' })
+    db.collectionData('venueBookingRequests').set('venue-2', { eventRequestId: 'request-1', replacesId: 'venue-1', status: 'approved',
+      venueNeedId: 'venue-1', venueId: 'room', venueName: 'Room', holdId: 'hold-2',
+      startsAt: '2026-11-20T09:00:00+08:00', endsAt: '2026-11-20T12:00:00+08:00' })
+    db.collectionData('venueAvailability').set('hold-2', { eventRequestId: 'request-1', bookingRequestId: 'venue-2',
+      venueId: 'room', status: 'confirmed_booking', lifecycleStatus: 'active',
+      startsAt: '2026-11-20T09:00:00+08:00', endsAt: '2026-11-20T12:00:00+08:00' })
     assert.equal((await transitionEventRequest('request-1', CONFIRM, assigned, db, NOW)).status, CONFIRMED)
   })
 

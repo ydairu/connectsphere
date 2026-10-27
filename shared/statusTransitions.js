@@ -59,6 +59,7 @@ export const TERMINAL_STATUS = 'terminal_status'
 export const WRONG_STATUS = 'wrong_status'
 export { NOT_PERMITTED }
 export const ARRANGEMENTS_NOT_APPROVED = 'arrangements_not_approved'
+export const PRIMARY_VENUE_REQUIRED = 'primary_venue_required'
 export const EVENT_NOT_ENDED = 'event_not_ended'
 export const INSUFFICIENT_INFORMATION = 'insufficient_information'
 export const SAFETY_APPROVAL_REQUIRED = 'safety_approval_required'
@@ -126,7 +127,8 @@ const TRANSITIONS = Object.freeze({
     from: [PLANNING],
     to: CONFIRMED,
     actor: isAssignedCoordinator,
-    guard: (request) => (arrangementsApproved(request) ? null : ARRANGEMENTS_NOT_APPROVED),
+    guard: (request) => !arrangementsApproved(request) ? ARRANGEMENTS_NOT_APPROVED
+      : request.primaryVenueReadiness?.ready === true ? null : PRIMARY_VENUE_REQUIRED,
   },
   // SPM-91/92 owns the persisted safety decision. Until its server-side verifier is wired in, the
   // context defaults to false and neither UI nor API can start preparation.

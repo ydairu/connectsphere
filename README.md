@@ -49,7 +49,7 @@ Application endpoints are under `/api` and, except the health check, require a F
 | `/api/health` | Public health check (`GET`) |
 | `/api/profile` | Read the signed-in profile (`GET`); Organiser updates their organisation name (`PATCH`) |
 | `/api/event-requests` | Create, load and edit owned drafts; submit or resubmit; perform status actions, Coordinator reassignment and venue suitability checks |
-| `/api/requests` | Scoped request list and detail, section edits and field history; event-specific venue bookings and equipment requests, including decisions |
+| `/api/requests` | Scoped request list and detail, section edits and field history; event-specific venue bookings, primary venue selection and equipment requests, including decisions |
 | `/api/venues` | Venue catalogue, detail, availability, maintenance blocks and assigned booking queue |
 | `/api/equipment` | Equipment catalogue and units, assigned requests and scoped reservations |
 | `/api/notifications` | List the signed-in user's notices and mark a notice read |
@@ -57,6 +57,10 @@ Application endpoints are under `/api` and, except the health check, require a F
 `/api/requests` applies `shared/permissions.js` in `backend/src/middleware/authorise.js`: records outside a user's scope are not returned, sections a role may not view are absent from the response body rather than hidden, and a forbidden section write is rejected with 403 naming each field. Its `PATCH` route does not accept status changes; actions use `POST /api/event-requests/:id/transitions`. The post-submission section editor has field-value validation for preparation, venue requirements and significant fields, but not yet for every editable field.
 
 Drafts are created and edited through `/api/event-requests`, which validates their fields. Post-submission section reads and edits use `/api/requests`, which applies role, record and status rules. Submission and later status actions remain under `/api/event-requests`; this route placement is recorded in `AGENTS.md`.
+
+The assigned Coordinator sets a primary venue with `PUT /api/requests/:id/primary-venue`, sending `{ "bookingId": "...", "expectedPrimaryVenueBookingId": null }` (or the current booking ID when switching). A stale selection returns 409. Confirm selects the sole approved booking automatically; multiple bookings require an explicit selection. Attendees receive only the primary venue as their event location.
+
+For older Confirmed events, `node backend/scripts/backfillPrimaryVenues.js` reports verifiable single-venue candidates and multi-venue events needing Coordinator review without writing. `node backend/scripts/backfillPrimaryVenues.js --write --project=<FIREBASE_PROJECT_ID>` writes only still-valid single-venue selections to the configured project, with change history. Review the dry run before using write mode.
 
 An assigned Coordinator can request `start_preparation` from a Confirmed event. The API checks a server-provided safety decision and rejects the action while the default verifier returns false. Venue and Technical Support Staff can edit their respective preparation sections only in Preparation. The current Confirm action does not yet check safety approval; see [SPM-88's current state](project_context.md#current-spm-88-state-26-october-2026).
 
@@ -100,7 +104,7 @@ The default `npm test` command does not run lint, build, Firestore emulator test
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` defines three independent jobs for pushes and pull requests into `main`. `code_checks` runs lint, existing tests, root Vitest coverage and the production build; `firestore_emulator` runs six transaction suites (SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81); `e2e` runs Playwright with one worker. These jobs need no Firebase project secrets. The workflow is configured to upload coverage, the Playwright report and the SPM-14/SPM-58 emulator JSON results. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for setup, commands, failure checks and verification limits.
+`.github/workflows/ci.yml` defines three independent jobs for pushes and pull requests into `main`. `code_checks` runs lint, existing tests, root Vitest coverage and the production build; `firestore_emulator` runs seven transaction suites (SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81, SPM-90); `e2e` runs Playwright with one worker. These jobs need no Firebase project secrets. The workflow is configured to upload coverage, the Playwright report and the SPM-14/SPM-58 emulator JSON results. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for setup, commands, failure checks and verification limits.
 
 An opt-in suite runs the SPM-42 and SPM-24 API cases against a real Firebase project and also checks simultaneous tentative venue holds (SPM-16):
 

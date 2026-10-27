@@ -151,6 +151,8 @@ function RequestDetailPage() {
   const [rejection, setRejection] = useState(null)
   const [completion, setCompletion] = useState(null)
   const [canViewHistory, setCanViewHistory] = useState(false)
+  const [canSetPrimary, setCanSetPrimary] = useState(false)
+  const [primaryVenueRequired, setPrimaryVenueRequired] = useState(false)
   const [owner, setOwner] = useState(null)
   const [preparation, setPreparation] = useState(null)
   const [historyVersion, setHistoryVersion] = useState(0)
@@ -177,6 +179,8 @@ function RequestDetailPage() {
     setRejection(response.rejection ?? null)
     setCompletion(response.completion ?? null)
     setCanViewHistory(response.canViewChangeHistory === true)
+    setCanSetPrimary(response.canSetPrimaryVenue === true)
+    setPrimaryVenueRequired(response.primaryVenueRequired === true)
     setPreparation(response.preparation ?? null)
     setOwner(typeof response.isOwnRequest === 'boolean' ? { name: response.ownerName ?? null, isOwn: response.isOwnRequest } : null)
     setForm(toFormValues(response.request))
@@ -390,11 +394,14 @@ function RequestDetailPage() {
             <div id={`request-${activeTab}-panel`} role="tabpanel" aria-labelledby={`request-${activeTab}-tab`}>
             {activeTab === 'event-status' && <>
             {renderSection('core')}
+            {request.primaryVenue && <Card className="request-form-section"><h2>Event location</h2><p><strong>{request.primaryVenue.venueName}</strong></p>{request.primaryVenue.location && <p>{request.primaryVenue.location}</p>}</Card>}
+            {primaryVenueRequired && request.status === PLANNING && <div className="alert alert-info" role="status">Choose an approved primary venue in Venue Details before confirming this event.</div>}
             <StatusActions
               status={request.status}
               actions={availableActions}
               arrangements={arrangements}
               cancellationRequest={cancellationRequest}
+              primaryVenueRequired={primaryVenueRequired}
               busy={acting || saving}
               onAction={handleAction}
             />
@@ -416,7 +423,8 @@ function RequestDetailPage() {
             {activeTab === 'venue-details' && <>
               {renderSection('venue')}
               {renderSection('venuePreparation')}
-              {(roles?.includes(COORDINATOR) || roles?.includes(ORGANISER)) && <VenueBookingOverview user={user} eventId={id} eventStatus={request.status} canManage={roles?.includes(COORDINATOR)} />}
+              {(roles?.includes(COORDINATOR) || roles?.includes(ORGANISER)) && <VenueBookingOverview user={user} eventId={id} eventStatus={request.status} canManage={roles?.includes(COORDINATOR)} canSetPrimary={canSetPrimary} primaryVenue={request.primaryVenue} onPrimaryChanged={async () => { applyResponse(await getRequest(user, id)); setHistoryVersion((version) => version + 1) }} />}
+              {!roles?.includes(COORDINATOR) && !roles?.includes(ORGANISER) && <Card className="request-form-section"><h2>Event location</h2><p>{request.primaryVenue?.venueName ?? 'Location to be announced'}</p>{request.primaryVenue?.location && <p>{request.primaryVenue.location}</p>}</Card>}
               {(roles?.includes(COORDINATOR) || roles?.includes(VENUE_STAFF)) && <Card className="request-form-section"><h2>Venue booking requests</h2><Link to={`/requests/${id}/venue-bookings`}>Open venue booking requests</Link></Card>}
             </>}
             {activeTab === 'equipment-required' && <>

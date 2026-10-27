@@ -1,12 +1,13 @@
-// SPM-28 — the change history of an event's fields.
+// SPM-28 — the change history of an event's fields, extended by SPM-90 for its primary venue.
 //
 // Pure functions: no Firebase, no I/O. The backend records entries inside the transaction that saves a
-// section edit (PATCH /api/requests/:id, the only path that writes event fields after submission) and
-// serves them through GET /api/requests/:id/history; both decisions are made here.
+// section edit (PATCH /api/requests/:id); SPM-90 records primary venue metadata changes through its
+// selection, confirmation and cancellation transactions. The existing history endpoint
+// serves them through GET /api/requests/:id/history. Entry shape and visibility are decided here.
 //
 // "Important actions must retain what changed, who changed it, and when, visible to authorised users where
 // appropriate." — effective-requirements.md §3 (Customer-confirmed). Who may view, which statuses record,
-// and that only field edits are recorded are team decisions of 4 Oct 2026, pending PO confirmation
+// and that section field edits are recorded are team decisions of 4 Oct 2026, pending PO confirmation
 // (effective-requirements.md §7, SPM-28).
 //
 // An entry is one document in the request's `activity` subcollection, in the shape every other activity
@@ -20,9 +21,20 @@ import { ORGANISER, ROLES, SECTIONS, canEdit, rolesOf, viewableSections } from '
 import { PREPARATION_SECTIONS, preparationSection } from './preparation.js'
 import { isAssignedCoordinator, isOwningOrganiser } from './requestActors.js'
 import { isSignificantField } from './significantChanges.js'
+import { PRIMARY_VENUE_FIELD, publicPrimaryVenue } from './primaryVenue.js'
 import { DRAFT } from './status.js'
 
 export const FIELD_CHANGED = 'field_changed'
+
+export function primaryVenueHistoryEntry(before, after, actor) {
+  return {
+    type: FIELD_CHANGED,
+    field: PRIMARY_VENUE_FIELD,
+    oldValue: jsonSafe(before ?? null),
+    newValue: jsonSafe(after ?? null),
+    actor,
+  }
+}
 
 // --- Values ---------------------------------------------------------------------------------------
 
@@ -138,7 +150,7 @@ export function canViewChangeHistory(user, request) {
 const ORGANISER_VISIBLE_SECTIONS = viewableSections([ORGANISER])
 
 function organiserMaySee(entry) {
-  return ORGANISER_VISIBLE_SECTIONS.includes(entry.field.split('.')[0])
+  return entry.field === PRIMARY_VENUE_FIELD || ORGANISER_VISIBLE_SECTIONS.includes(entry.field.split('.')[0])
 }
 
 function newestFirst(a, b) {
@@ -167,8 +179,8 @@ export function visibleChangeHistory(user, request, entries) {
     .map(({ id, field, oldValue, newValue, actor, at, significant }) => ({
       id: id ?? null,
       field,
-      oldValue: jsonSafe(oldValue),
-      newValue: jsonSafe(newValue),
+      oldValue: field === PRIMARY_VENUE_FIELD ? publicPrimaryVenue(oldValue, true) : jsonSafe(oldValue),
+      newValue: field === PRIMARY_VENUE_FIELD ? publicPrimaryVenue(newValue, true) : jsonSafe(newValue),
       actor: { type: actor?.type ?? 'user', name: actor?.name ?? null, role: actor?.role ?? null },
       at: at ?? null,
       // SPM-10: only on significant entries, for every viewer who may see the entry.

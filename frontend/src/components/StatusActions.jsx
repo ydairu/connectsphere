@@ -162,7 +162,7 @@ export function StatusNotices({ cancellation, rejection, completion }) {
   </>
 }
 
-function StatusActions({ status, actions, arrangements, cancellationRequest, busy, onAction }) {
+function StatusActions({ status, actions, arrangements, cancellationRequest, primaryVenueRequired = false, busy, onAction }) {
   const [pending, setPending] = useState(null)
   const [reason, setReason] = useState('')
 
@@ -230,7 +230,9 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, bus
           )}
 
           {confirmBlocked && (
-            <p className="form-note">The event can be confirmed once all mandatory venue and technical arrangements are approved.</p>
+            <p className="form-note">{primaryVenueRequired
+              ? 'Choose a current approved primary venue before confirming the event.'
+              : 'The event can be confirmed once all mandatory venue and technical arrangements are approved.'}</p>
           )}
           {approveCancellationBlocked && (
             <p className="form-note">

@@ -3,6 +3,7 @@ import { initializeApp, deleteApp } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 import { approveVenueBooking, cancelVenueBooking, submitVenueBooking } from '../../backend/src/services/venueBookingService.js'
 import { transitionEventRequest } from '../../backend/src/services/statusTransitionService.js'
+import { setPrimaryVenue } from '../../backend/src/services/primaryVenueService.js'
 import { CONFIRM } from '../../shared/statusTransitions.js'
 import { CONFIRMED, PLANNING } from '../../shared/status.js'
 import { coordinator, fixture, input, now, staff, secondStaff } from '../spm-14/fixtures.js'
@@ -32,6 +33,7 @@ describe.skipIf(!enabled)('SPM-81 Firestore transaction concurrency', () => {
     const room = await submit({ venueId: 'room', attendeeCount: 30, submissionKey: 'room' })
     await approve(hall)
     await approve(room)
+    await setPrimaryVenue('event', { bookingId: room.id, expectedPrimaryVenueBookingId: null }, coordinator, db, now)
     const results = await Promise.allSettled([
       cancelVenueBooking('event', hall.id, { action: 'cancel' }, coordinator, db, now),
       transitionEventRequest('event', CONFIRM, coordinator, db, now),

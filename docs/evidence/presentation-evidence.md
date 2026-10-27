@@ -1,6 +1,6 @@
 # Presentation Evidence Tracker
 
-Last reviewed: 22 October 2026 (CI job structure and local verification; earlier evidence retains its dated limits)
+Last reviewed: 27 October 2026 (SPM-90 local implementation and verification; earlier evidence retains its dated limits)
 
 ## Purpose
 
@@ -229,6 +229,12 @@ Venue Staff queue cards now pair the event and venue in each heading. Per-bookin
 ## 22 October 2026 — CI job structure
 
 The [CI workflow](../../.github/workflows/ci.yml) defines independent code-check, Firestore emulator, and Playwright jobs; the [pipeline guide](../testing/ci-pipeline.md) records their commands, artifacts, and limits. The emulator job now includes SPM-54, SPM-78, and SPM-79 alongside SPM-14, SPM-58, and SPM-81. Local verification passed: lint, 128 Node tests, 101 frontend tests, 1,798 root Vitest tests with coverage (49 opt-in cases skipped), 103 Chromium tests, the production build, and all six Firestore emulator suites. This verifies the commands locally; a GitHub Actions run is still needed to show that the jobs start independently and upload their artifacts. No live Firebase project or deployed-rule verification is claimed.
+
+## 27 October 2026 — SPM-90 primary venue
+
+The assigned Coordinator can select a current approved booking as an event's primary venue; multi-venue confirmation requires that choice. Attendee request views show the selected venue name and physical location, and the existing history records selection, switching and clearing. The acceptance mapping is in `docs/evidence/spm-90-traceability.md`; the human checklist is in `docs/testing/spm-90-manual-testing.md`.
+
+The full local suite passed 135 Node tests, 101 frontend tests, the root Vitest suite and 111 Chromium journeys before the final address display adjustment. After that adjustment, focused SPM-90 Node, API, page and Chromium tests, the four-case Firestore emulator suite, lint and the production build passed. Browser and HTTP tests used doubles; the emulator was local. Live-project migration, human acceptance, operational backlog/Sprint review and a CI run are still outstanding, so no Done claim is made.
 
 ## Evidence Entry Template
 

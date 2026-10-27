@@ -18,6 +18,7 @@ import { EQUIPMENT_REQUEST_REJECTED_NOTICE } from '../../../shared/notifications
 import { APPROVE_TECHNICAL } from '../../../shared/requestActions.js'
 import { CONFIRMED, PLANNING, UNDER_REVIEW } from '../../../shared/status.js'
 import { ARRANGEMENTS_NOT_APPROVED, CONFIRM } from '../../../shared/statusTransitions.js'
+import { addApprovedVenue } from '../../spm-90/approvedVenueFixture.js'
 import {
   approvalFixture,
   coordinator,
@@ -169,7 +170,7 @@ describe('SPM-36 after a rejection', () => {
     expect((await listEventEquipmentRequests('event', tech, db)).requests.find((request) => request.id === revised.id).actions).toEqual(['approve', 'reject'])
 
     await approve(revised.id)
-    db.collectionData('venueBookingRequests').set('approved-venue', { eventRequestId: 'event', status: 'approved' })
+    addApprovedVenue(db, 'event')
     expect((await transitionEventRequest('event', CONFIRM, coordinator, db, now)).status).toBe(CONFIRMED)
   })
 

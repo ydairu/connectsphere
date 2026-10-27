@@ -14,6 +14,6 @@ export function fixture() {
     venue: { layoutPreference: 'Theatre' }, internal: { planningNotes: 'SECRET' }, equipment: { requirements: ['SECRET'] } }
   return createFakeFirestore({ users: { c: coordinator, v1: staff, v2: secondStaff, o: organiser },
     eventRequests: { event, other: { ...event, assignedCoordinatorUid: 'other-c' } },
-    venues: { hall: { name: 'Hall', maximumCapacity: 50, setupMinutes: 30, turnaroundMinutes: 45 },
-      room: { name: 'Room', maximumCapacity: 200, setupMinutes: 0, turnaroundMinutes: 0 } } })
+    venues: { hall: { name: 'Hall', location: 'Level 1, Main Campus', maximumCapacity: 50, setupMinutes: 30, turnaroundMinutes: 45 },
+      room: { name: 'Room', location: 'Level 2, Main Campus', maximumCapacity: 200, setupMinutes: 0, turnaroundMinutes: 0 } } })
 }

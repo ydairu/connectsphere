@@ -86,7 +86,7 @@ const upcoming = { core: { ...requestAt(CONFIRMED).core, preferredDateTime: '202
 
 // What a request needs, beyond its status, for an action's guard to pass.
 const GUARD_SETUP = {
-  [CONFIRM]: { arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true } },
+  [CONFIRM]: { arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true }, primaryVenueReadiness: { ready: true } },
   [CANCEL]: upcoming,
   [APPROVE_CANCELLATION]: { ...upcoming, cancellationRequest: pendingCancellation },
 }
@@ -250,7 +250,7 @@ describe('SPM-9 — confirm guard: mandatory venue and technical arrangements', 
   })
 
   test('confirm is allowed once venue and required technical arrangements are approved', () => {
-    const request = requestAt(PLANNING, { equipment: { technicalSupportNeeded: true }, arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true } })
+    const request = requestAt(PLANNING, { equipment: { technicalSupportNeeded: true }, arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true }, primaryVenueReadiness: { ready: true } })
     assert.deepEqual(canTransition(assigned, request, CONFIRM, NOW), { allowed: true, from: PLANNING, to: CONFIRMED })
     assert.deepEqual(availableActions(assigned, request, NOW), [CONFIRM, REJECT])
   })
@@ -260,6 +260,7 @@ describe('SPM-9 — confirm guard: mandatory venue and technical arrangements', 
       equipment: { requirements: [], technicalSupportNeeded: false },
       arrangementApprovals: { venue: approved(venueStaff) },
       venueBookingReadiness: { ready: true },
+      primaryVenueReadiness: { ready: true },
     })
     assert.equal(canTransition(assigned, request, CONFIRM, NOW).allowed, true)
   })

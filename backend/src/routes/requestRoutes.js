@@ -9,7 +9,7 @@ import { validatePreparation } from '../middleware/validatePreparation.js'
 import { validateVenueRequirements } from '../middleware/validateVenueRequirements.js'
 import { refuseSignificantChangeWhileCancellationOpen, validateSignificantFields } from '../middleware/validateSignificantFields.js'
 import { createStaffRecipientLoader } from '../services/staffRecipientService.js'
-import { loadVenueBookingReadiness } from '../services/venueBookingService.js'
+import { loadVenueBookingState, PrimaryVenueError, setPrimaryVenue } from '../services/primaryVenueService.js'
 import { presentRequest } from '../middleware/authorise.js'
 
 // SPM-42's minimum API surface: list, read and section edit. No create, submit or draft-save routes —
@@ -31,6 +31,13 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   router.get('/:id/venue-bookings', authenticate, bookings.list)
   router.post('/:id/venue-bookings', authenticate, bookings.submit)
   router.post('/:id/venue-bookings/:bookingId/actions', authenticate, bookings.decide)
+  router.put('/:id/primary-venue', authenticate, async (req, res, next) => {
+    try { res.json({ primaryVenue: await setPrimaryVenue(req.params.id, req.body, req.user, getEventRequestDb()) }) }
+    catch (error) {
+      if (error instanceof PrimaryVenueError) return res.status(error.status).json({ message: error.message })
+      next(error)
+    }
+  })
   // SPM-17: the event's equipment requests. Who may read and submit is decided in the service
   // (shared/equipmentRequest.js), as SPM-14's booking routes do.
   const equipmentRequests = createEquipmentRequestController(getEventRequestDb)
@@ -45,9 +52,9 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead,
     async (req, res, next) => {
       try {
-        const venueBookingReadiness = await loadVenueBookingReadiness(req.params.id, getEventRequestDb())
+        const bookingState = await loadVenueBookingState(req.params.id, req.eventRequest, getEventRequestDb())
         const safetyApproved = await verifySafetyApproval(req.eventRequest, getEventRequestDb()) === true
-        res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName, ownerNames: req.ownerNames, venueBookingReadiness, safetyApproved })
+        res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName, ownerNames: req.ownerNames, ...bookingState, safetyApproved })
         next()
       } catch (error) { next(error) }
     }, controller.sendOne)

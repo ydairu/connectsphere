@@ -65,6 +65,7 @@ function RequestList({ requests, showOwner }) {
                   {[request.organisationName, date].filter(Boolean).join(' · ') || 'No preferred date yet'}
                 </p>
                 {owner && <p className="request-meta">Submitted by: {owner}</p>}
+                {request.primaryVenue?.venueName && <p className="request-meta">Location: {request.primaryVenue.venueName}{request.primaryVenue.location ? ` — ${request.primaryVenue.location}` : ''}</p>}
               </div>
               <div className="request-item-actions">
                 <StatusPill status={request.status} />

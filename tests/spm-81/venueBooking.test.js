@@ -5,6 +5,7 @@ import { transitionEventRequest } from '../../backend/src/services/statusTransit
 import { canCancelVenueBooking, venueBookingCancellationErrors, venueBookingReadiness } from '../../shared/venueBooking.js'
 import { CONFIRM } from '../../shared/statusTransitions.js'
 import { CONFIRMED, PLANNING } from '../../shared/status.js'
+import { setPrimaryVenue } from '../../backend/src/services/primaryVenueService.js'
 import { coordinator, fixture, input, now, organiser, staff } from '../spm-14/fixtures.js'
 
 let db
@@ -40,6 +41,7 @@ describe('SPM-81 independent venue decisions', () => {
     const [hall, room] = await pair()
     await approve(hall)
     await approve(room)
+    await setPrimaryVenue('event', { bookingId: room.id, expectedPrimaryVenueBookingId: null }, coordinator, db, now)
     const roomBefore = structuredClone([bookings().get(room.id), hold(room.id)])
     expect((await listEventVenueBookings('event', coordinator, db, now)).bookings.find((b) => b.id === hall.id).canCancel).toBe(true)
     const result = await cancel(hall)
@@ -61,11 +63,13 @@ describe('SPM-81 independent venue decisions', () => {
     const [hall, room] = await pair()
     await approve(hall)
     await approve(room)
+    await setPrimaryVenue('event', { bookingId: hall.id, expectedPrimaryVenueBookingId: null }, coordinator, db, now)
     await transitionEventRequest('event', CONFIRM, coordinator, db, now)
     db.store.get('event').arrangementApprovals = { venue: { decision: 'approved' }, technical: { decision: 'approved' } }
     const roomBefore = structuredClone([bookings().get(room.id), hold(room.id)])
     await cancel(hall)
     expect(db.store.get('event').status).toBe(PLANNING)
+    expect(db.store.get('event').primaryVenue).toBeNull()
     expect(db.store.get('event').arrangementApprovals).toEqual({ technical: { decision: 'approved' } })
     expect([bookings().get(room.id), hold(room.id)]).toEqual(roomBefore)
     expect(activity()).toContainEqual(expect.objectContaining({ type: 'status_changed', action: 'venue_booking_cancelled',

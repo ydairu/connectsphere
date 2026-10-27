@@ -16,6 +16,7 @@ import { APPROVE_TECHNICAL } from '../../../shared/requestActions.js'
 import { CONFIRMED, PLANNING, REJECTED, RETURNED, UNDER_REVIEW } from '../../../shared/status.js'
 import { APPROVE, CONFIRM, REJECT, RETURN_FOR_CLARIFICATION, START_REVIEW } from '../../../shared/statusTransitions.js'
 import { createCancellationApi } from '../../shared/helpers/cancellationApi.js'
+import { approvedVenueFixture } from '../../spm-90/approvedVenueFixture.js'
 
 const { organiserA1, organiserA2, organiserB1, coordinator, coordinator2, venueStaff, technicalStaff, venueTechnicalStaff, attendee } = SEED_ACCOUNTS
 const UNDER_REVIEW_ID = 'seed-req-a1-under-review'
@@ -37,7 +38,9 @@ async function expectSaved(account, action, id, reason) {
 
 // Venue and technical sign-off, so the assigned Coordinator may confirm the Planning event (SPM-9, SPM-79).
 async function approveArrangements() {
-  api.putDocument('venueBookingRequests', 'spm61-venue-approved', { eventRequestId: PLANNING_ID, status: 'approved' })
+  const { booking, holdId, hold } = approvedVenueFixture(PLANNING_ID, 'spm61-venue-approved')
+  api.putDocument('venueBookingRequests', 'spm61-venue-approved', booking)
+  api.putDocument('venueAvailability', holdId, hold)
   await expectSaved(technicalStaff, APPROVE_TECHNICAL, PLANNING_ID)
 }
 
