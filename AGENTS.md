@@ -12,7 +12,7 @@ Before changing product behaviour, read:
    - [`docs/requirements/customer-briefing.md`](docs/requirements/customer-briefing.md)
    - [`docs/requirements/clarification-session-1.md`](docs/requirements/clarification-session-1.md)
    - [`docs/requirements/clarification-session-2.md`](docs/requirements/clarification-session-2.md)
-4. The current Product Backlog workbook and Sprint record identified in `project_context.md`
+4. The current Product Backlog workbook and Sprint record identified in `project_context.md`, when available in the checkout
 5. The affected code, tests, configuration, and README sections
 
 Do not implement from a story title alone. Confirm the user story, acceptance criteria, customer clarification, current Sprint scope, and actual repository state.
@@ -28,7 +28,7 @@ When sources differ, use this order:
 5. Current Product Backlog and Sprint records
 6. Engineering recommendation
 
-A later customer clarification overrides an earlier clarification on the same customer-controlled matter. A team decision may fill an area deliberately left open by the customer, but it must not override a confirmed customer requirement.
+A later customer clarification or customer change overrides an earlier statement on the same customer-controlled matter. The later Week 7 changes and Session 3 material are distilled in `docs/requirements/effective-requirements.md`; their original source files are not present in this checkout. A team decision may fill an area deliberately left open by the customer, but it must not override a confirmed customer requirement.
 
 If a conflict cannot be resolved using this order, record it as unresolved and do not silently choose a rule.
 
@@ -72,7 +72,9 @@ A story is Done only when its acceptance criteria and the team's Definition of D
 
 ## 6. Authentication and Authorisation Guardrails
 
-The effective customer role model is:
+**Implementation boundary (27 October 2026):** The role constants and routes below implement the original five roles. Later customer requirements add Event Coordinator Lead and Safety Officer, but neither role is implemented in `shared/permissions.js` or the browser routes. Do not infer those roles, a Lead-managed queue, or a persisted safety review from this five-role guidance. The SPM-88 local Preparation status and edit condition exist; the production safety verifier fails closed pending SPM-91/92. See `project_context.md` and `docs/requirements/effective-requirements.md` before extending these workflows.
+
+The five roles currently implemented in the repository are:
 
 - Event Organiser
 - Event Coordinator
@@ -194,7 +196,7 @@ Update documentation narrowly and preserve chronology:
 
 Do not rewrite an earlier customer statement to make it agree with a later one. Record the later superseding rule separately.
 
-## 9. Current Sprint Boundaries
+## 9. Sprint 1 Boundaries (historical allocation)
 
 Sprint 1 contains seven selected stories across:
 
@@ -202,6 +204,6 @@ Sprint 1 contains seven selected stories across:
 2. Event Request Creation
 3. Draft Event Requests
 
-Use the current Sprint Planning record for ownership and estimates. The accepted allocation is listed in `project_context.md`. Do not expand a story to cover later functionality areas merely because its wording mentions a downstream role or workflow.
+Use the relevant Sprint Planning record for ownership and estimates when available. The accepted Sprint 1 allocation is listed in `project_context.md`. Do not expand a story to cover later functionality areas merely because its wording mentions a downstream role or workflow.
 
 In particular, SPM-42 names all five roles and multi-role permissions. It cannot be considered Done if only Event Organiser behaviour exists.

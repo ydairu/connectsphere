@@ -1,6 +1,6 @@
 # C4 model
 
-Observed source revision `b8eeecd`, 21 October 2026. These are logical C4 views. “Required, absent” follows [effective requirements](../requirements/effective-requirements.md), not a claim that a proposed implementation has been approved. See the [architecture index](README.md) for documentation findings.
+Reviewed against source revision `34bd89a`, 27 October 2026. These logical C4 views show implemented components and configured interactions, not a deployment inventory or a claim that backlog stories are Done. See the [architecture index](README.md) for related documents.
 
 ## Level 1 — System context
 
@@ -9,17 +9,11 @@ flowchart LR
   people["Organiser · Coordinator · Venue Staff<br/>Technical Support Staff · Attendee"]
   system["ConnectSphere<br/>Event planning and venue booking"]
   auth["Firebase Authentication<br/>Email/password identity"]
-  lead["Coordinator Lead<br/>Required, absent"]
-  safety["Safety Officer<br/>Required, absent"]
   people -->|"Use current browser workflows"| system
   system -->|"Sign in and verify ID tokens"| auth
-  lead -.->|"Required assignment supervision"| system
-  safety -.->|"Required operational safety review"| system
-  classDef missing fill:#fff7ed,stroke:#9a3412,stroke-dasharray:5 5,color:#000;
-  class lead,safety missing;
 ```
 
-The current [permission constants](../../shared/permissions.js) and [browser routes](../../frontend/src/App.jsx) recognise five roles. The later Week 7 requirement adds the two internal roles and changes new submissions to a Lead-managed unassigned queue; current [submission](../../backend/src/services/eventRequestService.js) still assigns a Coordinator automatically. The safety review and post-safety Preparation gate are likewise absent. One user can have multiple current roles, with backend permissions evaluated per role before combining access.
+The current [permission constants](../../shared/permissions.js) and [browser routes](../../frontend/src/App.jsx) recognise five roles. One user can have multiple current roles, with backend permissions evaluated per role before combining access. Later required roles and workflow changes are recorded in [effective requirements](../requirements/effective-requirements.md); they are not drawn as current actors.
 
 ## Level 2 — Containers
 
@@ -74,7 +68,7 @@ flowchart TB
     routes["Routes<br/>profile, event-requests, requests,<br/>venues, equipment, notifications"]
     identity["authenticate / requireRole<br/>Token + trusted users profile"]
     authz["authorise / presentRequest<br/>Scope, sections, projection"]
-    handlers["Controllers and services<br/>Submission, lifecycle, bookings,<br/>equipment, notifications"]
+    handlers["Controllers and services<br/>Submission, lifecycle, preparation,<br/>bookings, equipment, notifications"]
     store["eventRequestStore<br/>Scoped list/read/section update"]
     admin["Firebase Admin adapter"]
   end
@@ -92,19 +86,6 @@ flowchart TB
 
 [Express mounts](../../backend/src/app.js) compose route factories. [Authentication](../../backend/src/middleware/authenticate.js) loads trusted profile roles, and [authorisation](../../backend/src/middleware/authorise.js) uses [shared permissions](../../shared/permissions.js) for `/api/requests`. Other action routes enforce shared domain policies in services. The [store](../../backend/src/services/eventRequestStore.js) handles scoped request reads/section writes; draft, transition, booking, equipment and notification services use a Firestore-shaped database directly. There is no separate shared-policy service or universal repository layer.
 
-## Required capability gaps
+## Current lifecycle boundary
 
-```mermaid
-flowchart LR
-  present["Current request / venue / equipment workflows"]
-  lead["Required, absent<br/>Lead role, unassigned submission queue,<br/>Lead assignment and supervision"]
-  safety["Required, absent<br/>Safety Officer review and gate<br/>before Preparation / Confirmed"]
-  attendee["Required, absent<br/>Attendee event registration,<br/>capacity and waitlist workflow"]
-  present -.-> lead
-  present -.-> safety
-  present -.-> attendee
-  classDef missing fill:#fff7ed,stroke:#9a3412,stroke-dasharray:5 5,color:#000;
-  class lead,safety,attendee missing;
-```
-
-These are requirements, not extra deployed containers. Current [statuses](../../shared/status.js) contain no safety state, and [preparation access](../../shared/preparation.js) still uses the temporary Planning/Confirmed rule. Formal attendee registration is absent; account registration is a different flow. [Significant-change handling](../../shared/significantChanges.js), [field history](../../shared/changeHistory.js), in-app [notifications](../../backend/src/services/notificationService.js), venue bookings and equipment reservations have current code paths and should not be shown as wholly proposed. Exact completion is tracked in the Product Backlog and evidence records.
+The [status policy](../../shared/statusTransitions.js) includes Confirmed → Preparation through `start_preparation`; [preparation access](../../shared/preparation.js) permits staff edits only in Preparation. The API supplies a safety decision to that transition, but its [default verifier](../../backend/src/app.js) returns false until the persisted safety review integration exists. The current Confirm action still lacks that safety checkpoint. Submission still [assigns a Coordinator automatically](../../backend/src/services/eventRequestService.js). These limits and other required capabilities are tracked in [effective requirements](../requirements/effective-requirements.md) and [project context](../../project_context.md).

@@ -1,8 +1,8 @@
 # ConnectSphere
 
-ConnectSphere is a full-stack event management app built with React, Express and Firebase. It supports account registration, role-based event requests, venue booking and availability, equipment requests and reservations, and in-app notifications. The Express API enforces request permissions; the repository's Firestore rules deny direct browser access to event requests.
+ConnectSphere is a full-stack event management app built with React, Express and Firebase. It supports account registration, role-based event requests, venue booking and availability, equipment requests and reservations, and in-app notifications. The current lifecycle also includes a Preparation status and staff preparation sections. Entry into Preparation requires a server-verified safety approval; the production verifier currently fails closed while that integration is unfinished. The Express API enforces request permissions; the repository's Firestore rules deny direct browser access to event requests.
 
-The [effective requirements revision candidate](docs/requirements/effective-requirements.md) records later customer changes and is awaiting Product Owner approval as a repository checkpoint. Acceptance evidence is in [docs/evidence](docs/evidence), and manual checklists are in [docs/testing](docs/testing). See [venue hold expiry operations](docs/operations/venue-hold-expiry.md) before relying on scheduled notices.
+The [effective requirements revision candidate](docs/requirements/effective-requirements.md) records later customer changes and is awaiting Product Owner approval as a repository checkpoint. The [architecture index](docs/architecture/README.md) links the implementation diagrams; acceptance evidence is in [docs/evidence](docs/evidence), manual checklists are in [docs/testing](docs/testing), and [venue hold expiry operations](docs/operations/venue-hold-expiry.md) explains the scheduled processor.
 
 ## Technology Stack
 
@@ -16,38 +16,15 @@ The [effective requirements revision candidate](docs/requirements/effective-requ
 
 ```text
 connectsphere/
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── context/
-│   │   ├── hooks/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   └── utils/
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js
-├── backend/
-│   ├── scripts/
-│   ├── src/
-│   │   ├── config/
-│   │   ├── controllers/
-│   │   ├── middleware/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   ├── testing/
-│   │   └── utils/
-│   └── package.json
-├── shared/
-│   ├── eventRequest.js
-│   ├── permissions.js
-│   └── status.js
-├── .env.example
-├── .gitignore
-├── firebase.json
-├── firestore.rules
-├── package.json
-└── README.md
+├── frontend/       React pages, components, Firebase client and API client
+├── backend/        Express routes, services and operational scripts
+├── shared/         Domain rules and validation used on both sides
+├── tests/          Story suites, E2E fixtures and Firebase doubles
+├── docs/           Architecture, requirements, testing, operations and evidence
+├── .github/        CI and venue hold expiry workflows
+├── firebase.json   Firestore rules deployment configuration
+├── firestore.rules Browser data access rules
+└── package.json    npm workspace and root commands
 ```
 
 ## How the App Works
@@ -80,6 +57,8 @@ Application endpoints are under `/api` and, except the health check, require a F
 `/api/requests` applies `shared/permissions.js` in `backend/src/middleware/authorise.js`: records outside a user's scope are not returned, sections a role may not view are absent from the response body rather than hidden, and a forbidden section write is rejected with 403 naming each field. Its `PATCH` route does not accept status changes; actions use `POST /api/event-requests/:id/transitions`. The post-submission section editor has field-value validation for preparation, venue requirements and significant fields, but not yet for every editable field.
 
 Drafts are created and edited through `/api/event-requests`, which validates their fields. Post-submission section reads and edits use `/api/requests`, which applies role, record and status rules. Submission and later status actions remain under `/api/event-requests`; this route placement is recorded in `AGENTS.md`.
+
+An assigned Coordinator can request `start_preparation` from a Confirmed event. The API checks a server-provided safety decision and rejects the action while the default verifier returns false. Venue and Technical Support Staff can edit their respective preparation sections only in Preparation. The current Confirm action does not yet check safety approval; see [SPM-88's current state](project_context.md#current-spm-88-state-26-october-2026).
 
 `PATCH /api/profile` accepts only `{ "organisationName": "Example Organisation" }` with a Firebase bearer token and returns the saved name in the same shape. It updates only the authenticated organiser's profile, including for a multi-role organiser. Unauthenticated requests receive 401, non-organisers 403, and invalid names or additional fields 400. Unexpected persistence failures return 500.
 
@@ -138,6 +117,7 @@ The roles migration and seed scripts read the Firebase project configured in the
 - **Roles migration** — `node backend/scripts/migrate-user-roles.js [--organisations=<file.json>]` backfills `users/{uid}` from `role` to `roles[]`. It can add an Organiser's `organisationId` and `organisationName` from a team-supplied mapping file (see the script header). It never invents an organisation or removes `role`. Idempotent.
 - **Seed** — `node backend/scripts/seed.js` plans demonstration accounts for the five implemented roles (including a venue + technical staff account), two organisations, and event requests in every status. With `--write`, it creates or resets the seeded data and requires `SEED_ACCOUNT_PASSWORD`. Seeded Auth user IDs and Firestore document IDs start with `seed-`; seeded Firestore documents carry `seedTag`. The script has no general cleanup mode.
 - **Security-rule check** — `node backend/scripts/check-firestore-rules.js --project=<projectId>` signs in as seeded accounts and makes client-position Firestore requests against the deployed project. It creates a temporary Auth user/profile and edits the seeded attendee's name, with cleanup and restore logic. It needs the seed applied, `VITE_FIREBASE_API_KEY` and `SEED_ACCOUNT_PASSWORD`.
+- **Venue hold processing and backfill** — `npm run process:venue-holds --prefix backend` handles due warnings and expiry; `npm run backfill:venue-holds --prefix backend` supplies expiry metadata for older holds. Follow the [operations guide](docs/operations/venue-hold-expiry.md) before running these against a project.
 
 ## Local Setup
 

@@ -1,6 +1,12 @@
 # ConnectSphere Project Context
 
-Last reviewed: 26 October 2026 (SPM-88 local increment and SPM-61 Organiser notifications; older sections retain their historical dates)
+Last reviewed: 27 October 2026 (documentation audit against source revision `34bd89a`; older implementation sections retain their historical dates)
+
+## Current implementation map (27 October 2026)
+
+The browser has routes for authentication, profiles, requests and drafts, venue catalogue and bookings, equipment inventory and requests, reservations, and notifications (`frontend/src/App.jsx`). Express mounts health, profile, event request, scoped request, venue, equipment, and notification APIs (`backend/src/app.js`). `shared/` holds policy and validation used by both applications. Product request data goes through the Express API; the browser reads its own `users/{uid}` profile under Firestore rules. See `docs/architecture/` for current diagrams and data boundaries.
+
+The implemented role model still has five roles. Submission still assigns a Coordinator automatically; the later required Coordinator Lead and Safety Officer workflows are absent. The SPM-88 boundary below describes the local Preparation increment and its incomplete safety integration. CI has three jobs for code checks, Firestore emulator transactions, and Playwright. The earlier September observations below are historical checkpoints, not a current inventory of routes, seed counts, or CI.
 
 ## Current SPM-88 state (26 October 2026)
 
@@ -21,8 +27,8 @@ Detailed requirements and their provenance are maintained in [`docs/requirements
 Use the following priority when sources differ:
 
 1. Latest explicit team decision for a team-controlled choice
-2. Clarification Session 2
-3. Clarification Session 1
+2. Later customer clarifications and changes, including Session 3 and the Week 7 update as distilled in `docs/requirements/effective-requirements.md`
+3. Earlier customer clarifications, including Sessions 1 and 2
 4. Week 4 Project Instructions and Week 1 Customer Briefing
 5. Current Product Backlog and Sprint records
 6. Engineering recommendation
@@ -53,7 +59,7 @@ The repository currently uses:
 - Cloud Firestore
 - Firebase Admin SDK for backend token verification
 
-Tracked application routes currently include:
+At the original September checkpoint, tracked application routes included:
 
 - `/`
 - `/login`
@@ -62,9 +68,9 @@ Tracked application routes currently include:
 
 The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. The [CI workflow](.github/workflows/ci.yml) defines three independent jobs on every push and on pull requests into `main`: code checks and build, six local Firestore emulator transaction suites, and the full Playwright E2E suite. The opt-in live API harness is not part of CI. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for commands, artifacts, and verification boundaries.
 
-## Independently Observed Implementation State
+## Independently Observed Implementation State (September checkpoint)
 
-The current code provides a useful authentication prototype, but it does **not** yet match the complete customer/backlog role model.
+At that checkpoint, the code provided an authentication prototype but did **not** yet match the complete customer/backlog role model. Later sections and the current implementation map above supersede these observations where implementation changed.
 
 Observed facts:
 

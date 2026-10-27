@@ -1,22 +1,12 @@
 # ConnectSphere architecture
 
-Reviewed 21 October 2026 against source revision `b8eeecd`. This is a codebase snapshot, not a deployment inventory or a declaration that backlog stories are Done.
+Reviewed 27 October 2026 against source revision `34bd89a`. These documents describe the codebase, not a deployment inventory or a declaration that backlog stories are Done.
 
-- [C4 model](c4-model.md) shows the current system, containers, and application components. Its final diagram marks required but absent capabilities.
+- [C4 model](c4-model.md) shows the current system, containers, and application components.
 - [Codebase architecture](codebase-architecture.md) records API and data boundaries, key transactions, and verification environments.
 - [Effective requirements](../requirements/effective-requirements.md) distinguishes customer requirements, team decisions, and open questions. The [briefing](../requirements/customer-briefing.md), [Session 1](../requirements/clarification-session-1.md), and [Session 2](../requirements/clarification-session-2.md) preserve chronology.
 
-## Documentation to update
-
-| Document | Finding | Recommended maintenance |
-| --- | --- | --- |
-| [C4 model](c4-model.md), [codebase architecture](codebase-architecture.md) | The 4 October model described venue booking, equipment reservation, notifications and history as proposed or absent. | **Updated in this review** from mounted routes, services, policies and Firestore paths. |
-| [Root README](../../README.md) | Its opening feature notes are recent, but the overview still says drafts/submission are absent, the API table omits most mounted routes, and its five-role description omits the two Week 7 roles now required. | Reconcile the overview, API inventory and test/deployment notes before using it as a current feature guide. |
-| [Project context](../../project_context.md) | It contains dated implementation entries, but its early “current” route list, missing-CI and incomplete-submission claims are superseded by later entries and code. | Add a concise current-state summary; preserve dated historical evidence and avoid retroactively rewriting it. |
-| [Effective requirements](../requirements/effective-requirements.md), [AGENTS.md](../../AGENTS.md) | Effective requirements include the Week 7 Lead, Safety Officer, and post-safety Preparation gate. AGENTS.md still states the five-role and temporary preparation rules as current. | Reconcile active implementation guidance with the later requirements before implementing those roles or the safety gate. Preserve source provenance and record unresolved design choices. |
-| Product Backlog and Sprint record | `project_context.md` identifies these as operational records. The only workbook found here is the untracked `docs/requirements/Product Backlog (1).xlsx`; no standalone Sprint Planning file was found. | Confirm its canonical filename and status before editing. Do not infer Done from this architecture review. |
-
-The chronological briefing and clarification files are source records. Their earlier statements should remain intact; later superseding rules belong in effective requirements. Presentation evidence should change only after an implementation and its verification, so this documentation review does not update it.
+The later customer requirements include a Coordinator Lead, Safety Officer and safety approval checkpoints. The code still has five roles and automatic Coordinator assignment. It has a Preparation status and local edit gate, but the production safety verifier prevents entry until the review integration is implemented. See [project context](../../project_context.md) for the current increment and its limits. The chronological briefing and clarification files retain their original statements.
 
 ## Functionality-area map
 
@@ -29,8 +19,8 @@ This compact map identifies current code paths, not acceptance or workbook statu
 | 3. Draft requests | Private save, reopen and list | No new architecture gap identified here |
 | 4. Review and approval | Coordinator review, return, approve and reject actions | New safety review gate |
 | 5. Coordinator assignment | Automatic assignment and Coordinator reassignment | Lead-controlled unassigned queue and reassignment |
-| 6. Event status management | Status actions, arrangement decisions, cancellation | Safety and Preparation stages required by Week 7 |
-| 7. Event information management | Scoped section edits, change history, significant-change effects | General post-submission field validation; revised preparation gate |
+| 6. Event status management | Status actions, arrangement decisions, cancellation, Preparation status and start action | Persisted safety decision and checkpoints still required |
+| 7. Event information management | Scoped section edits, preparation sections, change history, significant-change effects | General post-submission field validation; safety re-review after significant Preparation edits |
 | 8. Venue catalogue | Create, edit, list, detail; setup/turnaround fields | Operational completeness against backlog criteria requires separate review |
 | 9. Availability calendar | Booking, hold and maintenance display | Verify all Week 7 acceptance criteria separately |
 | 10. Venue search/filter | Catalogue filters and time availability | Verify all suitability/filter criteria separately |
@@ -47,6 +37,6 @@ This compact map identifies current code paths, not acceptance or workbook statu
 
 ## Evidence and limits
 
-The model was checked against [frontend routes](../../frontend/src/App.jsx), [API mounts](../../backend/src/app.js), [request routes](../../backend/src/routes/requestRoutes.js), [venue routes](../../backend/src/routes/venueRoutes.js), [equipment routes](../../backend/src/routes/equipmentRoutes.js), [shared permissions](../../shared/permissions.js), [status policy](../../shared/statusTransitions.js), [Firestore rules](../../firestore.rules), and the service files linked in the model. Solid diagram arrows are current interactions. Dashed arrows or nodes explicitly say required but absent. Shared JavaScript runs inside frontend/backend processes; it is not a separate service.
+The model was checked against [frontend routes](../../frontend/src/App.jsx), [API mounts](../../backend/src/app.js), [request routes](../../backend/src/routes/requestRoutes.js), [venue routes](../../backend/src/routes/venueRoutes.js), [equipment routes](../../backend/src/routes/equipmentRoutes.js), [shared permissions](../../shared/permissions.js), [status policy](../../shared/statusTransitions.js), [Firestore rules](../../firestore.rules), and the service files linked in the model. Diagram arrows are current interactions. Shared JavaScript runs inside frontend/backend processes; it is not a separate service.
 
-Existing test files are evidence locations only. This review did not deploy rules, exercise the live Firebase project, or change workbook status.
+Existing test files are evidence locations only. This documentation update does not deploy rules, exercise the live Firebase project, or change workbook status.
