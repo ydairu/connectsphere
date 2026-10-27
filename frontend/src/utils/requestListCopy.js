@@ -1,4 +1,4 @@
-import { ATTENDEE, COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
+import { ATTENDEE, COORDINATOR, ORGANISER, SAFETY_OFFICER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
 
 // Wording for the requests page. The page, its data and its permission rules are identical for every
 // role — only the words differ, because the same list means different things to each of them: the
@@ -30,6 +30,14 @@ const COPY = {
     emptyTitle: 'No requests to show',
     emptyBody: 'Requests appear here once they are submitted.',
   },
+  // SPM-66: the Safety Officer's list is the safety-review queue — inScope() admits only queued events.
+  [SAFETY_OFFICER]: {
+    eyebrow: 'Safety review',
+    title: 'Safety-review queue',
+    description: 'Events awaiting an operational safety check. An event leaves the queue once its review is recorded.',
+    emptyTitle: 'No events awaiting a safety check',
+    emptyBody: 'Events appear here when their coordinator submits them for safety review.',
+  },
   [ATTENDEE]: {
     eyebrow: 'Events',
     title: 'Events open to you',
@@ -43,7 +51,7 @@ const COPY = {
 // both. Their sections differ, which the detail page shows — not this list.
 COPY[TECHNICAL_STAFF] = COPY[VENUE_STAFF]
 
-const PRECEDENCE = [COORDINATOR, VENUE_STAFF, TECHNICAL_STAFF, ORGANISER, ATTENDEE]
+const PRECEDENCE = [COORDINATOR, SAFETY_OFFICER, VENUE_STAFF, TECHNICAL_STAFF, ORGANISER, ATTENDEE]
 
 const FALLBACK = {
   eyebrow: 'Your requests',

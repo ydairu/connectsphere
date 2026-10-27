@@ -9,6 +9,7 @@ import { checkVenueHoldInTransaction, venueBookingLockPath, VenueValidationError
 import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
 import { CONFIRMED, PLANNING, PREPARATION } from '../../../shared/status.js'
+import { INVALIDATED_BY_VENUE_BOOKING_CANCELLED, INVALIDATED_BY_VENUE_BOOKING_REQUESTED, safetyReviewInvalidation } from '../../../shared/safetyReviewState.js'
 
 export const BOOKINGS = 'venueBookingRequests'
 export class VenueBookingError extends Error {
@@ -101,7 +102,9 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
       createdAt: at, createdByUid: user.uid })
     tx.set(lockRef, { venueId: value.venueId, lastCommitmentId: holdRef.id, updatedAt: at })
     tx.set(allocationRef, { lastUid: old ? allocation.data()?.lastUid ?? assignee.uid : assignee.uid, updatedAt: at })
-    tx.update(eventRef, { assignedStaffUids: [...new Set([...(event.assignedStaffUids ?? []), assignee.uid])], updatedAt: at })
+    // SPM-91: a new or replacement venue has not been safety-reviewed, so the current review is withdrawn.
+    const safetyReview = safetyReviewInvalidation(event, INVALIDATED_BY_VENUE_BOOKING_REQUESTED, at)
+    tx.update(eventRef, { assignedStaffUids: [...new Set([...(event.assignedStaffUids ?? []), assignee.uid])], ...(safetyReview ? { safetyReview } : {}), updatedAt: at })
     tx.set(eventRef.collection('activity').doc(), { type: 'venue_booking_requested', bookingRequestId: ref.id,
       replacesId: old?.id ?? null, actor: { uid: user.uid, role: COORDINATOR }, assignedVenueStaffUid: assignee.uid, at })
     return presentBooking({ id: ref.id, ...booking }, false, false, now)
@@ -252,6 +255,10 @@ export async function cancelVenueBooking(eventId, bookingId, input, user, db = g
     if (event.arrangementApprovals?.venue) {
       eventUpdate.arrangementApprovals = Object.fromEntries(Object.entries(event.arrangementApprovals).filter(([key]) => key !== 'venue'))
     }
+    // SPM-91 [Team decision pending]: the venue the Safety Officer reviewed is no longer booked, so a safety
+    // approval or a pending safety check is withdrawn and the replacement arrangement must be reviewed again.
+    const safetyReview = safetyReviewInvalidation(event, INVALIDATED_BY_VENUE_BOOKING_CANCELLED, at)
+    if (safetyReview) eventUpdate.safetyReview = safetyReview
     tx.update(eventRef, eventUpdate)
     tx.set(eventRef.collection('activity').doc(), { type: VENUE_BOOKING_CANCELLED, bookingRequestId: bookingId,
       actor: { uid: user.uid, role: COORDINATOR }, at })

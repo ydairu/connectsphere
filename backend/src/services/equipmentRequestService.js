@@ -8,6 +8,7 @@
 // rotation lock (systemLocks/technicalStaffAssignment) serialises choosing an assignee.
 
 import { COORDINATOR, TECHNICAL_STAFF, isAssignedCoordinator, rolesOf } from '../../../shared/permissions.js'
+import { INVALIDATED_BY_EQUIPMENT_REQUESTED, safetyReviewInvalidation } from '../../../shared/safetyReviewState.js'
 import {
   APPROVE_EQUIPMENT_REQUEST,
   EQUIPMENT_REQUESTED,
@@ -181,6 +182,9 @@ export async function submitEquipmentRequest(eventId, input, user, db = getAdmin
       const { [TECHNICAL_ARRANGEMENT]: _cleared, ...kept } = event.arrangementApprovals
       eventUpdate.arrangementApprovals = kept
     }
+    // SPM-91: the new equipment has not been safety-reviewed, so the current review is withdrawn.
+    const safetyReview = safetyReviewInvalidation(event, INVALIDATED_BY_EQUIPMENT_REQUESTED, at)
+    if (safetyReview) eventUpdate.safetyReview = safetyReview
     tx.update(eventRef, eventUpdate)
     tx.set(eventRef.collection(ACTIVITY_SUBCOLLECTION).doc(), {
       type: EQUIPMENT_REQUESTED,

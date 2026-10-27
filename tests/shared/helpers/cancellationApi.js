@@ -6,7 +6,7 @@
 // The seeded Confirmed event (seed-req-a1-confirmed) is moved to start 30 days after the real current time,
 // because the API uses the real clock and cancellation is allowed only before the start date/time.
 
-import { SEED_ACCOUNTS, SEED_EQUIPMENT_REQUESTS, SEED_EQUIPMENT_RESERVATIONS, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
+import { SEED_ACCOUNTS, SEED_EQUIPMENT_REQUESTS, SEED_EQUIPMENT_RESERVATIONS, SEED_REQUESTS, seedSafetyApproval } from '../../../backend/scripts/seedData.js'
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
@@ -18,7 +18,7 @@ const DAY = 24 * 60 * 60 * 1000
 
 export const CONFIRMED_ID = 'seed-req-a1-confirmed'
 
-export function createCancellationApi({ verifySafetyApproval = async () => false, includeReservations = false } = {}) {
+export function createCancellationApi({ includeReservations = false } = {}) {
   let db
   let server
   let baseUrl
@@ -37,7 +37,6 @@ export function createCancellationApi({ verifySafetyApproval = async () => false
       authenticate,
       eventRequestStore: createFakeFirestoreEventRequestStore(() => db),
       getEventRequestDb: () => db,
-      verifySafetyApproval,
     })
     await new Promise((resolve) => {
       server = app.listen(0, '127.0.0.1', resolve)
@@ -86,6 +85,15 @@ export function createCancellationApi({ verifySafetyApproval = async () => false
   const transactions = () => db.transactions
   /** Writes a document directly, e.g. an approved venue booking so an event can be confirmed. */
   const putDocument = (collection, id, data) => db.collectionData(collection).set(id, data)
+  /**
+   * SPM-91/92: records an approved safety review on the event (approved = true), or removes the review, as for
+   * an event confirmed before the safety check existed (approved = false). The seeded Confirmed and
+   * Preparation events start approved.
+   */
+  function setSafetyApproval(approved, id = CONFIRMED_ID) {
+    const { safetyReview: _review, safetyReviews: _reviews, ...request } = db.store.get(id)
+    db.store.set(id, approved ? { ...request, ...seedSafetyApproval(SEED_ACCOUNTS.coordinator, new Date().toISOString()) } : request)
+  }
 
-  return { start, stop, reset, setStart, call, act, view, list, notificationsOf, stored, activity, allNotifications, reservations, transactions, putDocument }
+  return { start, stop, reset, setStart, call, act, view, list, notificationsOf, stored, activity, allNotifications, reservations, transactions, putDocument, setSafetyApproval }
 }

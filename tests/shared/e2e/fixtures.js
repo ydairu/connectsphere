@@ -50,6 +50,13 @@ export async function approveVenueForEvent(request, eventId, coordinator = ROLE_
   return booking
 }
 
+// SPM-91/92: Confirm needs a recorded safety approval. For specs about other stories, the double records one
+// directly; the review itself is exercised by tests/spm-92/e2e.
+export async function recordSafetyApproval(request, eventId) {
+  const response = await request.post(`${DOUBLE_ORIGIN}/__double__/safety-approvals/${eventId}`)
+  expect(response.ok(), 'record a safety approval').toBeTruthy()
+}
+
 export async function loginAs(page, account, password = TEST_PASSWORD) {
   await page.goto('/login')
   await page.getByLabel('Email address').fill(account.email)

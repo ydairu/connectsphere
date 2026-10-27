@@ -7,6 +7,7 @@ import Card from '../components/Card.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import StatusPill from '../components/StatusPill.jsx'
+import SafetyStatusPill from '../components/SafetyStatusPill.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { listRequests } from '../services/api.js'
 import { requestListCopy } from '../utils/requestListCopy.js'
@@ -27,6 +28,10 @@ import { requestListCopy } from '../utils/requestListCopy.js'
 // ownerName / isOwnRequest in the API response) and can narrow the list to their own requests. The filter
 // runs over what the API already returned; it changes nothing about which requests the Organiser may see.
 // Other roles receive neither field and get neither the label nor the filter.
+//
+// SPM-91: an event's safety review status (safetyReviewStatus, sent only to users who may see it) is shown
+// beside its lifecycle status, e.g. "Pending safety check" on a Planning event. SPM-66: a Safety Officer's
+// list is the safety-review queue, because their scope holds only queued events.
 
 const ALL = 'all'
 const MINE = 'mine'
@@ -67,6 +72,7 @@ function RequestList({ requests, showOwner }) {
                 {owner && <p className="request-meta">Submitted by: {owner}</p>}
               </div>
               <div className="request-item-actions">
+                <SafetyStatusPill status={request.safetyReviewStatus} />
                 <StatusPill status={request.status} />
                 <Link className="button button-secondary button-small" to={`/requests/${request.id}`}>View</Link>
               </div>

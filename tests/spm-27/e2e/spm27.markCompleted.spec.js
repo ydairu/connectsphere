@@ -35,8 +35,8 @@ test.describe('SPM-27 — Coordinator marks an event Completed (E2E)', () => {
     expect(moved.ok(), 'move the event date into the past').toBeTruthy()
     await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, 'approve_technical')
-    await actAs(page.request, ROLE_USERS.coordinator, 'confirm')
     expect((await page.request.post(`${DOUBLE_ORIGIN}/__double__/safety-approvals/${planning.id}`)).ok()).toBeTruthy()
+    await actAs(page.request, ROLE_USERS.coordinator, 'confirm')
     await actAs(page.request, ROLE_USERS.coordinator, 'start_preparation')
 
     await signIn(page, ROLE_USERS.coordinator)
@@ -67,8 +67,8 @@ test.describe('SPM-27 — Coordinator marks an event Completed (E2E)', () => {
     // The seeded event starts 20 Nov 2026; this relies on the real clock being before it ends.
     await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, 'approve_technical')
-    await actAs(page.request, ROLE_USERS.coordinator, 'confirm')
     expect((await page.request.post(`${DOUBLE_ORIGIN}/__double__/safety-approvals/${planning.id}`)).ok()).toBeTruthy()
+    await actAs(page.request, ROLE_USERS.coordinator, 'confirm')
     await actAs(page.request, ROLE_USERS.coordinator, 'start_preparation')
 
     await signIn(page, ROLE_USERS.coordinator)

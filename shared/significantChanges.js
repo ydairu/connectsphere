@@ -15,6 +15,7 @@
 
 import { hasOpenCancellation } from './cancellationRequests.js'
 import { SIGNIFICANT_CHANGE_NOTICE, significantChangeNotifications } from './notifications.js'
+import { INVALIDATED_BY_SIGNIFICANT_CHANGE, safetyReviewInvalidation } from './safetyReviewState.js'
 import { CONFIRMED, DRAFT, PLANNING } from './status.js'
 
 // --- Classification -------------------------------------------------------------------------------
@@ -216,8 +217,10 @@ const RESET_STATUSES = Object.freeze([PLANNING, CONFIRMED])
  * What a saved edit sets off, given the record before and after it:
  *   { significantFields, metadata, statusChange, notifications }
  * - metadata: top-level fields to write with the edit — `arrangementApprovals: {}` (recorded decisions
- *   cleared; "Not required" is derived from the equipment fields, so it is unaffected), and at Confirmed
- *   `status: 'planning'`. Empty when nothing changes.
+ *   cleared; "Not required" is derived from the equipment fields, so it is unaffected), at Confirmed
+ *   `status: 'planning'`, and `safetyReview` when a safety approval or a pending safety check is withdrawn
+ *   (SPM-91 AC6: "its safety approval is invalidated and another safety check is required"). Empty when
+ *   nothing changes.
  * - statusChange: { fromStatus, toStatus, fields } for the status_changed entry, or null.
  * - notifications: one per assigned staff member in `staffRecipientUids` (already filtered to Venue and
  *   Technical Support Staff), never to `user`.
@@ -229,6 +232,8 @@ export function significantChangeEffects(user, before, after, { at, staffRecipie
   if (significantFields.length === 0 || !RESET_STATUSES.includes(before?.status)) return none
 
   const metadata = { arrangementApprovals: {} }
+  const safetyReview = safetyReviewInvalidation(before, INVALIDATED_BY_SIGNIFICANT_CHANGE, at ?? null)
+  if (safetyReview) metadata.safetyReview = safetyReview
   let statusChange = null
   if (before.status === CONFIRMED) {
     metadata.status = PLANNING

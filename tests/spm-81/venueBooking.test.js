@@ -5,6 +5,7 @@ import { transitionEventRequest } from '../../backend/src/services/statusTransit
 import { canCancelVenueBooking, venueBookingCancellationErrors, venueBookingReadiness } from '../../shared/venueBooking.js'
 import { CONFIRM } from '../../shared/statusTransitions.js'
 import { CONFIRMED, PLANNING } from '../../shared/status.js'
+import { INVALIDATED_BY_VENUE_BOOKING_CANCELLED, SAFETY_APPROVED, SAFETY_INVALIDATED } from '../../shared/safetyReview.js'
 import { coordinator, fixture, input, now, organiser, staff } from '../spm-14/fixtures.js'
 
 let db
@@ -12,6 +13,9 @@ beforeEach(() => {
   db = fixture()
   db.store.get('event').equipment = { requirements: [], technicalSupportNeeded: false }
 })
+// SPM-91/92: Confirm also needs a safety approval. Requesting or cancelling a venue withdraws one (SPM-91), so it
+// is recorded once the bookings are in place, and Confirm turns on the venue bookings alone.
+const approveSafety = () => { db.store.get('event').safetyReview = { status: SAFETY_APPROVED } }
 const bookings = () => db.collectionData('venueBookingRequests')
 const readiness = () => venueBookingReadiness([...bookings()].map(([id, booking]) => ({ id, ...booking })))
 const availability = () => db.collectionData('venueAvailability')
@@ -40,6 +44,7 @@ describe('SPM-81 independent venue decisions', () => {
     const [hall, room] = await pair()
     await approve(hall)
     await approve(room)
+    approveSafety()
     const roomBefore = structuredClone([bookings().get(room.id), hold(room.id)])
     expect((await listEventVenueBookings('event', coordinator, db, now)).bookings.find((b) => b.id === hall.id).canCancel).toBe(true)
     const result = await cancel(hall)
@@ -48,12 +53,15 @@ describe('SPM-81 independent venue decisions', () => {
     expect([bookings().get(room.id), hold(room.id)]).toEqual(roomBefore)
     expect(readiness()).toMatchObject({ ready: false, total: 2, approved: 1 })
     await expect(transitionEventRequest('event', CONFIRM, coordinator, db, now)).rejects.toMatchObject({ reason: 'arrangements_not_approved' })
+    // SPM-91 [Team decision pending]: the reviewed venue is gone, so the safety approval is withdrawn too.
+    expect(db.store.get('event').safetyReview).toMatchObject({ status: SAFETY_INVALIDATED, invalidatedReason: INVALIDATED_BY_VENUE_BOOKING_CANCELLED })
     expect((await listVenues({ availableFrom: input.startsAt, availableTo: input.endsAt }, db, now)).venues.map((v) => v.id)).toContain('hall')
     const replacement = await submit({ replacesId: hall.id, submissionKey: 'hall-replacement' })
     expect(replacement.venueNeedId).toBe(hall.venueNeedId)
     expect(bookings().get(hall.id)).toMatchObject({ status: 'cancelled', replacedById: replacement.id })
     await approve(replacement)
     expect(readiness()).toMatchObject({ ready: true, total: 2, approved: 2 })
+    approveSafety()
     expect((await transitionEventRequest('event', CONFIRM, coordinator, db, now)).status).toBe(CONFIRMED)
   })
 
@@ -61,6 +69,7 @@ describe('SPM-81 independent venue decisions', () => {
     const [hall, room] = await pair()
     await approve(hall)
     await approve(room)
+    approveSafety()
     await transitionEventRequest('event', CONFIRM, coordinator, db, now)
     db.store.get('event').arrangementApprovals = { venue: { decision: 'approved' }, technical: { decision: 'approved' } }
     const roomBefore = structuredClone([bookings().get(room.id), hold(room.id)])

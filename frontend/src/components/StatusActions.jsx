@@ -4,6 +4,7 @@ import { ORGANISER } from '../../../shared/permissions.js'
 import { REFUSE_CANCELLATION } from '../../../shared/requestActions.js'
 import { PLANNING, UNDER_REVIEW } from '../../../shared/status.js'
 import { APPROVE, APPROVE_CANCELLATION, CONFIRM, REJECT } from '../../../shared/statusTransitions.js'
+import { SAFETY_REVIEW_PENDING, SUBMIT_SAFETY_REVIEW } from '../../../shared/safetyReview.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { actionConfirmation, actionLabel, actionReason, actionReasonLabel, actionReasonPrompt } from '../utils/statusActions.js'
 import { signOffText } from '../utils/eventArrangements.js'
@@ -162,12 +163,16 @@ export function StatusNotices({ cancellation, rejection, completion }) {
   </>
 }
 
-function StatusActions({ status, actions, arrangements, cancellationRequest, busy, onAction }) {
+function StatusActions({ status, actions, arrangements, cancellationRequest, safetyReviewStatus = null, busy, onAction }) {
   const [pending, setPending] = useState(null)
   const [reason, setReason] = useState('')
 
   // The assigned Coordinator at Planning can reject but not yet confirm: say why there is no Confirm.
   const confirmBlocked = status === PLANNING && actions.includes(REJECT) && !actions.includes(CONFIRM)
+  // SPM-91: the arrangements are approved and only the safety check is outstanding — it can be submitted now,
+  // or is already in the queue.
+  const arrangementsReady = Object.values(arrangements ?? {}).every((arrangement) => !arrangement.required || arrangement.decision === 'approved')
+  const awaitingSafety = actions.includes(SUBMIT_SAFETY_REVIEW) || (safetyReviewStatus === SAFETY_REVIEW_PENDING && arrangementsReady)
   // SPM-5: likewise at Under Review, when required details are missing or invalid there is no Approve.
   const approveBlocked = status === UNDER_REVIEW && actions.includes(REJECT) && !actions.includes(APPROVE)
   // SPM-47: a pending request the Coordinator may refuse but no longer approve — its event has started.
@@ -229,8 +234,11 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, bus
             </div>
           )}
 
-          {confirmBlocked && (
+          {confirmBlocked && !awaitingSafety && (
             <p className="form-note">The event can be confirmed once all mandatory venue and technical arrangements are approved.</p>
+          )}
+          {confirmBlocked && awaitingSafety && (
+            <p className="form-note">The arrangements are approved. The event can be confirmed once it passes its safety check.</p>
           )}
           {approveCancellationBlocked && (
             <p className="form-note">

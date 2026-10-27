@@ -59,7 +59,7 @@ connectsphere/
 5. The frontend sends a Firebase ID token with authenticated requests to the Express API.
 6. The backend verifies the token and reads the user's trusted roles from Firestore.
 
-The current code implements five roles: `organiser`, `coordinator`, `venue_staff`, `technical_staff` and `attendee`, defined in `shared/permissions.js`. A user may hold several (`roles: string[]`) and receives the union of what each role permits. Profiles written before the roles migration hold a single `role` string and are still read correctly. Frontend role checks control presentation only; backend operations enforce access. The later customer material in the requirements revision candidate adds Event Coordinator Lead and Safety Officer roles; neither is implemented in the current role model.
+The current code implements six roles: `organiser`, `coordinator`, `venue_staff`, `technical_staff`, `attendee` and `safety_officer` (SPM-66), defined in `shared/permissions.js`. A user may hold several (`roles: string[]`) and receives the union of what each role permits. Profiles written before the roles migration hold a single `role` string and are still read correctly. Frontend role checks control presentation only; backend operations enforce access. The later customer material in the requirements revision candidate also adds an Event Coordinator Lead role, which is not implemented.
 
 Organisers can view and edit their organisation name on `/profile`, including adding a name to an older account. Saving uses the backend API. Names are trimmed and cannot be blank. Matching names do not link accounts or grant organisation access; changing a name does not alter an existing organisation ID or any event request. Registration does not assign organisation IDs or create shared organisation memberships.
 
@@ -202,7 +202,7 @@ You can also run either application separately with `npm run dev:frontend` or `n
 
 ## Seed Accounts
 
-With `--write --project=<projectId>`, `backend/scripts/seed.js` creates or resets these 11 accounts for testing and demonstrations. They all use the password in `SEED_ACCOUNT_PASSWORD`; keep that value out of version control.
+With `--write --project=<projectId>`, `backend/scripts/seed.js` creates or resets these 12 accounts for testing and demonstrations. They all use the password in `SEED_ACCOUNT_PASSWORD`; keep that value out of version control.
 
 | Role | Email | Organisation ID |
 | --- | --- | --- |
@@ -213,6 +213,7 @@ With `--write --project=<projectId>`, `backend/scripts/seed.js` creates or reset
 | Technical Support Staff | `technical-staff@seed.connectsphere.test` | — |
 | Venue + Technical Staff | `venue-technical-staff@seed.connectsphere.test` | — |
 | Attendee | `attendee@seed.connectsphere.test` | — |
+| Safety Officer | `safety-officer@seed.connectsphere.test` | — |
 | Event Organiser | `organiser-a1@seed.connectsphere.test` | SEED-ORG-A |
 | Event Organiser | `organiser-a2@seed.connectsphere.test` | SEED-ORG-A |
 | Event Organiser | `organiser-a3@seed.connectsphere.test` | SEED-ORG-A |

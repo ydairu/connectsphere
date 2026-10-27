@@ -1,5 +1,5 @@
 import {
-  DOUBLE_ORIGIN, EXTRA_USERS, FORBIDDEN_HEADING, ROLE_USERS, expect, loginAs, logout, test,
+  DOUBLE_ORIGIN, EXTRA_USERS, FORBIDDEN_HEADING, ROLE_USERS, expect, loginAs, logout, recordSafetyApproval, test,
 } from '../../shared/e2e/fixtures.js'
 import { AVAILABILITY_STATUS, MAINTENANCE_BLOCK_REASONS } from '../../../shared/venueAvailability.js'
 import { APPROVE_TECHNICAL } from '../../../shared/requestActions.js'
@@ -379,6 +379,8 @@ test.describe('SPM-6 / SPM-49 / SPM-29 / SPM-11 / SPM-30 venue management', () =
       headers: headers(ROLE_USERS.venueStaff), data: { action: 'approve' },
     })
     expect(venueDecision.status()).toBe(200)
+    // SPM-91/92: Confirm also needs a safety approval, recorded through the double here.
+    await recordSafetyApproval(request, 'seed-req-a1-planning')
     for (const [user, action] of [
       [ROLE_USERS.technicalStaff, APPROVE_TECHNICAL],
       [ROLE_USERS.coordinator, CONFIRM],

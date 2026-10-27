@@ -242,6 +242,18 @@ export function getRequestHistory(user, id) {
   return authenticatedRequest(user, `/api/requests/${id}/history`)
 }
 
+// SPM-66: the event's approved venue bookings with each venue's capacity, layouts, accessibility features and
+// operating hours: { venues: [...] }. Only the assigned Coordinator and a Safety Officer for a queued event.
+export function getSafetyVenueDetails(user, id) {
+  return authenticatedRequest(user, `/api/requests/${id}/safety-review/venues`)
+}
+
+// SPM-92: the Safety Officer's review, { outcome, checklist, comments, internalNotes }. An invalid review comes
+// back as 400 with `errors` by field; a review of an event no longer in the queue as 403 or 409.
+export function recordSafetyReview(user, id, review) {
+  return authenticatedRequest(user, `/api/requests/${id}/safety-review`, { method: 'POST', body: JSON.stringify(review) })
+}
+
 // SPM-9 action, e.g. { action: 'start_review' } or { action: 'cancel', reason: '...' }. The response is
 // shaped like getRequest's. A refused action comes back as 403 (not permitted), 400 (malformed, or a
 // required reason missing) or 409 (not allowed in the request's current state), with a message.

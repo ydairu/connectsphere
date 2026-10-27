@@ -1,10 +1,10 @@
 # SPM-88 manual review
 
-SPM-88 is incomplete until SPM-91/92 provides a real safety approval, SPM-87 provides significant-change re-review, and SPM-19 provides attendee registration. Record the date, test event ID, account, and actual result for each check. Use separate events for completion and cancellation because those actions close an event.
+SPM-88 is incomplete until SPM-87 provides significant-change re-review and SPM-19 provides attendee registration. SPM-91/92 now records the safety approval that Start Preparation reads (27 October 2026, local; not yet accepted). Record the date, test event ID, account, and actual result for each check. Use separate events for completion and cancellation because those actions close an event.
 
 ## Test setup
 
-1. Use a non-production Firebase project with seeded Coordinator, Organiser, Venue Staff, Technical Support Staff and Attendee accounts. Confirm the chosen future event is in Confirmed, has assigned staff and a valid safety approval from SPM-91/92. Until that integration exists, use the in-memory browser double; its test-only safety approval endpoint is in `tests/shared/firebase-double/doubleServer.js`.
+1. Use a non-production Firebase project with seeded Coordinator, Organiser, Venue Staff, Technical Support Staff and Attendee accounts. Confirm the chosen future event is in Confirmed, has assigned staff and a valid safety approval from SPM-91/92 (the seeded Confirmed event has one; a new event gets one through the Safety Officer's review). The in-memory browser double also has a test-only shortcut that records an approval, in `tests/shared/firebase-double/doubleServer.js`.
 2. Keep a second Preparation event whose end time has passed for completion. Use two more future events for direct and requested cancellation. Give those events a venue booking and equipment reservation when testing release.
 3. Check the event's stored `eventRequests/{id}/activity` entries and each user's in-app Notifications page. This requires backend/database access; the request page currently shows field change history, not status history.
 

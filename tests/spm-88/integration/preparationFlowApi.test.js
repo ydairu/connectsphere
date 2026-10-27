@@ -1,5 +1,6 @@
 // SPM-88: real Express routes and middleware with an in-memory Firestore double.
-// Safety approval is supplied by a server-side test verifier until SPM-91/92 provides the real one.
+// The seeded Confirmed event's safety approval (SPM-91/92) is removed before each test and recorded again
+// where a test needs it, so each test states the approval it depends on.
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { SEED_ACCOUNTS } from '../../../backend/scripts/seedData.js'
@@ -13,15 +14,14 @@ import { CONFIRMED_ID, createCancellationApi } from '../../shared/helpers/cancel
 
 const { organiserA1, coordinator, coordinator3, venueStaff, technicalStaff, venueTechnicalStaff, attendee } = SEED_ACCOUNTS
 const HOUR = 60 * 60 * 1000
-let safetyApproved = false
-const api = createCancellationApi({ verifySafetyApproval: async () => safetyApproved, includeReservations: true })
+const api = createCancellationApi({ includeReservations: true })
 
 beforeAll(api.start)
 afterAll(api.stop)
-beforeEach(() => { api.reset(); safetyApproved = false })
+beforeEach(() => { api.reset(); api.setSafetyApproval(false) })
 
 async function startPreparation() {
-  safetyApproved = true
+  api.setSafetyApproval(true)
   const response = await api.act(coordinator3, START_PREPARATION)
   expect(response.status).toBe(200)
   return response
@@ -38,7 +38,7 @@ describe('SPM-88 — start Preparation', () => {
   })
 
   it('uses the assigned Coordinator, writes one status entry and one notice per assigned staff member', async () => {
-    safetyApproved = true
+    api.setSafetyApproval(true)
     expect((await api.view(coordinator3)).json.availableActions).toContain(START_PREPARATION)
     expect((await api.act(coordinator, START_PREPARATION)).status).toBe(404)
     expect((await api.act(organiserA1, START_PREPARATION)).status).toBe(403)

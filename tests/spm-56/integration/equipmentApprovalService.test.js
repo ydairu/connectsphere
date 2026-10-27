@@ -29,6 +29,7 @@ import {
 } from '../../../shared/equipmentRequest.js'
 import { EQUIPMENT_REQUEST_APPROVED_NOTICE } from '../../../shared/notifications.js'
 import { APPROVE_TECHNICAL, REJECT_TECHNICAL } from '../../../shared/requestActions.js'
+import { SAFETY_APPROVED } from '../../../shared/safetyReview.js'
 import { CONFIRMED, PLANNING, UNDER_REVIEW } from '../../../shared/status.js'
 import { CANCEL, CONFIRM, REJECT } from '../../../shared/statusTransitions.js'
 import { createFakeFirestoreEventRequestStore } from '../../shared/firebase-double/fakeFirestoreEventRequestStore.js'
@@ -200,6 +201,8 @@ describe('SPM-56 re-confirm after a significant change cleared the sign-off', ()
     expect(notifications().filter((notice) => notice.type === EQUIPMENT_REQUEST_APPROVED_NOTICE).at(-1).message).toMatch(/re-confirmed/)
 
     db.collectionData('venueBookingRequests').set('approved-venue', { eventRequestId: 'event', status: 'approved' })
+    // SPM-91/92: Confirm also needs a safety approval, recorded outside this story; set directly here.
+    theEvent().safetyReview = { status: SAFETY_APPROVED }
     const confirmed = await transitionEventRequest('event', CONFIRM, coordinator, db, now)
     expect(confirmed.status).toBe(CONFIRMED)
   })
@@ -227,6 +230,7 @@ describe('SPM-56 the manual technical sign-off', () => {
     await transitionEventRequest('event', APPROVE_TECHNICAL, tech, db, now)
     expect(theEvent().arrangementApprovals.technical).toMatchObject({ decision: 'approved', byUid: 't1' })
     db.collectionData('venueBookingRequests').set('approved-venue', { eventRequestId: 'event', status: 'approved' })
+    theEvent().safetyReview = { status: SAFETY_APPROVED }
     expect((await transitionEventRequest('event', CONFIRM, coordinator, db, now)).status).toBe(CONFIRMED)
   })
 })

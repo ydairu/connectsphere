@@ -3,7 +3,7 @@
 // leads to its arrangements. Firebase is the in-memory double; the API and app are real.
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
-import { DOUBLE_ORIGIN, ROLE_USERS, approveVenueForEvent, expect, loginAs, logout, test } from '../../shared/e2e/fixtures.js'
+import { DOUBLE_ORIGIN, ROLE_USERS, approveVenueForEvent, expect, loginAs, logout, recordSafetyApproval, test } from '../../shared/e2e/fixtures.js'
 
 const underReview = SEED_REQUESTS.find((request) => request.id === 'seed-req-a1-under-review')
 const planning = SEED_REQUESTS.find((request) => request.id === 'seed-req-a1-planning')
@@ -48,6 +48,7 @@ test.describe('SPM-61 — the Organiser is notified of status changes (E2E)', ()
   test('spm61_a_confirmed_event_notice_leads_the_organiser_to_its_arrangements', async ({ page }) => {
     await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, planning.id, 'approve_technical')
+    await recordSafetyApproval(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.coordinator, planning.id, 'confirm')
 
     await signIn(page, ROLE_USERS.organiser)

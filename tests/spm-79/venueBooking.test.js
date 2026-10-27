@@ -5,6 +5,7 @@ import { normaliseVenueBooking, venueBookingReadiness, venueNeedId } from '../..
 import { APPROVE_VENUE } from '../../shared/requestActions.js'
 import { CONFIRM } from '../../shared/statusTransitions.js'
 import { CONFIRMED } from '../../shared/status.js'
+import { SAFETY_APPROVED } from '../../shared/safetyReview.js'
 import { coordinator, fixture, input, now, staff, secondStaff } from '../spm-14/fixtures.js'
 
 describe('SPM-79 venue needs', () => {
@@ -28,7 +29,12 @@ describe('SPM-79 booking and Confirm transactions', () => {
   let db
   beforeEach(() => { db = fixture(); db.store.get('event').equipment = { requirements: [], technicalSupportNeeded: false } })
   const request = (values) => submitVenueBooking('event', { ...input, ...values }, coordinator, db, now)
-  const confirm = () => transitionEventRequest('event', CONFIRM, coordinator, db, now)
+  // SPM-91/92: Confirm also needs a safety approval. Requesting a venue withdraws one (SPM-91), so it is
+  // recorded just before each Confirm, and these tests turn on the venue bookings alone.
+  const confirm = () => {
+    db.store.get('event').safetyReview = { status: SAFETY_APPROVED }
+    return transitionEventRequest('event', CONFIRM, coordinator, db, now)
+  }
   it('keeps separate holds, decisions and needs; replaces only the rejected need', async () => {
     const hall = await request({ startsAt: '2027-03-01T10:00:00Z', endsAt: '2027-03-01T11:00:00Z' })
     const room = await request({ venueId: 'room', attendeeCount: 30, startsAt: '2027-03-01T11:00:00Z', submissionKey: 'room' })

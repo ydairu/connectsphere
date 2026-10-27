@@ -4,7 +4,7 @@
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { SUBMITTED } from '../../../shared/status.js'
-import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test, approveVenueForEvent } from '../../shared/e2e/fixtures.js'
+import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test, approveVenueForEvent, recordSafetyApproval } from '../../shared/e2e/fixtures.js'
 
 // loginAs submits the form; the app lands on /profile. Wait for that before navigating.
 async function signIn(page, account) {
@@ -103,6 +103,8 @@ test.describe('SPM-9 — View an event’s current lifecycle status (E2E)', () =
     await expect(arrangementValue(page, 'Technical arrangement')).toHaveText('Approved')
     await logout(page)
 
+    // SPM-91/92: Confirm also needs a safety approval, recorded through the double here.
+    await recordSafetyApproval(page.request, planning.id)
     await signIn(page, ROLE_USERS.coordinator)
     await page.goto(`/requests/${planning.id}`)
     await expect(statusPill(page)).toHaveText('Planning')
@@ -113,6 +115,7 @@ test.describe('SPM-9 — View an event’s current lifecycle status (E2E)', () =
   test('spm9_organiser_requests_cancellation_and_the_coordinator_approves_it', async ({ page }) => {
     await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, planning.id, 'approve_technical')
+    await recordSafetyApproval(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.coordinator, planning.id, 'confirm')
 
     await signIn(page, ROLE_USERS.organiser)
