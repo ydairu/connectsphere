@@ -12,13 +12,14 @@ import { apiClient, startInMemoryApi } from '../../shared/helpers/requestApiServ
 
 const byId = (id) => SEED_REQUESTS.find((request) => request.id === id)
 
-// A1 owns one seeded event at each status after submission that SPM-64 AC3 names.
+// A1 owns one seeded event at each status after submission that SPM-64 AC3 names. SPM-19 (team decision,
+// 28 Oct 2026) reopens only the registration section at Confirmed; that case is below.
 const READ_ONLY = [
   [SUBMITTED, 'seed-req-a1-submitted'],
   [UNDER_REVIEW, 'seed-req-a1-under-review'],
   [PLANNING, 'seed-req-a1-planning'],
-  [CONFIRMED, 'seed-req-a1-confirmed'],
 ]
+const CONFIRMED_ID = 'seed-req-a1-confirmed'
 const RETURNED_ID = 'seed-req-a1-returned'
 const COLLEAGUES_ID = 'seed-req-a2-submitted'
 
@@ -63,6 +64,25 @@ describe('SPM-64 AC3 — the Organiser\'s own event is read-only after submissio
 
       const after = await api.get('organiserA1', id)
       expect(after.json.request[section]).toEqual(byId(id)[section])
+    })
+  })
+
+  describe(`at ${CONFIRMED}, only the registration section reopens (SPM-19)`, () => {
+    it('the GET offers the registration section alone', async () => {
+      const response = await api.get('organiserA1', CONFIRMED_ID)
+      expect(response.json.request.status).toBe(CONFIRMED)
+      expect(response.json.editableSections).toEqual(['registration'])
+    })
+
+    it.each(Object.entries(EDITS).filter(([section]) => section !== 'registration'))('a PATCH to %s is still refused with 403 naming the field', async (section, fields) => {
+      const response = await api.patch('organiserA1', CONFIRMED_ID, { [section]: fields })
+      expect(response.status).toBe(403)
+      expect(response.json.forbiddenFields).toEqual(Object.keys(fields).map((field) => `${section}.${field}`))
+      expect((await api.get('organiserA1', CONFIRMED_ID)).json.request[section]).toEqual(byId(CONFIRMED_ID)[section])
+    })
+
+    it('a same-organisation colleague still cannot edit it', async () => {
+      expect((await api.patch('organiserA2', CONFIRMED_ID, { registration: { enabled: false } })).status).toBe(403)
     })
   })
 

@@ -98,6 +98,9 @@ jobs:
       - name: Individual venue cancellation against Firestore emulator (SPM-81)
         run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-spm81 --config firebase.spm14.json "npm run test:spm81:emulator"
 
+      - name: Attendee registration transactions (SPM-19)
+        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-spm19 --config firebase.spm14.json "npm run test:spm19:emulator"
+
       - name: Upload booking emulator results
         if: always()
         uses: actions/upload-artifact@v4

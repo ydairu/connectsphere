@@ -29,6 +29,9 @@ export const EXTRA_USERS = Object.freeze({
   // planning) belong to it already, so SPM-65's coordinator views are unchanged. No E2E spec submits through
   // the UI, so SPM-8's selection in the double is not exercised by its presence.
   secondCoordinator: SEED_ACCOUNTS.coordinator2,
+  // SPM-19: more Attendees, to fill the seeded two-place event and be turned away from it.
+  secondAttendee: SEED_ACCOUNTS.attendee2,
+  thirdAttendee: SEED_ACCOUNTS.attendee3,
   // SPM-66: the Safety Officer. No seeded event is in the safety-review queue, so its list starts empty.
   safetyOfficer: SEED_ACCOUNTS.safetyOfficer,
 })

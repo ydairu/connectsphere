@@ -1,5 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
-import { COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
+import { ATTENDEE, COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
 import { useAuth } from '../hooks/useAuth.js'
 
 function Navbar() {
@@ -8,6 +8,7 @@ function Navbar() {
   const isCoordinator = roles.includes(COORDINATOR)
   const isVenueStaff = roles.includes(VENUE_STAFF)
   const isTechnicalStaff = roles.includes(TECHNICAL_STAFF)
+  const isAttendee = roles.includes(ATTENDEE)
 
   return (
     <header className="site-header">
@@ -21,6 +22,7 @@ function Navbar() {
             <>
               <NavLink className="nav-link" to="/requests">Requests</NavLink>
               <NavLink className="nav-link" to="/notifications">Notifications</NavLink>
+              {isAttendee && <NavLink className="nav-link" to="/registrations">My registrations</NavLink>}
               {isOrganiser && <NavLink className="nav-link" to="/requests/drafts">My drafts</NavLink>}
               {isOrganiser && <NavLink className="nav-link" to="/event-requests/new">Create request</NavLink>}
               {(isCoordinator || isVenueStaff) && <NavLink className="nav-link" to="/venues">Venues</NavLink>}

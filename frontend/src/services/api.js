@@ -290,3 +290,17 @@ export function listNotifications(user) {
 export function markNotificationRead(user, id) {
   return authenticatedRequest(user, `/api/notifications/${id}/read`, { method: 'POST' })
 }
+
+// SPM-19 — an Attendee registers for an event; the owning Organiser and assigned Coordinator read the
+// registered list; an Attendee reads their own registrations.
+export function registerForEvent(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/registrations`, { method: 'POST' })
+}
+
+export function listEventRegistrations(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/registrations`)
+}
+
+export function listMyRegistrations(user) {
+  return authenticatedRequest(user, '/api/registrations')
+}

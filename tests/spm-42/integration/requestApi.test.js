@@ -103,10 +103,11 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
   })
 
   it('Organiser who is also venue staff PATCHes their preparation section at Preparation', async () => {
-    // SPM-48: the venue role's section is venue preparation; the requested venue is read-only.
+    // SPM-48: the venue role's section is venue preparation; the requested venue is read-only. SPM-19: as the
+    // owning Organiser they may also edit registration at Preparation — and nothing else of the Organiser's.
     const response = await patchAs(ORGANISER_VENUE.uid, OWN_PREPARATION_REQUEST.id, { venuePreparation: { status: 'in_progress' } })
     expect(response.status).toBe(200)
-    expect(response.json.editableSections).toEqual(['venuePreparation'])
+    expect(response.json.editableSections).toEqual(['registration', 'venuePreparation'])
   })
 
   it('Self-registered organiser lists and opens their own submitted request without organisation ID', async () => {

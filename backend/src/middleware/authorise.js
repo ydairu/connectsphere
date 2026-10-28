@@ -15,6 +15,7 @@ import { requestOwnerFields } from '../../../shared/requestOwner.js'
 import { preparationEditing } from '../../../shared/preparationAccess.js'
 import { canCheckVenueSuitability } from '../../../shared/venueSuitability.js'
 import { canDecideSafetyReview, safetyReviewListStatus, safetyReviewSummary } from '../../../shared/safetyReview.js'
+import { canViewRegistrations } from '../../../shared/registration.js'
 import {
   allAvailableActions,
   arrangementsSummary,
@@ -67,6 +68,8 @@ function outOfScope(user, res) {
  * `safetyReview` (SPM-91/92) is the safety review as shared/safetyReview.js lets this user see it: in full for
  * the assigned Coordinator and an in-scope Safety Officer, the outcome and comments for the owning Organiser,
  * null for everyone else. `canDecideSafetyReview` says whether this user may record the review now.
+ * `canViewRegistrations` (SPM-19) says whether this user may read GET /api/requests/:id/registrations: the owning
+ * Organiser and the assigned Coordinator. GET /api/requests/:id adds `attendeeRegistration` for an Attendee.
  */
 export function presentRequest(user, request, { coordinatorName = null, ownerNames, venueBookingReadiness = null } = {}) {
   const current = { ...request, venueBookingReadiness }
@@ -89,6 +92,7 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
     reservedEquipment: reservedEquipmentSummary(user, request),
     safetyReview: safetyReviewSummary(user, request),
     canDecideSafetyReview: canDecideSafetyReview(user, request).allowed,
+    canViewRegistrations: canViewRegistrations(user, request),
     ...requestOwnerFields(user, request, ownerNames),
   }
 }
