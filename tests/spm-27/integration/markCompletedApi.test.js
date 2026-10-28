@@ -15,7 +15,7 @@ import { CONFIRMED_ID, createCancellationApi } from '../../shared/helpers/cancel
 
 const { organiserA1, coordinator, coordinator3, venueStaff, technicalStaff, attendee } = SEED_ACCOUNTS
 const HOUR = 60 * 60 * 1000
-const api = createCancellationApi({ verifySafetyApproval: async () => true })
+const api = createCancellationApi()
 
 beforeAll(api.start)
 afterAll(api.stop)

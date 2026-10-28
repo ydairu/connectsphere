@@ -39,6 +39,8 @@ async function expectSaved(account, action, id, reason) {
 async function approveArrangements() {
   api.putDocument('venueBookingRequests', 'spm61-venue-approved', { eventRequestId: PLANNING_ID, status: 'approved' })
   await expectSaved(technicalStaff, APPROVE_TECHNICAL, PLANNING_ID)
+  // SPM-91/92: Confirm also needs a recorded safety approval.
+  api.setSafetyApproval(true, PLANNING_ID)
 }
 
 describe('SPM-61 — the Organiser is notified of each status change (API, in-memory only)', () => {

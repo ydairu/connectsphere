@@ -5,6 +5,8 @@
 //   cancellation request        shared/cancellationRequests.js (request, return, resubmit, refuse;
 //                                                              approving is a transition)
 //   arrangement sign-off        shared/arrangements.js        (venue / technical approve or reject)
+//   safety review submission    shared/safetyReview.js        (submit / resubmit for safety review; the
+//                                                              Safety Officer's review has its own route)
 // All are sent to POST /api/event-requests/:id/transitions as { action, reason? }.
 
 import {
@@ -24,6 +26,7 @@ import {
 } from './cancellationRequests.js'
 import { COORDINATOR, EQUIPMENT, VENUE, rolesOf, viewableSectionsFor } from './permissions.js'
 import { isOwningOrganiser } from './requestActors.js'
+import { SUBMIT_SAFETY_REVIEW, canSubmitForSafetyReview } from './safetyReview.js'
 import { DRAFT } from './status.js'
 import { CANCEL, REJECT, RETURN_FOR_CLARIFICATION, availableActions } from './statusTransitions.js'
 
@@ -70,9 +73,12 @@ export function arrangementAction(action) {
   return Object.hasOwn(ARRANGEMENT_ACTIONS, action) ? ARRANGEMENT_ACTIONS[action] : null
 }
 
-/** Every action this user may take on this request now: transitions, then cancellation, then sign-off. */
-export function allAvailableActions(user, request, now = new Date(), context = {}) {
-  const actions = [...availableActions(user, request, now, context)]
+/**
+ * Every action this user may take on this request now: transitions, then cancellation, then sign-off, then the
+ * safety review submission. `request` carries the current venueBookingReadiness, as Confirm needs.
+ */
+export function allAvailableActions(user, request, now = new Date()) {
+  const actions = [...availableActions(user, request, now)]
   if (canRequestCancellation(user, request, now).allowed) actions.push(REQUEST_CANCELLATION)
   if (canResubmitCancellation(user, request, now).allowed) actions.push(RESUBMIT_CANCELLATION)
   if (canRefuseCancellation(user, request).allowed) actions.push(REFUSE_CANCELLATION)
@@ -81,6 +87,7 @@ export function allAvailableActions(user, request, now = new Date(), context = {
     actions.push(arrangement === VENUE_ARRANGEMENT ? APPROVE_VENUE : APPROVE_TECHNICAL)
     actions.push(arrangement === VENUE_ARRANGEMENT ? REJECT_VENUE : REJECT_TECHNICAL)
   }
+  if (canSubmitForSafetyReview(user, request).allowed) actions.push(SUBMIT_SAFETY_REVIEW)
   return actions
 }
 

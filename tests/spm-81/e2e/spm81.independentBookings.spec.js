@@ -1,4 +1,4 @@
-import { DOUBLE_ORIGIN, expect, test, ROLE_USERS, EXTRA_USERS, loginAs } from '../../shared/e2e/fixtures.js'
+import { DOUBLE_ORIGIN, expect, test, ROLE_USERS, EXTRA_USERS, loginAs, recordSafetyApproval } from '../../shared/e2e/fixtures.js'
 
 const eventId = 'seed-req-a1-planning'
 const pageUrl = `/requests/${eventId}/venue-bookings`
@@ -55,6 +55,8 @@ test('one approved venue can be cancelled and replaced without releasing the oth
   const replacement = (await (await replacementResponse).json()).booking
   expect(replacement.venueNeedId).toBe(hall.venueNeedId)
   await approve(replacement)
+  // SPM-91/92: Confirm also needs a safety approval, recorded through the double here.
+  await recordSafetyApproval(request, eventId)
   const ready = await request.get(`${DOUBLE_ORIGIN}/api/requests/${eventId}`, { headers: auth(coordinator.uid) })
   expect((await ready.json()).availableActions).toContain('confirm')
 })

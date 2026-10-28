@@ -22,6 +22,7 @@ import {
   hasPendingCancellation,
 } from './cancellationRequests.js'
 import { NOT_PERMITTED, isAssignedCoordinator, isOwningOrganiser } from './requestActors.js'
+import { safetyApproved } from './safetyReviewState.js'
 import {
   CANCELLED,
   COMPLETED,
@@ -122,19 +123,21 @@ const TRANSITIONS = Object.freeze({
   },
   // "Given an event is in Planning and all mandatory venue and required technical arrangements have been
   // approved, when the assigned Event Coordinator confirms it, then its status changes to Confirmed."
+  // SPM-91: "The event cannot become Confirmed without a valid safety approval." (CL3 G8!C2, C3)
   [CONFIRM]: {
     from: [PLANNING],
     to: CONFIRMED,
     actor: isAssignedCoordinator,
-    guard: (request) => (arrangementsApproved(request) ? null : ARRANGEMENTS_NOT_APPROVED),
+    guard: (request) =>
+      !arrangementsApproved(request) ? ARRANGEMENTS_NOT_APPROVED : safetyApproved(request) ? null : SAFETY_APPROVAL_REQUIRED,
   },
-  // SPM-91/92 owns the persisted safety decision. Until its server-side verifier is wired in, the
-  // context defaults to false and neither UI nor API can start preparation.
+  // SPM-88: preparation needs the safety approval recorded by SPM-92 (CL3 G8!C45). A Confirmed event confirmed
+  // before SPM-91 has none, so it cannot start preparation until it is reviewed.
   [START_PREPARATION]: {
     from: [CONFIRMED],
     to: PREPARATION,
     actor: isAssignedCoordinator,
-    guard: (_request, _now, context) => context.safetyApproved === true ? null : SAFETY_APPROVAL_REQUIRED,
+    guard: (request) => (safetyApproved(request) ? null : SAFETY_APPROVAL_REQUIRED),
   },
   // "Given an event is Under Review or Planning and its essential requirements cannot be fulfilled, when
   // the assigned Event Coordinator rejects it, then its status changes to Rejected."
@@ -183,7 +186,7 @@ export function targetStatus(action) {
  * Checks run in this order: action exists, request is not terminal, request is at an allowed status,
  * user is a permitted actor, guard passes. A multi-role user is permitted if any of their roles is.
  */
-export function canTransition(user, request, action, now = new Date(), context = {}) {
+export function canTransition(user, request, action, now = new Date()) {
   if (!Object.hasOwn(TRANSITIONS, action)) return { allowed: false, reason: UNKNOWN_ACTION }
   // "Given an event in Completed, Cancelled or Rejected, when any user attempts a status change, then it
   // is not allowed." Also true by construction — no action lists a terminal status in `from`.
@@ -193,13 +196,13 @@ export function canTransition(user, request, action, now = new Date(), context =
   if (!transition.from.includes(request.status)) return { allowed: false, reason: WRONG_STATUS }
   if (!transition.actor(user, request)) return { allowed: false, reason: NOT_PERMITTED }
 
-  const refusal = transition.guard?.(request, now, context)
+  const refusal = transition.guard?.(request, now)
   if (refusal) return { allowed: false, reason: refusal }
 
   return { allowed: true, from: request.status, to: transition.to }
 }
 
 /** Actions this user may perform on this request now, in table order. Drives the UI only. */
-export function availableActions(user, request, now = new Date(), context = {}) {
-  return ACTIONS.filter((action) => canTransition(user, request, action, now, context).allowed)
+export function availableActions(user, request, now = new Date()) {
+  return ACTIONS.filter((action) => canTransition(user, request, action, now).allowed)
 }

@@ -20,7 +20,7 @@ import {
   RETURN_CANCELLATION,
 } from '../../../shared/requestActions.js'
 import { CANCELLED, CONFIRMED } from '../../../shared/status.js'
-import { APPROVE_CANCELLATION, CANCEL } from '../../../shared/statusTransitions.js'
+import { APPROVE_CANCELLATION, CANCEL, START_PREPARATION } from '../../../shared/statusTransitions.js'
 import { CONFIRMED_ID, createCancellationApi } from '../../shared/helpers/cancellationApi.js'
 
 const { organiserA1, organiserA2, coordinator, coordinator3, venueStaff, technicalStaff, venueTechnicalStaff } = SEED_ACCOUNTS
@@ -107,7 +107,8 @@ describe('SPM-47 — the assigned Coordinator decides', () => {
   it('spm47_approval_cancels_the_event_as_spm63_defines_and_notifies_the_organiser_and_staff', async () => {
     await request()
     const coordinatorView = await api.view(coordinator3)
-    expect(coordinatorView.json.availableActions).toEqual([APPROVE_CANCELLATION, REFUSE_CANCELLATION, RETURN_CANCELLATION])
+    // The seeded event holds a safety approval (SPM-91/92), so SPM-88's Start Preparation is also offered.
+    expect(coordinatorView.json.availableActions).toEqual([START_PREPARATION, APPROVE_CANCELLATION, REFUSE_CANCELLATION, RETURN_CANCELLATION])
     expect(coordinatorView.json.cancellationRequest).toMatchObject({ status: 'pending', reason: REASON })
 
     const approved = await api.act(coordinator3, APPROVE_CANCELLATION)
@@ -198,7 +199,7 @@ describe('SPM-47 — the assigned Coordinator decides', () => {
   it('spm47_once_the_start_passes_the_request_can_no_longer_be_approved_and_the_reason_is_given', async () => {
     await request()
     api.setStart(CONFIRMED_ID, new Date(Date.now() - 60 * 1000))
-    expect((await api.view(coordinator3)).json.availableActions).toEqual([REFUSE_CANCELLATION])
+    expect((await api.view(coordinator3)).json.availableActions).toEqual([START_PREPARATION, REFUSE_CANCELLATION])
     const refused = await api.act(coordinator3, APPROVE_CANCELLATION)
     expect(refused.status).toBe(409)
     expect(refused.json).toMatchObject({ reason: 'event_started' })

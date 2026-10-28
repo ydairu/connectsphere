@@ -36,6 +36,7 @@ import {
 } from './statusTransitions.js'
 import { ATTENDEE, COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from './permissions.js'
 import { ARRANGEMENT_APPROVED, ARRANGEMENT_REJECTED } from './arrangements.js'
+import { SAFETY_APPROVED, SAFETY_CHANGES_REQUESTED, SAFETY_INVALIDATED, SAFETY_REVIEW_PENDING } from './safetyReviewState.js'
 import { CANCELLATION_PENDING, CANCELLATION_REFUSED, CANCELLATION_REQUEST_PENDING, NO_PENDING_CANCELLATION } from './cancellationRequests.js'
 import {
   CANCELLED,
@@ -84,9 +85,13 @@ const pendingCancellation = { status: CANCELLATION_PENDING, reason: 'Keynote wit
 // SPM-63/SPM-47: cancellation is possible only before the event starts.
 const upcoming = { core: { ...requestAt(CONFIRMED).core, preferredDateTime: '2026-12-01T09:00:00.000Z' } }
 
+// SPM-91/92: a recorded safety approval, which Confirm and Start Preparation require.
+const safetyApproval = { safetyReview: { status: SAFETY_APPROVED } }
+
 // What a request needs, beyond its status, for an action's guard to pass.
 const GUARD_SETUP = {
-  [CONFIRM]: { arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true } },
+  [CONFIRM]: { arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true }, ...safetyApproval },
+  [START_PREPARATION]: safetyApproval,
   [CANCEL]: upcoming,
   [APPROVE_CANCELLATION]: { ...upcoming, cancellationRequest: pendingCancellation },
 }
@@ -132,8 +137,7 @@ describe('SPM-9 — valid statuses', () => {
 describe('SPM-9 — each transition the criteria name', () => {
   for (const [action, from, to, actor] of LIFECYCLE) {
     test(`${action}: ${from} → ${to} by ${actor.uid}`, () => {
-      assert.deepEqual(canTransition(actor, requestAt(from, GUARD_SETUP[action]), action, NOW,
-        action === START_PREPARATION ? { safetyApproved: true } : {}), { allowed: true, from, to })
+      assert.deepEqual(canTransition(actor, requestAt(from, GUARD_SETUP[action]), action, NOW), { allowed: true, from, to })
     })
   }
 })
@@ -249,8 +253,8 @@ describe('SPM-9 — confirm guard: mandatory venue and technical arrangements', 
     }
   })
 
-  test('confirm is allowed once venue and required technical arrangements are approved', () => {
-    const request = requestAt(PLANNING, { equipment: { technicalSupportNeeded: true }, arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true } })
+  test('confirm is allowed once venue and required technical arrangements and safety are approved', () => {
+    const request = requestAt(PLANNING, { equipment: { technicalSupportNeeded: true }, arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true }, ...safetyApproval })
     assert.deepEqual(canTransition(assigned, request, CONFIRM, NOW), { allowed: true, from: PLANNING, to: CONFIRMED })
     assert.deepEqual(availableActions(assigned, request, NOW), [CONFIRM, REJECT])
   })
@@ -260,8 +264,21 @@ describe('SPM-9 — confirm guard: mandatory venue and technical arrangements', 
       equipment: { requirements: [], technicalSupportNeeded: false },
       arrangementApprovals: { venue: approved(venueStaff) },
       venueBookingReadiness: { ready: true },
+      ...safetyApproval,
     })
     assert.equal(canTransition(assigned, request, CONFIRM, NOW).allowed, true)
+  })
+
+  // SPM-91: "The event cannot become Confirmed without a valid safety approval."
+  test('confirm needs a valid safety approval once the arrangements are approved', () => {
+    const ready = { equipment: { technicalSupportNeeded: true }, arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true } }
+    for (const status of [undefined, SAFETY_REVIEW_PENDING, SAFETY_CHANGES_REQUESTED, SAFETY_INVALIDATED, 'rejected']) {
+      const request = requestAt(PLANNING, { ...ready, ...(status ? { safetyReview: { status } } : {}) })
+      assert.equal(canTransition(assigned, request, CONFIRM, NOW).reason, SAFETY_APPROVAL_REQUIRED, String(status))
+      assert.ok(!availableActions(assigned, request, NOW).includes(CONFIRM))
+    }
+    // Arrangements are reported first, so the Coordinator fixes them before asking for a safety check.
+    assert.equal(canTransition(assigned, requestAt(PLANNING, safetyApproval), CONFIRM, NOW).reason, ARRANGEMENTS_NOT_APPROVED)
   })
 
   test('the actor check runs before the guard, so an unassigned user is told "not permitted"', () => {
@@ -333,14 +350,16 @@ describe('SPM-9 — availableActions', () => {
 })
 
 describe('SPM-88 — entering Preparation', () => {
-  test('safety approval must be supplied by the server, even for an assigned Coordinator', () => {
+  test('a recorded safety approval is required, even for an assigned Coordinator', () => {
     const event = requestAt(CONFIRMED)
     assert.equal(canTransition(assigned, event, START_PREPARATION, NOW).reason, SAFETY_APPROVAL_REQUIRED)
     assert.deepEqual(availableActions(assigned, event, NOW), [])
-    assert.deepEqual(canTransition(assigned, event, START_PREPARATION, NOW, { safetyApproved: true }),
-      { allowed: true, from: CONFIRMED, to: PREPARATION })
-    assert.deepEqual(availableActions(assigned, event, NOW, { safetyApproved: true }), [START_PREPARATION])
-    assert.equal(canTransition(otherCoordinator, event, START_PREPARATION, NOW, { safetyApproved: true }).reason, NOT_PERMITTED)
+    // A context value no longer approves anything: only the record does.
+    assert.equal(canTransition(assigned, event, START_PREPARATION, NOW, { safetyApproved: true }).reason, SAFETY_APPROVAL_REQUIRED)
+    const approvedEvent = requestAt(CONFIRMED, safetyApproval)
+    assert.deepEqual(canTransition(assigned, approvedEvent, START_PREPARATION, NOW), { allowed: true, from: CONFIRMED, to: PREPARATION })
+    assert.deepEqual(availableActions(assigned, approvedEvent, NOW), [START_PREPARATION])
+    assert.equal(canTransition(otherCoordinator, approvedEvent, START_PREPARATION, NOW).reason, NOT_PERMITTED)
   })
 
   test('completion cannot skip Preparation', () => {

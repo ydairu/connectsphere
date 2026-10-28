@@ -15,6 +15,7 @@ import {
   ATTENDEE,
   COORDINATOR,
   ORGANISER,
+  SAFETY_OFFICER,
   TECHNICAL_STAFF,
   VENUE_STAFF,
 } from '../../shared/permissions.js'
@@ -35,6 +36,7 @@ import { buildVenueRecord } from '../../shared/venue.js'
 import { EQUIPMENT_UNIT_STATUS, normaliseEquipmentTypeInput, normaliseEquipmentUnitInput } from '../../shared/equipment.js'
 import { EQUIPMENT_REQUEST_STATUS, normaliseEquipmentRequest } from '../../shared/equipmentRequest.js'
 import { AVAILABILITY_STATUS } from '../../shared/venueAvailability.js'
+import { APPROVE_SAFETY, CHECK_SATISFACTORY, SAFETY_CHECKLIST_IDS, normaliseSafetyReviewDecision, safetyReviewDecisionUpdate, safetyReviewSubmission } from '../../shared/safetyReview.js'
 
 export const SEED_TAG = 'spm42-spm24-sprint1'
 export const SEED_ID_PREFIX = 'seed-'
@@ -77,6 +79,9 @@ export const SEED_ACCOUNTS = Object.freeze({
   // SPM-42 combined-permissions criterion: one account, two staff roles.
   venueTechnicalStaff: account('venue-technical-staff', 'Seed Venue + Technical Staff', [VENUE_STAFF, TECHNICAL_STAFF]),
   attendee: account('attendee', 'Seed Attendee', [ATTENDEE]),
+  // SPM-66: "Safety Officer accounts are created in system defaults" — like every internal role, never
+  // self-registered.
+  safetyOfficer: account('safety-officer', 'Seed Safety Officer', [SAFETY_OFFICER]),
   // Organisation A has three organisers. A1 and A2 demonstrate organisation scoping plus the
   // colleague-views-but-cannot-edit rule; A3 is below.
   organiserA1: account('organiser-a1', 'Seed Organiser A1', [ORGANISER], SEED_ORGANISATIONS.A),
@@ -110,7 +115,7 @@ const a1ConfirmedReservedEquipment = {
   reservedAt: A1_CONFIRMED_RESERVED_AT,
 }
 
-function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', currentEquipmentRequest, reservedEquipment, createdAt }) {
+function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', currentEquipmentRequest, reservedEquipment, safety, createdAt }) {
   const core = draft
     ? { title, purpose: null, description: null, preferredDateTime: null, durationHours: null, expectedAttendees: null, ...draftCore }
     : {
@@ -137,6 +142,7 @@ function eventRequest({ slug, status, owner, title, coordinator, assigned = [], 
     ...(approvals ? { arrangementApprovals: approvals } : {}),
     ...(currentEquipmentRequest ? { currentEquipmentRequest } : {}),
     ...(reservedEquipment ? { reservedEquipment } : {}),
+    ...(safety ?? {}),
     createdAt,
   }
 }
@@ -151,6 +157,23 @@ const bothArrangementsApproved = {
   [TECHNICAL_ARRANGEMENT]: { decision: ARRANGEMENT_APPROVED, byUid: technicalStaff.uid, at: '2026-09-06T12:30:00+08:00' },
 }
 
+/**
+ * SPM-91/92: the `safetyReview` and `safetyReviews` metadata of an event submitted by `coordinatorAccount` and
+ * approved by the seeded Safety Officer with every checklist item satisfactory, built with the same functions
+ * as the real submission and review. Also used by the test harnesses that need an approved event.
+ */
+export function seedSafetyApproval(coordinatorAccount, submittedAt, reviewedAt = submittedAt) {
+  const { value } = normaliseSafetyReviewDecision({
+    outcome: APPROVE_SAFETY,
+    checklist: Object.fromEntries(SAFETY_CHECKLIST_IDS.map((id) => [id, { result: CHECK_SATISFACTORY }])),
+    comments: 'Seeded approval.',
+  })
+  return safetyReviewDecisionUpdate(SEED_ACCOUNTS.safetyOfficer, { safetyReview: safetyReviewSubmission(coordinatorAccount, submittedAt) }, value, reviewedAt)
+}
+
+// An event reaches Confirmed only with a safety approval, so the seeded Confirmed and Preparation events carry one.
+const safetyApproved = (coordinatorAccount) => seedSafetyApproval(coordinatorAccount, '2026-09-06T13:00:00+08:00', '2026-09-06T15:00:00+08:00')
+
 export const SEED_REQUESTS = Object.freeze([
   // Organisation A, organiser A1 — one request in every status.
   // SPM-8 workloads (active = Submitted, Under Review, Returned, Planning, Confirmed): coordinator 5,
@@ -160,10 +183,10 @@ export const SEED_REQUESTS = Object.freeze([
   eventRequest({ slug: 'a1-under-review', coordinator, status: UNDER_REVIEW, owner: organiserA1, title: 'A1 under review', createdAt: '2026-09-03T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-returned', coordinator, status: RETURNED, owner: organiserA1, title: 'A1 returned for clarification', createdAt: '2026-09-04T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-planning', coordinator, status: PLANNING, owner: organiserA1, title: 'A1 planning (all staff assigned)', assigned: bothStaffTeams, createdAt: '2026-09-05T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, approvals: bothArrangementsApproved, reservedEquipment: a1ConfirmedReservedEquipment, createdAt: '2026-09-06T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, approvals: bothArrangementsApproved, reservedEquipment: a1ConfirmedReservedEquipment, safety: safetyApproved(coordinator3), createdAt: '2026-09-06T10:00:00+08:00' }),
   // SPM-88/SPM-27 demo: a Preparation event that has already taken place (1 Oct 2026), ready for manual
   // completion. Keep its stable id for existing test and walkthrough references.
-  eventRequest({ slug: 'a1-confirmed-past', coordinator, status: PREPARATION, owner: organiserA1, title: 'A1 preparation (event held, ready to complete)', assigned: bothStaffTeams, approvals: bothArrangementsApproved, preferredDateTime: '2026-10-01T09:00:00+08:00', createdAt: '2026-09-06T11:00:00+08:00' }),
+  eventRequest({ slug: 'a1-confirmed-past', coordinator, status: PREPARATION, owner: organiserA1, title: 'A1 preparation (event held, ready to complete)', assigned: bothStaffTeams, approvals: bothArrangementsApproved, preferredDateTime: '2026-10-01T09:00:00+08:00', safety: safetyApproved(coordinator), createdAt: '2026-09-06T11:00:00+08:00' }),
   eventRequest({ slug: 'a1-completed', coordinator, status: COMPLETED, owner: organiserA1, title: 'A1 completed', assigned: bothStaffTeams, createdAt: '2026-09-07T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-cancelled', coordinator: coordinator2, status: CANCELLED, owner: organiserA1, title: 'A1 cancelled', assigned: bothStaffTeams, createdAt: '2026-09-08T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-rejected', coordinator, status: REJECTED, owner: organiserA1, title: 'A1 rejected', createdAt: '2026-09-09T10:00:00+08:00' }),

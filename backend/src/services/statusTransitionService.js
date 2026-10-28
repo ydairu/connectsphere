@@ -1,16 +1,18 @@
 // SPM-9 — apply an action to an event request: a status transition, an Organiser cancellation request and
-// the Coordinator's return or refusal of it (SPM-47), or a venue/technical arrangement sign-off.
+// the Coordinator's return or refusal of it (SPM-47), a venue/technical arrangement sign-off, or submitting
+// the event for its safety review (SPM-91).
 //
 // Which actions exist, from which statuses, by whom and under what guard is decided only by the shared
-// modules (shared/statusTransitions.js, shared/cancellationRequests.js, shared/arrangements.js). This file
-// reads the request, asks them, and writes the change and its activity entry in one transaction, so the
-// state that was checked is the state that is changed.
+// modules (shared/statusTransitions.js, shared/cancellationRequests.js, shared/arrangements.js,
+// shared/safetyReview.js). This file reads the request, asks them, and writes the change and its activity
+// entry in one transaction, so the state that was checked is the state that is changed.
 //
 // Submit and resubmit go through submitDraftEventRequest(), which also validates mandatory fields and
 // assigns the Coordinator (SPM-3, SPM-8); there is one path for them, not two.
 
 import {
   ARRANGEMENT_NOT_REQUIRED,
+  ARRANGEMENT_REJECTED,
   EQUIPMENT_REQUEST_DECIDES,
   NOT_ASSIGNED_STAFF,
   NOT_AT_PLANNING,
@@ -67,6 +69,19 @@ import {
   canTransition,
 } from '../../../shared/statusTransitions.js'
 import { cancellationNotifications, preparationStartedNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
+import {
+  ARRANGEMENTS_NOT_READY,
+  NOT_AWAITING_SAFETY_REVIEW,
+  SAFETY_ALREADY_APPROVED,
+  SAFETY_ARRANGEMENT_NOT_REVISED,
+  SAFETY_NOT_AT_PLANNING,
+  SAFETY_REVIEW_ALREADY_PENDING,
+  SUBMIT_SAFETY_REVIEW,
+  INVALIDATED_BY_TECHNICAL_REJECTED,
+  canSubmitForSafetyReview,
+  safetyReviewInvalidation,
+  safetyReviewSubmission,
+} from '../../../shared/safetyReview.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError, submitDraftEventRequest } from './eventRequestService.js'
@@ -83,6 +98,8 @@ export const REASON_INVALID = 'reason_invalid'
 export const CANCELLATION_REQUESTED = 'cancellation_requested'
 export const CANCELLATION_DECIDED = 'cancellation_decided'
 export const ARRANGEMENT_DECIDED = 'arrangement_decided'
+// SPM-91: the Coordinator submitted (or resubmitted) the event for its safety review.
+export const SAFETY_REVIEW_SUBMITTED = 'safety_review_submitted'
 
 const MESSAGES = Object.freeze({
   [UNKNOWN_ACTION]: 'Unknown action.',
@@ -92,7 +109,13 @@ const MESSAGES = Object.freeze({
   [ARRANGEMENTS_NOT_APPROVED]: 'All mandatory venue and technical arrangements must be approved before confirmation.',
   [EVENT_NOT_ENDED]: 'An event can be marked complete only after it has taken place.',
   [INSUFFICIENT_INFORMATION]: 'The request is missing required details or has invalid ones. Complete them, or return it for clarification.',
-  [SAFETY_APPROVAL_REQUIRED]: 'A valid safety approval is required before preparation can start.',
+  [SAFETY_APPROVAL_REQUIRED]: 'A valid safety approval from the Safety Officer is required first.',
+  [SAFETY_NOT_AT_PLANNING]: 'An event is submitted for safety review while it is in planning.',
+  [ARRANGEMENTS_NOT_READY]: 'All required venue bookings and technical arrangements must be approved before the safety review.',
+  [SAFETY_REVIEW_ALREADY_PENDING]: 'This event is already awaiting its safety check.',
+  [SAFETY_ALREADY_APPROVED]: 'This event already has a valid safety approval.',
+  [SAFETY_ARRANGEMENT_NOT_REVISED]: 'The Safety Officer rejected the safety arrangement. Revise the venue arrangement before resubmitting.',
+  [NOT_AWAITING_SAFETY_REVIEW]: 'This event is not awaiting a safety check.',
   [CANCELLATION_REQUEST_PENDING]: 'The organiser has an open cancellation request. Decide that request instead.',
   [NO_PENDING_CANCELLATION]: 'There is no pending cancellation request.',
   [CANCELLATION_ALREADY_PENDING]: 'A cancellation request is already awaiting the coordinator’s decision.',
@@ -167,11 +190,8 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     const existing = { id, ...snapshot.data() }
     requireRequestScope(user, existing)
 
-    // SPM-91/92 must provide this server-side verifier. It is never read from the HTTP request body.
-    // Without it, Start Preparation fails closed, including for old Confirmed records.
-    const safetyApproved = action === START_PREPARATION && typeof options.verifySafetyApproval === 'function'
-      ? await options.verifySafetyApproval(existing, db, tx) === true
-      : false
+    // Confirm and the safety review submission both need every venue booking approved (SPM-79, SPM-91).
+    const readiness = action === CONFIRM || action === SUBMIT_SAFETY_REVIEW ? await loadVenueBookingReadiness(id, db, now, tx) : null
     const preparationRecipients = action === START_PREPARATION
       ? await assignedPreparationRecipients(tx, db, existing, user)
       : []
@@ -215,6 +235,11 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
         updatedAt: at,
       }
       addActivity(tx, docRef, { type: CANCELLATION_DECIDED, action, decision: CANCELLATION_REFUSED, reason, actor, at })
+    } else if (action === SUBMIT_SAFETY_REVIEW) {
+      // SPM-91: the event enters the safety-review queue; its status stays Planning. Earlier reviews are kept.
+      refuse(canSubmitForSafetyReview(user, { ...existing, venueBookingReadiness: readiness }))
+      update = { safetyReview: safetyReviewSubmission(user, at), updatedAt: at }
+      addActivity(tx, docRef, { type: SAFETY_REVIEW_SUBMITTED, action, resubmission: Boolean(existing.safetyReview), actor, at })
     } else if (arrangementAction(action)) {
       const { arrangement, decision } = arrangementAction(action)
       refuse(canDecideArrangement(user, existing, arrangement))
@@ -222,10 +247,12 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
         arrangementApprovals: { ...existing.arrangementApprovals, [arrangement]: { decision, byUid: user.uid, at } },
         updatedAt: at,
       }
+      // SPM-91: a rejected technical arrangement no longer matches what was safety-reviewed.
+      const safetyReview = decision === ARRANGEMENT_REJECTED ? safetyReviewInvalidation(existing, INVALIDATED_BY_TECHNICAL_REJECTED, at) : null
+      if (safetyReview) update.safetyReview = safetyReview
       addActivity(tx, docRef, { type: ARRANGEMENT_DECIDED, arrangement, decision, actor, at })
     } else {
-      const readiness = action === CONFIRM ? await loadVenueBookingReadiness(id, db, now, tx) : null
-      const decision = canTransition(user, readiness ? { ...existing, venueBookingReadiness: readiness } : existing, action, now, { safetyApproved })
+      const decision = canTransition(user, readiness ? { ...existing, venueBookingReadiness: readiness } : existing, action, now)
       refuse(decision)
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }

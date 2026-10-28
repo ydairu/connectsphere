@@ -4,7 +4,7 @@
 // spec relies on the real clock being before then.
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
-import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test, approveVenueForEvent } from '../../shared/e2e/fixtures.js'
+import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test, approveVenueForEvent, recordSafetyApproval } from '../../shared/e2e/fixtures.js'
 
 const planning = SEED_REQUESTS.find((request) => request.id === 'seed-req-a1-planning')
 const REASON = 'Venue closed for urgent repairs'
@@ -27,6 +27,7 @@ test.describe('SPM-63 — Coordinator cancels a Confirmed event (E2E)', () => {
   test('spm63_coordinator_cancels_with_a_reason_and_the_organiser_and_staff_are_notified', async ({ page }) => {
     await approveVenueForEvent(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.technicalStaff, planning.id, 'approve_technical')
+    await recordSafetyApproval(page.request, planning.id)
     await actAs(page.request, ROLE_USERS.coordinator, planning.id, 'confirm')
 
     await signIn(page, ROLE_USERS.coordinator)

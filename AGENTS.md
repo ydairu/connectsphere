@@ -79,6 +79,7 @@ The effective customer role model is:
 - Venue Staff
 - Technical Support Staff
 - Attendee
+- Safety Officer (Week 7 Change #6; implemented by SPM-66 as `safety_officer`)
 
 A user may hold multiple roles; effective access is the union of assigned roles. Enforce access in the backend/data layer as well as the UI. Hiding a control is not sufficient authorisation.
 
@@ -96,7 +97,7 @@ The customer did not prescribe password length, complexity, expiry, history, loc
   | Prefix | Routes | Story | Files |
   |---|---|---|---|
   | `/api/event-requests` | `POST /` creates a draft; `PATCH /:id` updates the owner's own draft | SPM-7 | `backend/src/routes/eventRequestRoutes.js`, `backend/src/services/eventRequestService.js`, validation in `shared/eventRequest.js` |
-  | `/api/requests` | `GET /` scoped list; `GET /:id`; `PATCH /:id` role-based section edit (preparation values validated, SPM-48); `GET /:id/history` field change history (SPM-28, read-only); `GET`/`POST /:id/venue-bookings` venue booking requests (SPM-14, `backend/src/services/venueBookingService.js`); `GET`/`POST /:id/equipment-requests` equipment requests (SPM-17, `backend/src/services/equipmentRequestService.js`); `GET /:id/equipment-requests/:requestId/availability` availability check, read-only (SPM-18, `backend/src/services/equipmentAvailabilityService.js`); `POST /:id/equipment-requests/:requestId/actions` approve, re-confirm or reject an equipment request (SPM-56, SPM-36) | SPM-42 | `backend/src/routes/requestRoutes.js`, `backend/src/middleware/authorise.js`, `backend/src/services/eventRequestStore.js` |
+  | `/api/requests` | `GET /` scoped list; `GET /:id`; `PATCH /:id` role-based section edit (preparation values validated, SPM-48); `GET /:id/history` field change history (SPM-28, read-only); `GET`/`POST /:id/venue-bookings` venue booking requests (SPM-14, `backend/src/services/venueBookingService.js`); `GET`/`POST /:id/equipment-requests` equipment requests (SPM-17, `backend/src/services/equipmentRequestService.js`); `GET /:id/equipment-requests/:requestId/availability` availability check, read-only (SPM-18, `backend/src/services/equipmentAvailabilityService.js`); `POST /:id/equipment-requests/:requestId/actions` approve, re-confirm or reject an equipment request (SPM-56, SPM-36); `POST /:id/safety-review` the Safety Officer's review and `GET /:id/safety-review/venues` the booked venues' safety details (SPM-92, SPM-66, `backend/src/services/safetyReviewService.js`) | SPM-42 | `backend/src/routes/requestRoutes.js`, `backend/src/middleware/authorise.js`, `backend/src/services/eventRequestStore.js` |
 
 - **[Team decision] Which route set to use, by the request's status.** Proposed by Shaun and confirmed with the SPM-7/SPM-4 owner on 20 September 2026.
   - **A draft** is created and edited through `/api/event-requests` (SPM-7, SPM-4). It validates field values with `shared/eventRequest.js`, and its own owner-and-draft check matches what `shared/permissions.js` permits at that status. The UI sends drafts to `/event-requests/:id/edit`.
@@ -122,16 +123,25 @@ The customer did not prescribe password length, complexity, expiry, history, loc
   | Venue Staff | `core`, `venue`, `venuePreparation` | `venuePreparation` only (SPM-48) |
   | Technical Support Staff | `core`, `equipment`, `equipmentPreparation` | `equipmentPreparation` only (SPM-48) |
   | Attendee | `core` | nothing |
+  | Safety Officer | `core`, `venue`, `equipment`, only for events in the safety-review queue (SPM-66) | nothing |
 
   - **SPM-48 behaviour change:** staff no longer edit `venue` or `equipment`. This is a team decision of 7 Oct 2026, pending PO confirmation, with an open question in effective-requirements.md §7.
   - **Preparation is internal:** Organisers and Attendees never receive either preparation section or its history.
   - **Preparation is shown from Planning onwards.**
 - **SPM-88 local preparation condition (story not Done).**
-  - **Rule:** a preparation section is editable only when the event is in Preparation. Starting that status requires a server-verified safety approval; the production verifier currently fails closed until SPM-91/92 supplies the real decision.
+  - **Rule:** a preparation section is editable only when the event is in Preparation. Starting that status requires the recorded safety approval (`safetyApproved()` in `shared/safetyReviewState.js`, SPM-91/92).
   - **Where it lives:** `canUpdateVenuePreparation` / `canUpdateEquipmentPreparation` in `shared/preparation.js`, applied through `SECTION_CONDITIONS` in `editableSectionsFor`.
   - **Do not:** restate the condition anywhere else, in a route or in the UI. The page gets the reason from the API's `preparation` field.
-  - **Dependencies:** SPM-91/92 must also gate Confirm behind safety approval. SPM-87 must supply the significant-change return to Planning and safety re-review; until then significant edits in Preparation return 409 without a write. SPM-19 must provide registration in Confirmed and Preparation.
+  - **Dependencies:** SPM-87 must supply the significant-change return to Planning and safety re-review; until then significant edits in Preparation return 409 without a write. SPM-19 must provide registration in Confirmed and Preparation.
   - **Import order:** `shared/preparation.js` must not import `permissions.js`, because `permissions.js` imports it.
+- **Safety review (SPM-91, SPM-92, SPM-66).**
+  - **Where the rules live:** who may submit, who may review, what a valid review is, what it writes and what each role sees are decided only by `shared/safetyReview.js`. The record reads (`awaitingSafetyReview`, `safetyApproved`, `safetyReviewInvalidation`) are in `shared/safetyReviewState.js`, which imports only `status.js` so that `permissions.js` and `statusTransitions.js` can use it.
+  - **Records:** `safetyReview` (the current status) and `safetyReviews` (every recorded review, with reviewer, time, checklist, outcome, comments and internal notes) are top-level record metadata, so no section edit can write them. The lifecycle status stays Planning throughout the review.
+  - **Submitting:** the `submit_safety_review` action on `POST /api/event-requests/:id/transitions`, by the assigned Coordinator, at Planning, once every venue booking and the technical arrangement are approved. The same action resubmits.
+  - **Reviewing:** `POST /api/requests/:id/safety-review`, by a Safety Officer, on an event in the queue. The event then leaves the queue and the Safety Officer's scope.
+  - **Gates:** Confirm and Start Preparation both require `safetyApproved()`. Do not pass approval in through a context value or a verifier.
+  - **Invalidation:** every change to the reviewed arrangements withdraws an approval or a pending check, and marks a rejected arrangement as revised, through `safetyReviewInvalidation`: a significant change (`significantChangeEffects`), a venue booking requested (`submitVenueBooking`) or cancelled (`cancelVenueBooking`), an equipment request submitted (`submitEquipmentRequest`), and a technical sign-off rejected (`transitionEventRequest`). Any new path that changes the reviewed arrangements must do the same.
+  - **What the Organiser sees:** the outcome and the overall comments only, never internal notes, checklist comments or the reviewer (`safetyReviewSummary`).
 - **Equipment reservations (SPM-62, SPM-57).**
   - **Reserving** is the `reserve` action on SPM-56's `POST /api/requests/:id/equipment-requests/:requestId/actions`, by the request's assigned Technical Support Staff member, on an Approved request at Planning or Confirmed.
   - **Records:** one `equipmentReservations` document per reserved type, belonging to the event and never to a venue booking. The event gets `reservedEquipment` (types and quantities only, never unit ids).

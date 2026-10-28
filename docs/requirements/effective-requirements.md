@@ -390,6 +390,18 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - **Safety Officer allocation — resolved.** Routed via a safety-review queue or assigned to an authorised Safety Officer; reviewer recorded per check (G8!C49; see §2.1).
 - **Downstream recovery state — resolved.** On "request changes" the event stays in Planning and the Coordinator drives the re-review; on safety rejection the event stays Planning while the venue arrangement is revised (G8!C46, C47).
 
+**[Team decision pending PO confirmation — SPM-66, SPM-91, SPM-92, 27 Oct 2026]** Choices made while implementing the gate, where the customer left the detail open. None of them overrides a confirmed rule above.
+
+- **Status modelling (item 15 below).** The review is record metadata (`safetyReview`, `safetyReviews`), not new lifecycle statuses. The event stays in Planning while pending, after changes are requested and after a rejection. Confirm and Start Preparation both require a recorded approval.
+- **Queue, not assignment.** Every Safety Officer sees every queued event; there is no claim or assignment step. An event leaves the queue, and the Safety Officer's scope, once a review is recorded.
+- **What the Safety Officer sees.** The event's core, venue and equipment sections, the booked venues' capacity, supported layouts, accessibility features, facilities and operating hours, and the change history of attendance and the venue and equipment fields. The venue record has no separate "restrictions" field, so operating hours are the only recorded venue restriction.
+- **Checklist marking.** Each of the six items is marked Satisfactory, Concern or Not applicable, with an optional comment. Any marking may accompany any outcome.
+- **What the Organiser sees.** The latest outcome and its overall comments. Checklist comments and internal notes are treated as internal.
+- **Rejection.** Rejecting the safety arrangement records the rejection and notifies the Coordinator with the reason. It does not cancel or change any venue booking. The same arrangement cannot be resubmitted: the Coordinator must first change it (any of the changes listed under Invalidation), and may then resubmit.
+- **Invalidation.** Any change to the reviewed arrangements withdraws an approval or a pending check and counts as revising a rejected arrangement: a significant change (the confirmed rule for approvals, SPM-91 AC6), a venue booking requested or cancelled, an equipment request submitted, or the technical sign-off rejected. A changes-requested review is left as it is.
+- **Events confirmed before SPM-91.** A Confirmed event with no safety review at all may be submitted for review while Confirmed, so it can reach Preparation. It is not sent back to Planning.
+- **Closed while waiting.** An event rejected or cancelled while its check is pending leaves the queue, and the pending check is no longer shown.
+
 ### 4.7 Event Information Management
 
 **[Customer-confirmed]** Field and section permissions follow role and ownership. Routine contact or descriptive edits are normal. Significant date/time, duration, attendance, venue/layout, or equipment changes trigger formal re-review and may alter Planning/confirmation status.
@@ -899,7 +911,7 @@ Resolved by CL3 unless noted; genuine customer gaps are flagged, not filled.
 
 13. ~~**Role provisioning.**~~ **Bounded by CL3:** Lead is not the account admin; external users self-register; internal accounts use existing internal setup/defaults (G8!C18–C21). **Remaining customer gap:** the concrete actor that creates/changes/deactivates internal accounts is not named; the equipment-vs-IT-team distinction (G8!B20) was never answered.
 14. ~~**Safety Officer allocation.**~~ **Resolved:** routed via a safety-review queue or assigned to an authorised Safety Officer; reviewer recorded per check (G8!C49).
-15. **Safety-gate status vocabulary/placement — stage order resolved, implementation label open.** CL3 confirms safety approval is required before Confirmed and Preparation is a separate gated stage (G8!C2, C3); whether these become discrete status rows, metadata, or a derived precondition is a **team implementation choice**. Approved=Confirmed remains settled (item 1).
+15. **Safety-gate status vocabulary/placement — stage order resolved, implementation label open.** CL3 confirms safety approval is required before Confirmed and Preparation is a separate gated stage (G8!C2, C3); whether these become discrete status rows, metadata, or a derived precondition is a **team implementation choice**. Approved=Confirmed remains settled (item 1). **Team decision pending PO confirmation (27 Oct 2026):** metadata, with the label "Pending safety check" while queued (§4.6.1).
 16. ~~**Reassignment authority.**~~ **Resolved:** only the Lead reassigns; the assigned Coordinator may only request (G8!C12, C35, C39).
 17. ~~**Lead supervision scope.**~~ **Resolved:** a Lead sees the unassigned queue plus the active events that Lead themselves previously assigned; ≥1 Lead supported, per-Lead scope recorded, no hard-coded single Lead (G8!C33, C41).
 18. ~~**Notification recipients.**~~ **Resolved:** new assignment → new Coordinator + Organiser; reassignment → new + previous Coordinator + Organiser; Lead action recorded; "notify other Leads" optional per queue/scope (G8!C43).

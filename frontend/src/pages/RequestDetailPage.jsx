@@ -16,11 +16,15 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import StatusActions, { StatusNotices } from '../components/StatusActions.jsx'
 import StatusPill from '../components/StatusPill.jsx'
+import SafetyReview from '../components/SafetyReview.jsx'
+import SafetyStatusPill from '../components/SafetyStatusPill.jsx'
 import Tabs from '../components/Tabs.jsx'
 import VenueBookingOverview from '../components/VenueBookingOverview.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getRequest, transitionRequest, updateRequest } from '../services/api.js'
 import { statusLabel } from '../utils/statusLabels.js'
+import { safetyOutcomeLabel } from '../utils/safetyReview.js'
+import { SAFETY_APPROVED, SAFETY_REVIEW_PENDING } from '../../../shared/safetyReview.js'
 import { fieldLabel } from '../utils/changeHistory.js'
 import { buildPatch, hasChanges, toFormValues, withSavedValues } from '../utils/requestPatch.js'
 import { SECTION_ORDER, optionLabel, preparationReadOnlyText, sectionFields, sectionTitle } from '../utils/requestSections.js'
@@ -63,6 +67,10 @@ import { SECTION_ORDER, optionLabel, preparationReadOnlyText, sectionFields, sec
 // significant change while a cancellation request is open (409, AC7) puts the significant fields back to
 // their saved values and keeps unsaved ordinary edits; a stale write (409) reloads the latest record.
 // Nothing is saved again automatically.
+// SPM-91/92: the safety check (safetyReview in the response) is shown beside the status and on the Event
+// Status tab; the Coordinator submits it through the status actions. A Safety Officer (canDecideSafetyReview)
+// sees the booked venues and records the review; the event then leaves their scope, so they are taken back to
+// the queue.
 
 function ReadOnlyValue({ field, value }) {
   const { type } = field
@@ -153,6 +161,8 @@ function RequestDetailPage() {
   const [canViewHistory, setCanViewHistory] = useState(false)
   const [owner, setOwner] = useState(null)
   const [preparation, setPreparation] = useState(null)
+  const [safetyReview, setSafetyReview] = useState(null)
+  const [canDecideSafety, setCanDecideSafety] = useState(false)
   const [historyVersion, setHistoryVersion] = useState(0)
   const [acting, setActing] = useState(false)
   const [form, setForm] = useState({})
@@ -178,6 +188,8 @@ function RequestDetailPage() {
     setCompletion(response.completion ?? null)
     setCanViewHistory(response.canViewChangeHistory === true)
     setPreparation(response.preparation ?? null)
+    setSafetyReview(response.safetyReview ?? null)
+    setCanDecideSafety(response.canDecideSafetyReview === true)
     setOwner(typeof response.isOwnRequest === 'boolean' ? { name: response.ownerName ?? null, isOwn: response.isOwnRequest } : null)
     setForm(toFormValues(response.request))
   }, [])
@@ -369,7 +381,12 @@ function RequestDetailPage() {
             <h1>{request?.core?.title || (loading ? 'Loading…' : 'Event request')}</h1>
             {request && <p>Reference {request.id}</p>}
           </div>
-          {request && <StatusPill status={request.status} />}
+          {request && (
+            <div className="request-item-actions">
+              <SafetyStatusPill status={safetyReview?.status} />
+              <StatusPill status={request.status} />
+            </div>
+          )}
         </div>
 
         {loading && <Card><LoadingSpinner label="Loading request" /></Card>}
@@ -395,8 +412,18 @@ function RequestDetailPage() {
               actions={availableActions}
               arrangements={arrangements}
               cancellationRequest={cancellationRequest}
+              safetyReviewStatus={safetyReview?.status ?? null}
               busy={acting || saving}
               onAction={handleAction}
+            />
+            <SafetyReview
+              user={user}
+              requestId={id}
+              eventStatus={request.status}
+              summary={safetyReview}
+              canDecide={canDecideSafety}
+              busy={acting || saving}
+              onRecorded={(outcome) => navigate('/requests', { replace: true, state: { notice: `Safety review recorded: ${safetyOutcomeLabel(outcome)}.` } })}
             />
 
             {canReassign && (
@@ -448,6 +475,8 @@ function RequestDetailPage() {
                   {pendingSignificant.status === CONFIRMED
                     ? ' and moves the event back to Planning. It cannot be confirmed again until both sign-offs are approved.'
                     : '. The event cannot be confirmed until both sign-offs are approved again.'}{' '}
+                  {[SAFETY_APPROVED, SAFETY_REVIEW_PENDING].includes(safetyReview?.status) &&
+                    'The safety check is withdrawn, and the event must pass a new one before it can be confirmed. '}
                   Assigned venue and technical staff will be notified.
                 </p>
                 <div className="form-actions">

@@ -16,6 +16,7 @@ import { EQUIPMENT_REQUEST_DECIDES } from '../../../shared/arrangements.js'
 import { EQUIPMENT_REQUESTS_COLLECTION, EQUIPMENT_REQUEST_REJECTED } from '../../../shared/equipmentRequest.js'
 import { EQUIPMENT_REQUEST_REJECTED_NOTICE } from '../../../shared/notifications.js'
 import { APPROVE_TECHNICAL } from '../../../shared/requestActions.js'
+import { SAFETY_APPROVED } from '../../../shared/safetyReview.js'
 import { CONFIRMED, PLANNING, UNDER_REVIEW } from '../../../shared/status.js'
 import { ARRANGEMENTS_NOT_APPROVED, CONFIRM } from '../../../shared/statusTransitions.js'
 import {
@@ -170,6 +171,8 @@ describe('SPM-36 after a rejection', () => {
 
     await approve(revised.id)
     db.collectionData('venueBookingRequests').set('approved-venue', { eventRequestId: 'event', status: 'approved' })
+    // SPM-91/92: Confirm also needs a safety approval, recorded outside this story; set directly here.
+    theEvent().safetyReview = { status: SAFETY_APPROVED }
     expect((await transitionEventRequest('event', CONFIRM, coordinator, db, now)).status).toBe(CONFIRMED)
   })
 

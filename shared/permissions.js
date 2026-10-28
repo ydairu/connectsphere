@@ -17,6 +17,7 @@
 // Section data lives under its section key, so a field's section is its top-level key.
 
 import { DRAFT, RETURNED, PREPARATION, COMPLETED, CANCELLED, REJECTED, registrationEligibleStatus } from './status.js'
+import { awaitingSafetyReview } from './safetyReviewState.js'
 import {
   EQUIPMENT_PREPARATION,
   PREPARATION_CONDITIONS,
@@ -36,7 +37,10 @@ export const COORDINATOR = 'coordinator'
 export const VENUE_STAFF = 'venue_staff'
 export const TECHNICAL_STAFF = 'technical_staff'
 export const ATTENDEE = 'attendee'
-export const ROLES = Object.freeze([ORGANISER, COORDINATOR, VENUE_STAFF, TECHNICAL_STAFF, ATTENDEE])
+// SPM-66: "a further new internal role ... Safety Officer, responsible for reviewing the operational safety of
+// planned events" (W7-CUST Change #6). Provisioned through system defaults, never self-registered.
+export const SAFETY_OFFICER = 'safety_officer'
+export const ROLES = Object.freeze([ORGANISER, COORDINATOR, VENUE_STAFF, TECHNICAL_STAFF, ATTENDEE, SAFETY_OFFICER])
 
 // --- Sections -------------------------------------------------------------------------------------
 // Grouping of SPM-7's field list — plan, "Sections". Without named sections, "venue staff update only
@@ -69,6 +73,11 @@ const SECTION_ACCESS = Object.freeze({
   // Attendee: event information available to them; never internal planning information.
   // — customer-rulings.md, Roles and access
   [ATTENDEE]: { view: [CORE], edit: [] },
+  // SPM-66: attendance, the venue's layout and accessibility needs, and equipment — what the safety check
+  // reviews — and no edits ("The Safety Officer cannot edit event details"). Venue capacity and operating
+  // hours come from the booked venues (GET /api/requests/:id/safety-review/venues). Internal planning and
+  // preparation are not part of the review.
+  [SAFETY_OFFICER]: { view: [CORE, VENUE, EQUIPMENT], edit: [] },
 })
 
 // Finished events are read-only for every role. Not a customer ruling: team decision, proposed by
@@ -173,6 +182,11 @@ function roleInScope(role, user, request) {
       // SPM-88 extends the original Confirmed-only viewing rule to Preparation. Registration itself
       // remains SPM-19 scope.
       return registrationEligibleStatus(request.status) && request.registration?.enabled === true
+    case SAFETY_OFFICER:
+      // SPM-66: "Events reach the Safety Officer only through the safety-review queue. They cannot open events
+      // that aren't awaiting or under their review." Any Safety Officer may see a queued event (CL3 G8!C49);
+      // once the review is recorded the event leaves the queue and their scope.
+      return awaitingSafetyReview(request)
     default:
       return false
   }
@@ -188,6 +202,7 @@ function roleInScope(role, user, request) {
  *  - Coordinator: events assigned to them, never drafts. — SPM-65 team decision of 1 Oct 2026
  *  - Venue/technical staff: assigned events, never drafts. — plan, "Role capability"
  *  - Attendee: Confirmed or Preparation events with registration enabled (SPM-88).
+ *  - Safety Officer: events in the safety-review queue (SPM-66).
  */
 export function inScope(user, request) {
   return rolesOf(user).some((role) => roleInScope(role, user, request))

@@ -25,9 +25,12 @@
 //   approve / reject / confirm /     the owning Organiser only, with the rejection reason or the
 //   return for clarification         clarification message                        (SPM-61)
 //   start preparation                assigned Venue and Technical Support Staff   (SPM-88)
+//   safety review recorded           the assigned Coordinator, with the Safety     (SPM-92)
+//                                    Officer's comments
 // The user who acted is never notified of their own action.
 
 import { REFUSE_CANCELLATION, REQUEST_CANCELLATION, RESUBMIT_CANCELLATION, RETURN_CANCELLATION } from './requestActions.js'
+import { APPROVE_SAFETY, REJECT_SAFETY_ARRANGEMENT, REQUEST_SAFETY_CHANGES } from './safetyReview.js'
 import { PLANNING, PREPARATION, UNDER_REVIEW } from './status.js'
 import { APPROVE, APPROVE_CANCELLATION, CANCEL, CONFIRM, REJECT, RETURN_FOR_CLARIFICATION } from './statusTransitions.js'
 
@@ -54,6 +57,10 @@ export const REQUEST_APPROVED_NOTICE = 'request_approved'
 export const REQUEST_REJECTED_NOTICE = 'request_rejected'
 export const REQUEST_CONFIRMED_NOTICE = 'request_confirmed'
 export const REQUEST_RETURNED_NOTICE = 'request_returned'
+// SPM-92: the Safety Officer recorded the event's safety review.
+export const SAFETY_APPROVED_NOTICE = 'safety_approved'
+export const SAFETY_CHANGES_REQUESTED_NOTICE = 'safety_changes_requested'
+export const SAFETY_REJECTED_NOTICE = 'safety_arrangement_rejected'
 
 function titleOf(request) {
   const title = request.core?.title
@@ -145,6 +152,24 @@ export function statusChangeNotifications(action, request, actor, { reason = nul
     return notice(REQUEST_RETURNED_NOTICE, `The event coordinator returned “${title}” for clarification. Update the request and resubmit it.`)
   }
   return []
+}
+
+/**
+ * SPM-92 — the notice for the assigned Coordinator when `actor` records the safety review of `event` (the record
+ * before the review). Approval "notifies the Coordinator"; request changes notifies them "with actionable
+ * comments"; on rejection "the Coordinator receives the reason" — the comments are the notice's reason.
+ * Internal notes are never sent.
+ */
+export function safetyReviewDecidedNotifications(event, actor, { outcome, comments = '', at }) {
+  const title = titleOf(event)
+  const notices = {
+    [APPROVE_SAFETY]: [SAFETY_APPROVED_NOTICE, `“${title}” passed its safety check. It can be confirmed once every other confirmation condition is met.`],
+    [REQUEST_SAFETY_CHANGES]: [SAFETY_CHANGES_REQUESTED_NOTICE, `The Safety Officer requested changes to “${title}”. It stays in Planning; make the changes and resubmit it for safety review.`],
+    [REJECT_SAFETY_ARRANGEMENT]: [SAFETY_REJECTED_NOTICE, `The Safety Officer rejected the safety arrangement for “${title}”. The venue arrangement must be revised before another safety review; the event stays in Planning.`],
+  }
+  if (!notices[outcome]) return []
+  const [type, message] = notices[outcome]
+  return addressed([{ recipientUid: event.assignedCoordinatorUid, type, message, reason: comments || null }], event, actor, title, at)
 }
 
 const STATUS_NAMES = Object.freeze({ planning: 'Planning', confirmed: 'Confirmed' })

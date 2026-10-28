@@ -24,6 +24,7 @@ import {
   SUBMIT,
 } from '../../../shared/statusTransitions.js'
 import { SIGNIFICANT_CHANGE } from '../../../shared/significantChanges.js'
+import { SUBMIT_SAFETY_REVIEW } from '../../../shared/safetyReview.js'
 import { VENUE_BOOKING_CANCELLED } from '../../../shared/venueBooking.js'
 
 // Button wording for the SPM-9 actions in shared/requestActions.js. `confirm` is the question asked
@@ -94,6 +95,12 @@ const ACTIONS = {
   // event. Labelled so a status history shows it readably; never in availableActions.
   [SIGNIFICANT_CHANGE]: { label: 'Moved back to Planning (significant change)' },
   [VENUE_BOOKING_CANCELLED]: { label: 'Moved back to Planning (venue booking cancelled)' },
+  // SPM-91: also the resubmission after changes were requested, the arrangement was rejected or an approval
+  // was withdrawn.
+  [SUBMIT_SAFETY_REVIEW]: {
+    label: 'Submit for safety review',
+    confirm: 'Send this event to the Safety Officer for its operational safety check? It stays in Planning, and can be confirmed only once the check is approved.',
+  },
 }
 
 /** The wording for an action or a status_changed entry's action; an unknown action is shown as it is. */
