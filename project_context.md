@@ -1,18 +1,18 @@
 # ConnectSphere Project Context
 
-Last reviewed: 29 October 2026 (SPM-90 and SPM-66/91/92 merge; older implementation sections retain their historical dates)
+Last reviewed: 29 October 2026 (SPM-90 local recheck and SPM-66/91/92 merge; older implementation sections retain their historical dates)
 
 ## Current implementation map (27 October 2026)
 
 The browser has routes for authentication, profiles, requests and drafts, venue catalogue and bookings, equipment inventory and requests, reservations, and notifications (`frontend/src/App.jsx`). Express mounts health, profile, event request, scoped request, venue, equipment, and notification APIs (`backend/src/app.js`). `shared/` holds policy and validation used by both applications. Product request data goes through the Express API; the browser reads its own `users/{uid}` profile under Firestore rules. See `docs/architecture/` for current diagrams and data boundaries.
 
-The implemented role model includes Safety Officer; Coordinator Lead remains absent. Submission still assigns a Coordinator automatically. SPM-90 now has local primary-venue selection, confirmation gating, attendee location projection and change history. Confirm also requires the recorded SPM-91/92 safety approval. The operational backlog and Sprint records, live-project backfill and human acceptance remain outstanding. CI has three jobs for code checks, Firestore emulator transactions, and Playwright. The earlier September observations below are historical checkpoints, not a current inventory of routes, seed counts, or CI.
+The implemented role model includes Safety Officer; Coordinator Lead remains absent. Submission still assigns a Coordinator automatically. SPM-90 has local primary-venue selection, confirmation gating, attendee location projection and change history. Confirm also requires the recorded SPM-91/92 safety approval. Live-project backfill and human acceptance remain outstanding. The available backlog workbook is a reference for story interactions; its status is not used to judge application implementation. CI has three jobs for code checks, Firestore emulator transactions, and Playwright. The earlier September observations below are historical checkpoints, not a current inventory of routes, seed counts, or CI.
 
-## Current SPM-90 state (27 October 2026)
+## Current SPM-90 state (29 October 2026)
 
 The assigned Coordinator can choose a current approved venue booking as primary through `PUT /api/requests/:id/primary-venue`. Confirm requires a primary venue for a multi-venue event and automatically selects the sole approved booking for a single venue need. Attendees receive only the primary venue name, catalogue location and event times; Organisers retain all associated bookings. Switching the primary booking while Confirmed preserves the event status. Cancelling the primary booking clears it, returns a Confirmed event to Planning through the existing cancellation behavior, and requires an explicit replacement choice. The existing change history records selection, switching and clearing. The selection API uses an expected previous booking ID to reject stale competing updates.
 
-The backfill script is dry-run-first and was not run against a live project. Already Confirmed multi-venue events without primary metadata need Coordinator selection before rollout. The Product Backlog workbook and Sprint record were absent from this checkout, so no operational status or assignment was changed and SPM-90 is not claimed Done. Manual acceptance remains pending in `docs/testing/spm-90-manual-testing.md`; acceptance mapping is in `docs/evidence/spm-90-traceability.md`. No Firestore rules were changed or deployed.
+The backfill script is dry-run-first and was not run against a live project. Already Confirmed multi-venue events without primary metadata need Coordinator selection before rollout. The locally available Product Backlog workbook was consulted for story interactions and left unchanged. The SPM-90 implementation meets the acceptance criteria in local automated checks; manual acceptance remains pending in `docs/testing/spm-90-manual-testing.md`. Acceptance mapping and the 29 October verification results are in `docs/evidence/spm-90-traceability.md`. No Firestore rules were changed or deployed.
 
 ## Current SPM-88 state (26 October 2026)
 

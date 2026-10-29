@@ -6,6 +6,7 @@ import { setPrimaryVenue } from '../../backend/src/services/primaryVenueService.
 import { transitionEventRequest } from '../../backend/src/services/statusTransitionService.js'
 import { CONFIRM } from '../../shared/statusTransitions.js'
 import { PLANNING } from '../../shared/status.js'
+import { SAFETY_APPROVED } from '../../shared/safetyReview.js'
 import { coordinator, fixture, input, now, staff, secondStaff } from '../spm-14/fixtures.js'
 
 const projectId = 'demo-connectsphere-spm90'
@@ -38,6 +39,7 @@ describe.skipIf(!enabled)('SPM-90 Firestore transaction races', () => {
   it('selects the sole approved venue with its location in the confirmation transaction', async () => {
     const hall = await submit()
     await approve(hall)
+    await db.collection('eventRequests').doc('event').update({ safetyReview: { status: SAFETY_APPROVED } })
     const result = await transitionEventRequest('event', CONFIRM, coordinator, db, now)
     expect(result.status).toBe('confirmed')
     const event = (await db.collection('eventRequests').doc('event').get()).data()
