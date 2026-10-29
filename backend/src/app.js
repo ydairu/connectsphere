@@ -8,6 +8,7 @@ import { authenticate as firebaseAuthenticate } from './middleware/authenticate.
 import healthRoutes from './routes/healthRoutes.js'
 import { createNotificationRoutes } from './routes/notificationRoutes.js'
 import profileRoutes from './routes/profileRoutes.js'
+import { createRegistrationRoutes } from './routes/registrationRoutes.js'
 import { createRequestRoutes } from './routes/requestRoutes.js'
 import { createVenueRoutes } from './routes/venueRoutes.js'
 import { firestoreEventRequestStore } from './services/eventRequestStore.js'
@@ -42,6 +43,7 @@ export function createApp({
   app.use('/api/notifications', createNotificationRoutes({ authenticate, getDb: getNotificationDb }))
   app.use('/api/profile', profileRoutes)
   app.use('/api/requests', createRequestRoutes({ authenticate, store: eventRequestStore, getUserDb, getEventRequestDb }))
+  app.use('/api/registrations', createRegistrationRoutes({ authenticate, getDb: getEventRequestDb }))
   app.use('/api/venues', createVenueRoutes({ authenticate, getDb: getVenueDb, getBookingDb: getEventRequestDb }))
 
   app.use((_req, res) => {

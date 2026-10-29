@@ -101,6 +101,8 @@ function NotificationsPage() {
                     <div className="request-item-main">
                       <h2>{notification.message}</h2>
                       {notification.reason && <p>{reasonLabel}: {notification.reason}</p>}
+                      {/* SPM-19: a registration confirmation carries the event's start, shown in the reader's time zone. */}
+                      {formatDateTime(notification.eventStartsAt) && <p>Event starts: {formatDateTime(notification.eventStartsAt)}</p>}
                       <p className="request-meta">{[unread ? 'Unread' : 'Read', when].filter(Boolean).join(' · ')}</p>
                     </div>
                     <div className="request-item-actions">

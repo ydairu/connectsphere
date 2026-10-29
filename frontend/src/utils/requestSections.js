@@ -63,6 +63,10 @@ export const SECTION_FIELDS = Object.freeze({
     title: 'Registration',
     fields: [
       { name: 'enabled', label: 'Registration enabled', type: 'boolean' },
+      // SPM-19: the period and capacity the Organiser sets; the API checks them (shared/registration.js).
+      { name: 'opensAt', label: 'Registration opens', shortLabel: 'Opens', type: 'datetime' },
+      { name: 'closesAt', label: 'Registration closes', shortLabel: 'Closes', type: 'datetime' },
+      { name: 'capacity', label: 'Registration capacity', shortLabel: 'Capacity', type: 'number' },
       { name: 'notes', label: 'Registration notes', type: 'textarea' },
     ],
   },

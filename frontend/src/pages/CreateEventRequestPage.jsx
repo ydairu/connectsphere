@@ -22,6 +22,9 @@ const initialForm = {
   equipmentRequirements: '',
   technicalSupportNeeded: false,
   registrationEnabled: false,
+  registrationOpensAt: '',
+  registrationClosesAt: '',
+  registrationCapacity: '',
   registrationNotes: '',
 }
 
@@ -46,6 +49,9 @@ function toPayload(form) {
     },
     registration: {
       enabled: form.registrationEnabled,
+      opensAt: form.registrationOpensAt,
+      closesAt: form.registrationClosesAt,
+      capacity: form.registrationCapacity,
       notes: form.registrationNotes,
     },
   }
@@ -70,6 +76,9 @@ function toForm(eventRequest) {
     equipmentRequirements: listToText(eventRequest.equipment?.requirements),
     technicalSupportNeeded: eventRequest.equipment?.technicalSupportNeeded ?? false,
     registrationEnabled: eventRequest.registration?.enabled ?? false,
+    registrationOpensAt: eventRequest.registration?.opensAt ?? '',
+    registrationClosesAt: eventRequest.registration?.closesAt ?? '',
+    registrationCapacity: eventRequest.registration?.capacity?.toString() ?? '',
     registrationNotes: eventRequest.registration?.notes ?? '',
   }
 }
@@ -328,6 +337,10 @@ function CreateEventRequestPage() {
             <TextArea id="equipmentRequirements" name="equipmentRequirements" label="Equipment requirements" value={form.equipmentRequirements} onChange={updateField} error={fieldError(errors, 'equipment.requirements')} rows="4" placeholder="One item per line" />
             <Checkbox id="technicalSupportNeeded" name="technicalSupportNeeded" label="Technical support is needed" checked={form.technicalSupportNeeded} onChange={updateField} />
             <Checkbox id="registrationEnabled" name="registrationEnabled" label="Attendee registration is needed" checked={form.registrationEnabled} onChange={updateField} />
+            {/* SPM-19: the registration period and capacity. Registration opens to Attendees once the event is confirmed. */}
+            <Input id="registrationOpensAt" name="registrationOpensAt" label="Registration opens" type="datetime-local" value={form.registrationOpensAt} onChange={updateField} error={fieldError(errors, 'registration.opensAt')} />
+            <Input id="registrationClosesAt" name="registrationClosesAt" label="Registration closes" type="datetime-local" value={form.registrationClosesAt} onChange={updateField} error={fieldError(errors, 'registration.closesAt')} />
+            <Input id="registrationCapacity" name="registrationCapacity" label="Registration capacity" type="number" min="1" value={form.registrationCapacity} onChange={updateField} error={fieldError(errors, 'registration.capacity')} />
             <TextArea id="registrationNotes" name="registrationNotes" label="Registration needs" value={form.registrationNotes} onChange={updateField} error={fieldError(errors, 'registration.notes')} rows="3" />
           </Card>
 

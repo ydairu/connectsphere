@@ -101,6 +101,9 @@ jobs:
       - name: Primary venue transaction races (SPM-90)
         run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-spm90 --config firebase.spm14.json "npm run test:spm90:emulator"
 
+      - name: Attendee registration transactions (SPM-19)
+        run: npx --yes --package=firebase-tools@15.34.0 firebase emulators:exec --only firestore --project demo-connectsphere-spm19 --config firebase.spm14.json "npm run test:spm19:emulator"
+
       - name: Upload booking emulator results
         if: always()
         uses: actions/upload-artifact@v4

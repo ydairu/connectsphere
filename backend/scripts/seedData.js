@@ -72,13 +72,16 @@ export const SEED_ACCOUNTS = Object.freeze({
   // SPM-8: a second coordinator, so workload-based assignment has more than one candidate to choose from.
   coordinator2: account('coordinator-2', 'Seed Coordinator 2', [COORDINATOR]),
   // SPM-8: a third coordinator, so the seed spreads active work across three different workloads and the
-  // next submission visibly goes to the one with the fewest. Seeded workloads: 5, 2 and 1 (see SEED_REQUESTS).
+  // next submission visibly goes to the one with the fewest. Seeded workloads: 6, 2 and 1 (see SEED_REQUESTS).
   coordinator3: account('coordinator-3', 'Seed Coordinator 3', [COORDINATOR]),
   venueStaff: account('venue-staff', 'Seed Venue Staff', [VENUE_STAFF]),
   technicalStaff: account('technical-staff', 'Seed Technical Staff', [TECHNICAL_STAFF]),
   // SPM-42 combined-permissions criterion: one account, two staff roles.
   venueTechnicalStaff: account('venue-technical-staff', 'Seed Venue + Technical Staff', [VENUE_STAFF, TECHNICAL_STAFF]),
   attendee: account('attendee', 'Seed Attendee', [ATTENDEE]),
+  // SPM-19: two more Attendees, so the two-place event below can be filled and a third person turned away.
+  attendee2: account('attendee-2', 'Seed Attendee 2', [ATTENDEE]),
+  attendee3: account('attendee-3', 'Seed Attendee 3', [ATTENDEE]),
   // SPM-66: "Safety Officer accounts are created in system defaults" — like every internal role, never
   // self-registered.
   safetyOfficer: account('safety-officer', 'Seed Safety Officer', [SAFETY_OFFICER]),
@@ -115,7 +118,7 @@ const a1ConfirmedReservedEquipment = {
   reservedAt: A1_CONFIRMED_RESERVED_AT,
 }
 
-function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', currentEquipmentRequest, reservedEquipment, safety, createdAt }) {
+function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, registrationSettings = {}, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', currentEquipmentRequest, reservedEquipment, safety, createdAt }) {
   const core = draft
     ? { title, purpose: null, description: null, preferredDateTime: null, durationHours: null, expectedAttendees: null, ...draftCore }
     : {
@@ -137,7 +140,7 @@ function eventRequest({ slug, status, owner, title, coordinator, assigned = [], 
     core,
     venue: { layoutPreference: draft ? null : 'theatre', accessibilityRequired: !draft },
     equipment: { requirements: draft ? [] : ['projector', 'wireless microphone'], technicalSupportNeeded: !draft },
-    registration: { enabled: registrationEnabled },
+    registration: { enabled: registrationEnabled, ...registrationSettings },
     internal: { planningNotes: draft ? '' : `Seed internal note (${status}) — must never reach an attendee.` },
     ...(approvals ? { arrangementApprovals: approvals } : {}),
     ...(currentEquipmentRequest ? { currentEquipmentRequest } : {}),
@@ -174,16 +177,25 @@ export function seedSafetyApproval(coordinatorAccount, submittedAt, reviewedAt =
 // An event reaches Confirmed only with a safety approval, so the seeded Confirmed and Preparation events carry one.
 const safetyApproved = (coordinatorAccount) => seedSafetyApproval(coordinatorAccount, '2026-09-06T13:00:00+08:00', '2026-09-06T15:00:00+08:00')
 
+// SPM-19: a registration period that opened before the seeded data was written and closes the day before the
+// event (seeded events start 20 Nov 2026, so registration on the seed closes on 19 Nov), and a capacity.
+function seedRegistrationOpen(capacity, closesAt = '2026-11-19T09:00:00+08:00') {
+  return { opensAt: '2026-10-01T09:00:00+08:00', closesAt, capacity }
+}
+
 export const SEED_REQUESTS = Object.freeze([
   // Organisation A, organiser A1 — one request in every status.
-  // SPM-8 workloads (active = Submitted, Under Review, Returned, Planning, Confirmed): coordinator 5,
+  // SPM-8 workloads (active = Submitted, Under Review, Returned, Planning, Confirmed): coordinator 6,
   // coordinator-2 2, coordinator-3 1. Finished requests are assigned too, but do not count.
   eventRequest({ slug: 'a1-draft', status: DRAFT, owner: organiserA1, title: 'A1 draft (private to A1)', draft: true, createdAt: '2026-09-01T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-submitted', coordinator, status: SUBMITTED, owner: organiserA1, title: 'A1 submitted', createdAt: '2026-09-02T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-under-review', coordinator, status: UNDER_REVIEW, owner: organiserA1, title: 'A1 under review', createdAt: '2026-09-03T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-returned', coordinator, status: RETURNED, owner: organiserA1, title: 'A1 returned for clarification', createdAt: '2026-09-04T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-planning', coordinator, status: PLANNING, owner: organiserA1, title: 'A1 planning (all staff assigned)', assigned: bothStaffTeams, createdAt: '2026-09-05T10:00:00+08:00' }),
-  eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, approvals: bothArrangementsApproved, reservedEquipment: a1ConfirmedReservedEquipment, safety: safetyApproved(coordinator3), createdAt: '2026-09-06T10:00:00+08:00' }),
+  eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, registrationSettings: seedRegistrationOpen(80), approvals: bothArrangementsApproved, reservedEquipment: a1ConfirmedReservedEquipment, safety: safetyApproved(coordinator3), createdAt: '2026-09-06T10:00:00+08:00' }),
+  // SPM-19 demo: two places, so two Attendees fill it and the third is told it is full. No venue is booked,
+  // so the Organiser's capacity is the limit. Assigned to the busiest Coordinator so coordinator-3 stays next.
+  eventRequest({ slug: 'a1-confirmed-small', coordinator, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (2 places, registration open)', registrationEnabled: true, registrationSettings: seedRegistrationOpen(2, '2026-11-25T09:00:00+08:00'), approvals: bothArrangementsApproved, preferredDateTime: '2026-11-26T09:00:00+08:00', safety: safetyApproved(coordinator), createdAt: '2026-09-06T12:00:00+08:00' }),
   // SPM-88/SPM-27 demo: a Preparation event that has already taken place (1 Oct 2026), ready for manual
   // completion. Keep its stable id for existing test and walkthrough references.
   eventRequest({ slug: 'a1-confirmed-past', coordinator, status: PREPARATION, owner: organiserA1, title: 'A1 preparation (event held, ready to complete)', assigned: bothStaffTeams, approvals: bothArrangementsApproved, preferredDateTime: '2026-10-01T09:00:00+08:00', safety: safetyApproved(coordinator), createdAt: '2026-09-06T11:00:00+08:00' }),

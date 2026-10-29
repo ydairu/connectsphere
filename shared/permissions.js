@@ -242,6 +242,21 @@ function roleGateOpen(role, user, request) {
 }
 
 /**
+ * The sections one role, held by this user and in scope, may edit on this record right now. Normally the
+ * role's whole edit set when its gate is open, and nothing otherwise.
+ *
+ * SPM-19 [Team decision, 28 Oct 2026]: once the event is Confirmed or Preparation, the owning Organiser may
+ * edit the registration section, and only that section. Registration opens only at those statuses, and the
+ * Organiser "decides the registration opening and closing time" and "may instead close registration" when it
+ * is full (Clarification 2, Attendee Registration). Every other section stays locked after submission.
+ */
+function roleEditableSections(role, user, request) {
+  if (roleGateOpen(role, user, request)) return SECTION_ACCESS[role]?.edit ?? []
+  if (role === ORGANISER && isOwner(user, request) && registrationEligibleStatus(request.status)) return [REGISTRATION]
+  return []
+}
+
+/**
  * May this record be edited right now, by this user? True if any of the user's roles has its gate open.
  *
  * Implements the status criterion the plan adds to SPM-42 (Correction 1): an organiser cannot edit
@@ -273,13 +288,14 @@ export function viewableSectionsFor(user, request) {
  * Sections this user may edit on this particular record right now: the union, over roles that are both
  * in scope and past their state gate, of each role's edit set.
  *
- * Implements SPM-42 edit-by-role, the organiser status gate (Clarification 2), and multi-role union.
+ * Implements SPM-42 edit-by-role, the organiser status gate (Clarification 2), and multi-role union. SPM-19:
+ * the owner's registration section after confirmation (roleEditableSections).
  */
 export function editableSectionsFor(user, request) {
-  const roles = rolesOf(user).filter(
-    (role) => roleInScope(role, user, request) && roleGateOpen(role, user, request),
-  )
-  return editableSections(roles).filter((section) => SECTION_CONDITIONS[section]?.(request) ?? true)
+  const sections = rolesOf(user)
+    .filter((role) => roleInScope(role, user, request))
+    .map((role) => roleEditableSections(role, user, request))
+  return unionSections(sections).filter((section) => SECTION_CONDITIONS[section]?.(request) ?? true)
 }
 
 /**

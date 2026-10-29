@@ -4,6 +4,8 @@ import { COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../s
 import { CONFIRMED, DRAFT, PLANNING } from '../../../shared/status.js'
 import { CANCELLATION_REQUEST_OPEN, SIGNIFICANT_FIELDS, significantFieldsIn } from '../../../shared/significantChanges.js'
 import ArrangementsSummary from '../components/ArrangementsSummary.jsx'
+import AttendeeRegistration from '../components/AttendeeRegistration.jsx'
+import EventRegistrations from '../components/EventRegistrations.jsx'
 import AssignedCoordinator from '../components/AssignedCoordinator.jsx'
 import ChangeHistory from '../components/ChangeHistory.jsx'
 import Button from '../components/Button.jsx'
@@ -71,6 +73,9 @@ import { SECTION_ORDER, optionLabel, preparationReadOnlyText, sectionFields, sec
 // Status tab; the Coordinator submits it through the status actions. A Safety Officer (canDecideSafetyReview)
 // sees the booked venues and records the review; the event then leaves their scope, so they are taken back to
 // the queue.
+// SPM-19: an Attendee registers from the Event Status tab (attendeeRegistration in the response); the owning
+// Organiser and assigned Coordinator see the registered list there (canViewRegistrations). The Organiser changes
+// the registration period and capacity in the Registration section, which reopens for them once Confirmed.
 
 function ReadOnlyValue({ field, value }) {
   const { type } = field
@@ -165,6 +170,8 @@ function RequestDetailPage() {
   const [preparation, setPreparation] = useState(null)
   const [safetyReview, setSafetyReview] = useState(null)
   const [canDecideSafety, setCanDecideSafety] = useState(false)
+  const [attendeeRegistration, setAttendeeRegistration] = useState(null)
+  const [canViewRegistrations, setCanViewRegistrations] = useState(false)
   const [historyVersion, setHistoryVersion] = useState(0)
   const [acting, setActing] = useState(false)
   const [form, setForm] = useState({})
@@ -194,6 +201,8 @@ function RequestDetailPage() {
     setPreparation(response.preparation ?? null)
     setSafetyReview(response.safetyReview ?? null)
     setCanDecideSafety(response.canDecideSafetyReview === true)
+    setAttendeeRegistration(response.attendeeRegistration ?? null)
+    setCanViewRegistrations(response.canViewRegistrations === true)
     setOwner(typeof response.isOwnRequest === 'boolean' ? { name: response.ownerName ?? null, isOwn: response.isOwnRequest } : null)
     setForm(toFormValues(response.request))
   }, [])
@@ -413,6 +422,7 @@ function RequestDetailPage() {
             {renderSection('core')}
             {request.primaryVenue && <Card className="request-form-section"><h2>Event location</h2><p><strong>{request.primaryVenue.venueName}</strong></p>{request.primaryVenue.location && <p>{request.primaryVenue.location}</p>}</Card>}
             {primaryVenueRequired && request.status === PLANNING && <div className="alert alert-info" role="status">Choose an approved primary venue in Venue Details before confirming this event.</div>}
+            <AttendeeRegistration user={user} requestId={id} summary={attendeeRegistration} />
             <StatusActions
               status={request.status}
               actions={availableActions}
@@ -446,6 +456,7 @@ function RequestDetailPage() {
             <AssignedCoordinator coordinator={assignedCoordinator} />
             {roles?.includes(ORGANISER) && <ArrangementsSummary request={request} arrangements={arrangements} reservedEquipment={reservedEquipment} />}
             <ClarificationRequests status={request.status} entries={clarificationRequests} />
+            <EventRegistrations user={user} requestId={id} canView={canViewRegistrations} />
             </>}
             {activeTab === 'venue-details' && <>
               {renderSection('venue')}

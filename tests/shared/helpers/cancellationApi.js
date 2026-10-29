@@ -1,4 +1,4 @@
-// Shared harness for the SPM-47, SPM-63, SPM-61 and SPM-88 API suites. Real HTTP against the real Express app, the
+// Shared harness for the SPM-47, SPM-63, SPM-61, SPM-88 and SPM-19 API suites. Real HTTP against the real Express app, the
 // authenticate middleware and the shared rule modules. Mocked: Firebase token verification (a test token
 // names the uid) and persistence (backend/src/testing/fakeFirestore.js, holding the seeded requests and
 // profiles). This is not database verification.
@@ -85,6 +85,10 @@ export function createCancellationApi({ includeReservations = false } = {}) {
   const transactions = () => db.transactions
   /** Writes a document directly, e.g. an approved venue booking so an event can be confirmed. */
   const putDocument = (collection, id, data) => db.collectionData(collection).set(id, data)
+  /** Every document in a top-level collection, e.g. SPM-19's eventRegistrations. */
+  const documents = (collection) => [...db.collectionData(collection).values()]
+  /** Merges `changes` into a stored event, e.g. an SPM-19 registration period set relative to the real clock. */
+  const updateStored = (id, changes) => db.store.set(id, { ...db.store.get(id), ...changes })
   /**
    * SPM-91/92: records an approved safety review on the event (approved = true), or removes the review, as for
    * an event confirmed before the safety check existed (approved = false). The seeded Confirmed and
@@ -95,5 +99,5 @@ export function createCancellationApi({ includeReservations = false } = {}) {
     db.store.set(id, approved ? { ...request, ...seedSafetyApproval(SEED_ACCOUNTS.coordinator, new Date().toISOString()) } : request)
   }
 
-  return { start, stop, reset, setStart, call, act, view, list, notificationsOf, stored, activity, allNotifications, reservations, transactions, putDocument, setSafetyApproval }
+  return { start, stop, reset, setStart, call, act, view, list, notificationsOf, stored, activity, allNotifications, reservations, transactions, putDocument, documents, updateStored, setSafetyApproval }
 }

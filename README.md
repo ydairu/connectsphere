@@ -186,7 +186,7 @@ You can also run either application separately with `npm run dev:frontend` or `n
 
 ## Seed Accounts
 
-With `--write --project=<projectId>`, `backend/scripts/seed.js` creates or resets these 12 accounts for testing and demonstrations. They all use the password in `SEED_ACCOUNT_PASSWORD`; keep that value out of version control.
+With `--write --project=<projectId>`, `backend/scripts/seed.js` creates or resets these 14 accounts for testing and demonstrations. They all use the password in `SEED_ACCOUNT_PASSWORD`; keep that value out of version control.
 
 | Role | Email | Organisation ID |
 | --- | --- | --- |
@@ -197,14 +197,18 @@ With `--write --project=<projectId>`, `backend/scripts/seed.js` creates or reset
 | Technical Support Staff | `technical-staff@seed.connectsphere.test` | — |
 | Venue + Technical Staff | `venue-technical-staff@seed.connectsphere.test` | — |
 | Attendee | `attendee@seed.connectsphere.test` | — |
+| Attendee | `attendee-2@seed.connectsphere.test` | — |
+| Attendee | `attendee-3@seed.connectsphere.test` | — |
 | Safety Officer | `safety-officer@seed.connectsphere.test` | — |
 | Event Organiser | `organiser-a1@seed.connectsphere.test` | SEED-ORG-A |
 | Event Organiser | `organiser-a2@seed.connectsphere.test` | SEED-ORG-A |
 | Event Organiser | `organiser-a3@seed.connectsphere.test` | SEED-ORG-A |
 | Event Organiser | `organiser-b1@seed.connectsphere.test` | SEED-ORG-B |
 
-The three Coordinator accounts demonstrate workload-based assignment in the current implementation. An untouched seed gives them 5, 2 and 1 active requests (Submitted, Under Review, Returned, Planning or Confirmed), so a new submission selects `coordinator-3`. Other requests in a shared project can change that choice. The venue + technical account demonstrates combined permissions, and the two organisations demonstrate organisation-scoped request visibility.
+The three Coordinator accounts demonstrate workload-based assignment in the current implementation. An untouched seed gives them 6, 2 and 1 active requests (Submitted, Under Review, Returned, Planning or Confirmed), so a new submission selects `coordinator-3`. Other requests in a shared project can change that choice. The venue + technical account demonstrates combined permissions, and the two organisations demonstrate organisation-scoped request visibility.
 
-The seed defines 17 event requests covering every status in `shared/status.js`, owned by `organiser-a1`, `organiser-a2` and `organiser-b1`. `organiser-a3` owns none, to show the empty drafts list.
+The seed defines 18 event requests covering every status in `shared/status.js`, owned by `organiser-a1`, `organiser-a2` and `organiser-b1`. `organiser-a3` owns none, to show the empty drafts list.
+
+For Attendee registration (SPM-19), two Confirmed events have registration open until the day before they start: `seed-req-a1-confirmed` with 80 places, and `seed-req-a1-confirmed-small` ("A1 confirmed (2 places, registration open)") with 2. On the two-place event, `attendee` and `attendee-2` can fill it and `attendee-3` is then told it is full. Seed Coordinator and `organiser-a1` see who registered. Registration on the seed closes on 19 and 25 November 2026.
 
 These are shared demonstration credentials. Use them only in test or demonstration projects, and identify seeded data by its `seedTag` and `seed-` ID prefix when cleaning up.
