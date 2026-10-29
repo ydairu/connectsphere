@@ -1,4 +1,5 @@
 import { CLOSED, NOT_OPEN_YET, REGISTERED, UNAVAILABLE_MESSAGES } from '../../../shared/registration.js'
+import { CANCELLED, COMPLETED, PLANNING, REJECTED } from '../../../shared/status.js'
 
 // SPM-19 — how registration times, reasons and statuses read on the pages. The rules are in
 // shared/registration.js; the API sends the reason, this file only words it.
@@ -24,4 +25,16 @@ export function registrationStatusLabel(status) {
 /** "Venue A, Venue B", or null when no venue is known yet. */
 export function venueText(venueNames) {
   return Array.isArray(venueNames) && venueNames.length > 0 ? venueNames.join(', ') : null
+}
+
+// SPM-41: what "My registrations" says about an event that is no longer simply going ahead.
+const EVENT_STATUS_NOTES = Object.freeze({
+  [CANCELLED]: 'Event cancelled',
+  [REJECTED]: 'Event cancelled',
+  [PLANNING]: 'Event being rearranged',
+  [COMPLETED]: 'Event held',
+})
+
+export function eventStatusNote(status) {
+  return EVENT_STATUS_NOTES[status] ?? null
 }

@@ -191,14 +191,21 @@ export function buildRegistration(event, user, { venueNames = [], at }) {
   }
 }
 
-/** One of the Attendee's own registrations, as "My registrations" and the event page show it. */
-export function presentOwnRegistration(record) {
+/**
+ * One of the Attendee's own registrations, as "My registrations" and the event page show it. SPM-41 (E3, team
+ * decision of 29 Oct 2026): when the event is given, its current title, start, duration and status are shown, so a
+ * rescheduled or cancelled event never reads as it was at registration. The copy kept on the registration is the
+ * fallback for an event that no longer exists. The venue stays as registered: SPM-90 keeps registration venue
+ * snapshots, and a venue change is SPM-74's to announce. Only these fields of the event are sent.
+ */
+export function presentOwnRegistration(record, event = null) {
   return {
     eventRequestId: record.eventRequestId,
     status: record.status,
-    eventTitle: record.eventTitle,
-    eventStartsAt: record.eventStartsAt,
-    eventDurationHours: record.eventDurationHours,
+    eventStatus: event?.status ?? null,
+    eventTitle: event?.core?.title ?? record.eventTitle,
+    eventStartsAt: event?.core?.preferredDateTime ?? record.eventStartsAt,
+    eventDurationHours: event?.core?.durationHours ?? record.eventDurationHours,
     venueNames: record.venueNames ?? [],
     registeredAt: record.registeredAt,
   }
@@ -207,4 +214,23 @@ export function presentOwnRegistration(record) {
 /** One row of the registered list for the owning Organiser or assigned Coordinator (D3). No uid is sent. */
 export function presentRegistrant(record) {
   return { name: record.attendeeName, email: record.attendeeEmail, status: record.status, registeredAt: record.registeredAt }
+}
+
+// --- Changes to the event (SPM-41) ------------------------------------------------------------------
+
+/** When the event ends: its start plus its duration, as an ISO string; null when either is unknown. */
+export function eventEndsAt(core = {}) {
+  const start = time(core.preferredDateTime)
+  const hours = Number(core.durationHours)
+  return start !== null && Number.isFinite(hours) && hours > 0 ? new Date(start + hours * 60 * 60 * 1000).toISOString() : null
+}
+
+/**
+ * SPM-41: has the event been rescheduled between `before` and `after`? A new start date/time, or (E1, team
+ * decision of 29 Oct 2026) a new duration, because the end time moves. The same instant written differently is
+ * not a change.
+ */
+export function eventRescheduled(before, after) {
+  return time(before?.core?.preferredDateTime) !== time(after?.core?.preferredDateTime) ||
+    Number(before?.core?.durationHours) !== Number(after?.core?.durationHours)
 }

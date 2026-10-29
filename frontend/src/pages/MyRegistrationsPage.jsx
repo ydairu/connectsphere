@@ -5,11 +5,13 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { listMyRegistrations } from '../services/api.js'
-import { displayDateTime, registrationStatusLabel, venueText } from '../utils/registration.js'
+import { displayDateTime, eventStatusNote, registrationStatusLabel, venueText } from '../utils/registration.js'
+import { registrationEligibleStatus } from '../../../shared/status.js'
 
 // SPM-19 — "view my registration status". The signed-in Attendee's registrations, soonest event first, from
 // GET /api/registrations, which returns only the caller's own. Each one keeps the event's name, time and venue
-// as registered, so it still reads correctly if the event later leaves the Attendee's view.
+// as registered, so it still reads correctly if the event later leaves the Attendee's view. SPM-41: the date,
+// time and status are the event's current ones, with a note when it is cancelled or being rearranged.
 
 function MyRegistrationsPage() {
   const { user } = useAuth()
@@ -58,10 +60,14 @@ function MyRegistrationsPage() {
                       {[displayDateTime(registration.eventStartsAt), venueText(registration.venueNames)].filter(Boolean).join(' · ')}
                     </p>
                     <p>Status: <strong>{registrationStatusLabel(registration.status)}</strong></p>
+                    {eventStatusNote(registration.eventStatus) && <p className="form-note"><strong>{eventStatusNote(registration.eventStatus)}</strong></p>}
                   </div>
-                  <div className="request-item-actions">
-                    <Link className="button button-secondary button-small" to={`/requests/${registration.eventRequestId}`}>View event</Link>
-                  </div>
+                  {/* SPM-41: Attendees can open only Confirmed and Preparation events (SPM-42 scope). */}
+                  {registrationEligibleStatus(registration.eventStatus) && (
+                    <div className="request-item-actions">
+                      <Link className="button button-secondary button-small" to={`/requests/${registration.eventRequestId}`}>View event</Link>
+                    </div>
+                  )}
                 </Card>
               </li>
             ))}

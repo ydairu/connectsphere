@@ -86,6 +86,7 @@ import {
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError, submitDraftEventRequest } from './eventRequestService.js'
+import { loadRegisteredAttendeeUids } from './registeredAttendees.js'
 import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
 import { prepareVenueHoldRelease } from './venueBookingService.js'
@@ -201,6 +202,11 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     const readiness = action === SUBMIT_SAFETY_REVIEW ? await loadVenueBookingReadiness(id, db, now, tx) : null
     const preparationRecipients = action === START_PREPARATION
       ? await assignedPreparationRecipients(tx, db, existing, user)
+      : []
+    // SPM-41: a cancellation, or (E5) a rejection of an event that still has registrations, notifies the registered
+    // Attendees. Read here, before any write in this transaction.
+    const attendeeUids = action === CANCEL || action === APPROVE_CANCELLATION || action === REJECT
+      ? await loadRegisteredAttendeeUids(db, id, tx)
       : []
 
     // The reason is checked only after the action itself is allowed, so a refusal names the real cause.
@@ -326,10 +332,10 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     }
 
     // SPM-47, SPM-63 — notify the affected users in the same transaction, so a notice exists only for an
-    // action that was saved. An approval carries the Organiser's request reason. No Attendee uids are passed:
-    // Attendee Registration does not exist yet (shared/notifications.js).
+    // action that was saved. An approval carries the Organiser's request reason. SPM-41: and every registered
+    // Attendee, without the reason.
     const noticeReason = action === APPROVE_CANCELLATION ? existing.cancellationRequest?.reason ?? null : reasonFor()
-    addNotifications(tx, db, cancellationNotifications(action, existing, user, { reason: noticeReason, at }))
+    addNotifications(tx, db, cancellationNotifications(action, existing, user, { reason: noticeReason, at, attendeeUids }))
     if (action === START_PREPARATION) {
       addNotifications(tx, db, preparationStartedNotifications(existing, user, { recipientUids: preparationRecipients, at }))
     }

@@ -28,6 +28,8 @@
 //   safety review recorded           the assigned Coordinator, with the Safety     (SPM-92)
 //                                    Officer's comments
 //   attendee registers                the Attendee, with the event's start and venue (SPM-19)
+//   event cancelled or rescheduled    every registered Attendee, with no reason; a reschedule carries the
+//                                     new and previous start and end (SPM-41)
 // The user who acted is never notified of their own action, except the SPM-19 registration confirmation,
 // which is the Attendee's own record of what they registered for.
 
@@ -35,6 +37,7 @@ import { REFUSE_CANCELLATION, REQUEST_CANCELLATION, RESUBMIT_CANCELLATION, RETUR
 import { APPROVE_SAFETY, REJECT_SAFETY_ARRANGEMENT, REQUEST_SAFETY_CHANGES } from './safetyReview.js'
 import { PLANNING, PREPARATION, UNDER_REVIEW } from './status.js'
 import { APPROVE, APPROVE_CANCELLATION, CANCEL, CONFIRM, REJECT, RETURN_FOR_CLARIFICATION } from './statusTransitions.js'
+import { eventEndsAt } from './registration.js'
 
 export const NOTIFICATIONS_COLLECTION = 'notifications'
 
@@ -63,6 +66,9 @@ export const REQUEST_RETURNED_NOTICE = 'request_returned'
 export const SAFETY_APPROVED_NOTICE = 'safety_approved'
 export const SAFETY_CHANGES_REQUESTED_NOTICE = 'safety_changes_requested'
 export const SAFETY_REJECTED_NOTICE = 'safety_arrangement_rejected'
+// SPM-41: an event a registered Attendee registered for was cancelled or rescheduled.
+export const ATTENDEE_EVENT_CANCELLED_NOTICE = 'attendee_event_cancelled'
+export const EVENT_RESCHEDULED_NOTICE = 'event_rescheduled'
 // SPM-19: the Attendee's registration was confirmed.
 export const REGISTRATION_CONFIRMED_NOTICE = 'registration_confirmed'
 
@@ -101,10 +107,41 @@ export function cancellationNotifications(action, request, actor, { reason = nul
         : `“${title}” has been cancelled by the event coordinator.`
     notify([request.ownerUid], EVENT_CANCELLED_NOTICE, message)
     notify(request.assignedStaffUids ?? [], EVENT_CANCELLED_NOTICE, `“${title}”, which you are assigned to, has been cancelled.`)
-    notify(attendeeUids, EVENT_CANCELLED_NOTICE, `“${title}”, which you registered for, has been cancelled.`)
   }
 
-  return addressed(notices, request, actor, title, at)
+  // SPM-41: registered Attendees get their own notice, without the reason, which may be internal or the Organiser's.
+  // E5 (team decision, 29 Oct 2026): an event can still have registrations when it is rejected — after a reschedule
+  // moved it back to Planning (SPM-10, D5). For its Attendees that is a cancellation.
+  const attendees = action === CANCEL || action === APPROVE_CANCELLATION || action === REJECT
+    ? attendeeChangeNotifications('cancelled', request, request, actor, { attendeeUids, at })
+    : []
+  return [...addressed(notices, request, actor, title, at), ...attendees]
+}
+
+/**
+ * SPM-41 — the notices for every registered Attendee (`attendeeUids`) when the event is cancelled or rescheduled.
+ * `before` and `after` are the event before and after the change. A reschedule carries the new and previous start
+ * and end, which the page shows in the reader's time zone. No reason is sent: a cancellation reason may be
+ * internal or the Organiser's own. Each Attendee gets one notice, never the user who acted.
+ */
+export function attendeeChangeNotifications(change, before, after, actor, { attendeeUids = [], at }) {
+  const title = titleOf(after)
+  const cancelled = change === 'cancelled'
+  const times = cancelled ? {} : {
+    eventStartsAt: after.core?.preferredDateTime ?? null,
+    eventEndsAt: eventEndsAt(after.core),
+    previousStartsAt: before.core?.preferredDateTime ?? null,
+    previousEndsAt: eventEndsAt(before.core),
+  }
+  const notices = attendeeUids.map((uid) => ({
+    recipientUid: uid,
+    type: cancelled ? ATTENDEE_EVENT_CANCELLED_NOTICE : EVENT_RESCHEDULED_NOTICE,
+    changeType: change,
+    message: `“${title}”, which you registered for, has been ${cancelled ? 'cancelled' : 'rescheduled'}.`,
+    reason: null,
+    ...times,
+  }))
+  return addressed(notices, after, actor, title, at)
 }
 
 // One notice per recipient, never to the user who acted, never to a missing uid.

@@ -1,6 +1,9 @@
 // Event request handlers — load, send, update. Authorisation is not decided here: every response body is
 // produced by authorise.js. Create, submit and draft-save belong to SPM-7, SPM-3 and SPM-4.
 
+import { attendeeChangeNotifications } from '../../../shared/notifications.js'
+import { eventRescheduled } from '../../../shared/registration.js'
+import { loadRegisteredAttendeeUids } from '../services/registeredAttendees.js'
 import { COORDINATOR, rolesOf } from '../../../shared/permissions.js'
 import { historyEntriesForEdit } from '../../../shared/changeHistory.js'
 import { SIGNIFICANT_CHANGE, significantChangeEffects } from '../../../shared/significantChanges.js'
@@ -11,6 +14,11 @@ import { loadVenueBookingReadiness } from '../services/venueBookingService.js'
 
 function newestFirst(a, b) {
   return (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0)
+}
+
+// SPM-41: the fields whose change reschedules the event (shared/registration.js, eventRescheduled).
+function mayReschedule(patch) {
+  return Object.hasOwn(patch?.core ?? {}, 'preferredDateTime') || Object.hasOwn(patch?.core ?? {}, 'durationHours')
 }
 
 // loadCoordinatorName (SPM-46) comes from services/assignedCoordinatorService.js and reads users/{uid} only
@@ -70,6 +78,8 @@ export function createRequestController(store, loadCoordinatorName, loadOwnerNam
     async update(req, res) {
       try {
         const staffRecipientUids = await loadStaffRecipients(req.user, req.eventRequest, req.body)
+        // SPM-41: an edit that may move the event's date, time or duration loads its registered Attendees.
+        const attendeeUids = getDb && mayReschedule(req.body) ? await loadRegisteredAttendeeUids(getDb(), req.params.id) : []
         const at = new Date().toISOString()
         // SPM-28: one field_changed entry per changed field, written in the same transaction as the edit.
         // SPM-10: in the same transaction, a significant change at Planning/Confirmed clears the sign-off,
@@ -82,7 +92,11 @@ export function createRequestController(store, loadCoordinatorName, loadOwnerNam
             const activity = statusChange
               ? [{ type: STATUS_CHANGED, action: SIGNIFICANT_CHANGE, ...statusChange, actor: userActor(req.user), at, reason: SIGNIFICANT_CHANGE }]
               : []
-            return { metadata, activity, notifications }
+            // SPM-41: a new date, time or duration notifies every registered Attendee, in the same transaction.
+            const attendees = eventRescheduled(before, after)
+              ? attendeeChangeNotifications('rescheduled', before, after, req.user, { attendeeUids, at })
+              : []
+            return { metadata, activity, notifications: [...notifications, ...attendees] }
           },
         })
         const coordinatorName = await loadCoordinatorName(req.user, request)
