@@ -17,25 +17,30 @@ export const COORDINATOR_ASSIGNED = 'coordinator_assigned'
 export const SYSTEM_ACTOR = Object.freeze({ type: 'system', name: 'System' })
 
 /**
- * Every user holding the Event Coordinator role, as { uid, name }: by `roles`, plus profiles written before
- * the roles migration that only carry the legacy `role` field. rolesOf() then decides, so a legacy `role`
- * is ignored whenever `roles` exists. Nothing else from the profile is returned.
+ * Every user holding `role`, as { uid, name }: by `roles`, plus profiles written before the roles migration that
+ * only carry the legacy `role` field. rolesOf() then decides, so a legacy `role` is ignored whenever `roles`
+ * exists. Nothing else from the profile is returned.
  *
  * `read` runs a query: pass `(query) => tx.get(query)` inside a transaction (SPM-68 assignment, SPM-26
- * reassignment); the default reads outside one (the candidate lists).
+ * reassignment, SPM-85 submit); the default reads outside one (the candidate lists).
  */
-export async function loadCoordinators(db, read = (query) => query.get()) {
+export async function loadUsersWithRole(db, role, read = (query) => query.get()) {
   const users = db.collection('users')
   const [byRoles, byLegacyRole] = await Promise.all([
-    read(users.where('roles', 'array-contains', COORDINATOR)),
-    read(users.where('role', '==', COORDINATOR)),
+    read(users.where('roles', 'array-contains', role)),
+    read(users.where('role', '==', role)),
   ])
-  const coordinators = new Map()
+  const holders = new Map()
   for (const doc of [...byRoles.docs, ...byLegacyRole.docs]) {
     const profile = doc.data()
-    if (rolesOf(profile).includes(COORDINATOR)) coordinators.set(doc.id, { uid: doc.id, name: profile.name ?? null })
+    if (rolesOf(profile).includes(role)) holders.set(doc.id, { uid: doc.id, name: profile.name ?? null })
   }
-  return [...coordinators.values()]
+  return [...holders.values()]
+}
+
+/** Every user holding the Event Coordinator role; see loadUsersWithRole(). */
+export function loadCoordinators(db, read) {
+  return loadUsersWithRole(db, COORDINATOR, read)
 }
 
 /**

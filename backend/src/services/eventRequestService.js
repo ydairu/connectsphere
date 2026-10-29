@@ -1,3 +1,6 @@
+import { awaitingCoordinatorAssignment } from '../../../shared/coordinatorAssignment.js'
+import { newUnassignedRequestNotifications } from '../../../shared/notifications.js'
+import { COORDINATOR_LEAD } from '../../../shared/permissions.js'
 import { DRAFT, RETURNED, SUBMITTED } from '../../../shared/status.js'
 import { RESUBMIT, SUBMIT, canTransition } from '../../../shared/statusTransitions.js'
 import {
@@ -7,6 +10,8 @@ import {
   validateEventRequestSubmission,
 } from '../../../shared/eventRequest.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
+import { loadUsersWithRole } from './coordinatorAssignmentService.js'
+import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
 
 export class EventRequestValidationError extends Error {
@@ -75,6 +80,8 @@ export async function updateDraftEventRequest(id, input, organiser, db = getAdmi
 // SPM-9: a Returned request is resubmitted the same way (Returned → Submitted). It keeps its Coordinator, since
 // nothing here writes assignedCoordinatorUid, so it never re-enters the queue (CL3 G8!C15). Either change is
 // recorded in the activity history in the same transaction.
+// SPM-85: a first submission that enters the queue notifies every Event Coordinator Lead in the same
+// transaction, so a notice exists only for a saved submission. The Leads are read before any write.
 export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), now = new Date()) {
   return db.runTransaction(async (tx) => {
     const docRef = db.collection('eventRequests').doc(id)
@@ -97,6 +104,10 @@ export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), 
       ...(action === SUBMIT ? { submittedAt: now.toISOString() } : {}),
       updatedAt: now.toISOString(),
     }
+    const submitted = { id, ...existing, ...update }
+    const leads = action === SUBMIT && awaitingCoordinatorAssignment(submitted)
+      ? await loadUsersWithRole(db, COORDINATOR_LEAD, (query) => tx.get(query))
+      : []
 
     tx.update(docRef, update)
     recordStatusChange(tx, docRef, {
@@ -106,6 +117,10 @@ export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), 
       actor: userActor(organiser),
       at: now.toISOString(),
     })
-    return { id, ...existing, ...update }
+    addNotifications(tx, db, newUnassignedRequestNotifications(submitted, organiser, {
+      recipientUids: leads.map((lead) => lead.uid),
+      at: now.toISOString(),
+    }))
+    return submitted
   })
 }

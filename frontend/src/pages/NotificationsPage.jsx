@@ -6,7 +6,13 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { listNotifications, markNotificationRead } from '../services/api.js'
-import { ATTENDEE_EVENT_CANCELLED_NOTICE, EVENT_RESCHEDULED_NOTICE, REQUEST_CONFIRMED_NOTICE, REQUEST_RETURNED_NOTICE } from '../../../shared/notifications.js'
+import {
+  ATTENDEE_EVENT_CANCELLED_NOTICE,
+  EVENT_RESCHEDULED_NOTICE,
+  NEW_UNASSIGNED_REQUEST_NOTICE,
+  REQUEST_CONFIRMED_NOTICE,
+  REQUEST_RETURNED_NOTICE,
+} from '../../../shared/notifications.js'
 
 // The signed-in user's in-app notifications. Venue booking rejections link to the booking; other notices
 // link to the event. The API returns only the user's own.
@@ -35,6 +41,8 @@ function linkFor(notification) {
   if ([ATTENDEE_EVENT_CANCELLED_NOTICE, EVENT_RESCHEDULED_NOTICE].includes(notification.type)) {
     return { to: '/registrations', label: 'View my registrations' }
   }
+  // SPM-85: the Lead assigns from the queue, and cannot open the event once another Lead has assigned it.
+  if (notification.type === NEW_UNASSIGNED_REQUEST_NOTICE) return { to: '/requests/unassigned', label: 'View unassigned requests' }
   const to = `/requests/${notification.eventRequestId}`
   if (notification.type === REQUEST_RETURNED_NOTICE) return { to, label: 'Edit request' }
   if (notification.type === REQUEST_CONFIRMED_NOTICE) return { to, label: 'View arrangements' }

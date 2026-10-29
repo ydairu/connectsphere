@@ -30,6 +30,8 @@
 //   attendee registers                the Attendee, with the event's start and venue (SPM-19)
 //   event cancelled or rescheduled    every registered Attendee, with no reason; a reschedule carries the
 //                                     new and previous start and end (SPM-41)
+//   request submitted into the        every Event Coordinator Lead, with the event's start; a Returned
+//   unassigned queue                  request resubmitted to its Coordinator notifies no one  (SPM-85)
 // The user who acted is never notified of their own action, except the SPM-19 registration confirmation,
 // which is the Attendee's own record of what they registered for.
 
@@ -69,6 +71,8 @@ export const SAFETY_REJECTED_NOTICE = 'safety_arrangement_rejected'
 // SPM-41: an event a registered Attendee registered for was cancelled or rescheduled.
 export const ATTENDEE_EVENT_CANCELLED_NOTICE = 'attendee_event_cancelled'
 export const EVENT_RESCHEDULED_NOTICE = 'event_rescheduled'
+// SPM-85: a newly submitted request is waiting in the Event Coordinator Lead's unassigned queue.
+export const NEW_UNASSIGNED_REQUEST_NOTICE = 'new_unassigned_request'
 // SPM-19: the Attendee's registration was confirmed.
 export const REGISTRATION_CONFIRMED_NOTICE = 'registration_confirmed'
 
@@ -154,6 +158,25 @@ function addressed(notices, request, actor, title, at) {
       return true
     })
     .map((notice) => ({ ...notice, eventRequestId: request.id, eventTitle: title, createdAt: at, readAt: null }))
+}
+
+/**
+ * SPM-85 — the notices for the Event Coordinator Leads (`recipientUids`) when `request` (the record as submitted,
+ * with its id) enters the unassigned queue. The message names the event and, when known, its organisation; the
+ * event's start is carried as `eventStartsAt`, which the page shows in the reader's time zone (as SPM-19's does).
+ * The page links the notice to the queue, not the event. A Lead who submitted the request is not notified.
+ */
+export function newUnassignedRequestNotifications(request, actor, { recipientUids = [], at }) {
+  const title = titleOf(request)
+  const organisation = typeof request.organisationName === 'string' ? request.organisationName.trim() : ''
+  const message = `New request “${title}”${organisation ? ` from ${organisation}` : ''} is waiting for assignment.`
+  return addressed(recipientUids.map((uid) => ({
+    recipientUid: uid,
+    type: NEW_UNASSIGNED_REQUEST_NOTICE,
+    message,
+    reason: null,
+    eventStartsAt: request.core?.preferredDateTime ?? null,
+  })), request, actor, title, at)
 }
 
 /** SPM-88: assigned Venue and Technical Support Staff learn that preparation has started. */
