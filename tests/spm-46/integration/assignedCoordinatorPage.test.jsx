@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 import { AuthContext } from '../../../frontend/src/context/auth-context.js'
-import { NAME_UNAVAILABLE, NOT_YET_ASSIGNED } from '../../../frontend/src/components/AssignedCoordinator.jsx'
+import { NAME_UNAVAILABLE, UNASSIGNED } from '../../../frontend/src/components/AssignedCoordinator.jsx'
 import RequestDetailPage from '../../../frontend/src/pages/RequestDetailPage.jsx'
 
 vi.mock('../../../frontend/src/services/api.js', async (importOriginal) => {
@@ -70,23 +70,23 @@ describe('SPM-46 — the Organiser sees the assigned Coordinator', () => {
     expect(screen.queryByText('Seed Coordinator')).toBeNull()
   })
 
-  it('Test 4: a submitted event with no Coordinator says "Not yet assigned"', async () => {
+  it('Test 4: a submitted event with no Coordinator says "Unassigned" (SPM-68 wording)', async () => {
     showRequest(organiserResponse({ assigned: false, name: null }))
-    expect(await screen.findByText(NOT_YET_ASSIGNED)).toBeTruthy()
-    expect(coordinatorValue().textContent).toBe('Not yet assigned')
+    expect(await screen.findByText(UNASSIGNED)).toBeTruthy()
+    expect(coordinatorValue().textContent).toBe('Unassigned')
   })
 
-  it('an assigned Coordinator without a usable name says "Assigned (name unavailable)", not "Not yet assigned"', async () => {
+  it('an assigned Coordinator without a usable name says "Assigned (name unavailable)", not "Unassigned"', async () => {
     showRequest(organiserResponse({ assigned: true, name: null }))
     expect(await screen.findByText(NAME_UNAVAILABLE)).toBeTruthy()
-    expect(screen.queryByText(NOT_YET_ASSIGNED)).toBeNull()
+    expect(screen.queryByText(UNASSIGNED)).toBeNull()
   })
 
   it('Test 5: a draft opens in the draft editor and shows no Coordinator', async () => {
     showRequest(organiserResponse(null, { status: 'draft' }))
     expect(await screen.findByText('Draft editor')).toBeTruthy()
     expect(screen.queryByText('Event Coordinator')).toBeNull()
-    expect(screen.queryByText(NOT_YET_ASSIGNED)).toBeNull()
+    expect(screen.queryByText(UNASSIGNED)).toBeNull()
   })
 
   it('a role the API sends no Coordinator to sees no Coordinator row', async () => {

@@ -17,6 +17,7 @@ import { createValidateRegistration } from '../middleware/validateRegistration.j
 import { loadRegistrationContext } from '../services/registrationService.js'
 import { attendeeRegistrationSummary } from '../../../shared/registration.js'
 import { ATTENDEE, inScopeAs } from '../../../shared/permissions.js'
+import { AssignmentError, listUnassignedRequests } from '../services/coordinatorLeadAssignmentService.js'
 
 // SPM-42's minimum API surface: list, read and section edit. No create, submit or draft-save routes —
 // those are SPM-7, SPM-3 and SPM-4.
@@ -33,6 +34,15 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
     getEventRequestDb,
   )
   const router = Router()
+  // SPM-68: the Event Coordinator Lead's unassigned queue. Registered before '/:id', which would otherwise
+  // take "unassigned" as an id. Only a Lead gets 200 (shared/coordinatorLeadAssignment.js); everyone else 403.
+  router.get('/unassigned', authenticate, async (req, res, next) => {
+    try { res.json(await listUnassignedRequests(req.user, getEventRequestDb())) }
+    catch (error) {
+      if (error instanceof AssignmentError) return res.status(error.status).json({ message: error.message, reason: error.reason })
+      next(error)
+    }
+  })
   const bookings = createVenueBookingController(getEventRequestDb)
   router.get('/:id/venue-bookings', authenticate, bookings.list)
   router.post('/:id/venue-bookings', authenticate, bookings.submit)

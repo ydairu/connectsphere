@@ -14,6 +14,7 @@
 import {
   ATTENDEE,
   COORDINATOR,
+  COORDINATOR_LEAD,
   ORGANISER,
   SAFETY_OFFICER,
   TECHNICAL_STAFF,
@@ -69,11 +70,14 @@ function account(slug, name, roles, organisation) {
 
 export const SEED_ACCOUNTS = Object.freeze({
   coordinator: account('coordinator', 'Seed Coordinator', [COORDINATOR]),
-  // SPM-8: a second coordinator, so workload-based assignment has more than one candidate to choose from.
+  // Three coordinators with different active workloads — 6, 2 and 1 (see SEED_REQUESTS) — so the SPM-68
+  // assignment picker shows the Lead distinct counts beside each name. Since SPM-68 nothing is assigned
+  // automatically; the counts inform the Lead's choice.
   coordinator2: account('coordinator-2', 'Seed Coordinator 2', [COORDINATOR]),
-  // SPM-8: a third coordinator, so the seed spreads active work across three different workloads and the
-  // next submission visibly goes to the one with the fewest. Seeded workloads: 6, 2 and 1 (see SEED_REQUESTS).
   coordinator3: account('coordinator-3', 'Seed Coordinator 3', [COORDINATOR]),
+  // SPM-68: "a new internal role, Event Coordinator Lead, defined in system defaults" — never self-registered.
+  // Lead only, so the account demonstrates that a Lead cannot act as a Coordinator.
+  coordinatorLead: account('coordinator-lead', 'Seed Coordinator Lead', [COORDINATOR_LEAD]),
   venueStaff: account('venue-staff', 'Seed Venue Staff', [VENUE_STAFF]),
   technicalStaff: account('technical-staff', 'Seed Technical Staff', [TECHNICAL_STAFF]),
   // SPM-42 combined-permissions criterion: one account, two staff roles.
@@ -96,8 +100,10 @@ export const SEED_ACCOUNTS = Object.freeze({
 
 const { coordinator, coordinator2, coordinator3, venueStaff, technicalStaff, venueTechnicalStaff, organiserA1, organiserA2, organiserB1 } = SEED_ACCOUNTS
 
-// `coordinator` is set on every non-draft request: a submitted event is always assigned exactly one
-// Coordinator (Clarification 1, Coordinator and Staff Assignment). Drafts carry no assignment field.
+// `coordinator` is set on every non-draft request except `a2-unassigned`: these stand for events assigned before
+// SPM-68, which keep their Coordinator (CL3 G8!C38). `coordinator: null` writes assignedCoordinatorUid: null, as
+// a real submission now does, putting the request in the Lead's unassigned queue. Drafts carry no assignment
+// field.
 // `approvals` is SPM-9's arrangementApprovals record metadata, set only where a request needs it.
 // SPM-56: the equipment requests each seeded event's summary (currentEquipmentRequest) names; the requests
 // themselves are SEED_EQUIPMENT_REQUESTS below. A1's Planning event is deliberately left without a summary:
@@ -118,7 +124,7 @@ const a1ConfirmedReservedEquipment = {
   reservedAt: A1_CONFIRMED_RESERVED_AT,
 }
 
-function eventRequest({ slug, status, owner, title, coordinator, assigned = [], registrationEnabled = false, registrationSettings = {}, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', currentEquipmentRequest, reservedEquipment, safety, createdAt }) {
+function eventRequest({ slug, status, owner, title, coordinator, submittedAt, assigned = [], registrationEnabled = false, registrationSettings = {}, draft = false, draftCore = {}, approvals, preferredDateTime = '2026-11-20T09:00:00+08:00', currentEquipmentRequest, reservedEquipment, safety, createdAt }) {
   const core = draft
     ? { title, purpose: null, description: null, preferredDateTime: null, durationHours: null, expectedAttendees: null, ...draftCore }
     : {
@@ -136,7 +142,7 @@ function eventRequest({ slug, status, owner, title, coordinator, assigned = [], 
     organisationId: owner.organisationId,
     organisationName: owner.organisationName,
     assignedStaffUids: assigned.map((staff) => staff.uid),
-    ...(coordinator ? { assignedCoordinatorUid: coordinator.uid } : {}),
+    ...(coordinator !== undefined ? { assignedCoordinatorUid: coordinator?.uid ?? null } : {}),
     core,
     venue: { layoutPreference: draft ? null : 'theatre', accessibilityRequired: !draft },
     equipment: { requirements: draft ? [] : ['projector', 'wireless microphone'], technicalSupportNeeded: !draft },
@@ -146,6 +152,7 @@ function eventRequest({ slug, status, owner, title, coordinator, assigned = [], 
     ...(currentEquipmentRequest ? { currentEquipmentRequest } : {}),
     ...(reservedEquipment ? { reservedEquipment } : {}),
     ...(safety ?? {}),
+    ...(submittedAt ? { submittedAt } : {}),
     createdAt,
   }
 }
@@ -185,8 +192,9 @@ function seedRegistrationOpen(capacity, closesAt = '2026-11-19T09:00:00+08:00') 
 
 export const SEED_REQUESTS = Object.freeze([
   // Organisation A, organiser A1 — one request in every status.
-  // SPM-8 workloads (active = Submitted, Under Review, Returned, Planning, Confirmed): coordinator 6,
-  // coordinator-2 2, coordinator-3 1. Finished requests are assigned too, but do not count.
+  // Active workloads shown in the SPM-68 picker (active = Submitted, Under Review, Returned, Planning, Confirmed,
+  // Preparation): coordinator 6, coordinator-2 2, coordinator-3 1. Finished requests are assigned too, but do not
+  // count.
   eventRequest({ slug: 'a1-draft', status: DRAFT, owner: organiserA1, title: 'A1 draft (private to A1)', draft: true, createdAt: '2026-09-01T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-submitted', coordinator, status: SUBMITTED, owner: organiserA1, title: 'A1 submitted', createdAt: '2026-09-02T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-under-review', coordinator, status: UNDER_REVIEW, owner: organiserA1, title: 'A1 under review', createdAt: '2026-09-03T10:00:00+08:00' }),
@@ -194,7 +202,7 @@ export const SEED_REQUESTS = Object.freeze([
   eventRequest({ slug: 'a1-planning', coordinator, status: PLANNING, owner: organiserA1, title: 'A1 planning (all staff assigned)', assigned: bothStaffTeams, createdAt: '2026-09-05T10:00:00+08:00' }),
   eventRequest({ slug: 'a1-confirmed', coordinator: coordinator3, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (registration open)', assigned: bothStaffTeams, registrationEnabled: true, registrationSettings: seedRegistrationOpen(80), approvals: bothArrangementsApproved, reservedEquipment: a1ConfirmedReservedEquipment, safety: safetyApproved(coordinator3), createdAt: '2026-09-06T10:00:00+08:00' }),
   // SPM-19 demo: two places, so two Attendees fill it and the third is told it is full. No venue is booked,
-  // so the Organiser's capacity is the limit. Assigned to the busiest Coordinator so coordinator-3 stays next.
+  // so the Organiser's capacity is the limit. Assigned to the busiest Coordinator, keeping the three workloads distinct.
   eventRequest({ slug: 'a1-confirmed-small', coordinator, status: CONFIRMED, owner: organiserA1, title: 'A1 confirmed (2 places, registration open)', registrationEnabled: true, registrationSettings: seedRegistrationOpen(2, '2026-11-25T09:00:00+08:00'), approvals: bothArrangementsApproved, preferredDateTime: '2026-11-26T09:00:00+08:00', safety: safetyApproved(coordinator), createdAt: '2026-09-06T12:00:00+08:00' }),
   // SPM-88/SPM-27 demo: a Preparation event that has already taken place (1 Oct 2026), ready for manual
   // completion. Keep its stable id for existing test and walkthrough references.
@@ -212,6 +220,8 @@ export const SEED_REQUESTS = Object.freeze([
   // Organisation A, organiser A2 — the colleague.
   eventRequest({ slug: 'a2-draft', status: DRAFT, owner: organiserA2, title: 'A2 draft (private to A2, hidden from A1)', draft: true, createdAt: '2026-09-10T10:00:00+08:00' }),
   eventRequest({ slug: 'a2-submitted', coordinator: coordinator2, status: SUBMITTED, owner: organiserA2, title: 'A2 submitted (A1 can view, cannot edit)', createdAt: '2026-09-10T11:00:00+08:00' }),
+  // SPM-68: submitted after the change, so no Coordinator yet — the one request in the Lead's unassigned queue.
+  eventRequest({ slug: 'a2-unassigned', coordinator: null, status: SUBMITTED, owner: organiserA2, title: 'A2 unassigned (waiting for a Coordinator)', preferredDateTime: '2026-12-10T14:00:00+08:00', submittedAt: '2026-10-28T09:30:00+08:00', createdAt: '2026-10-27T16:00:00+08:00' }),
 
   // Organisation B — invisible to organisation A. Assigned to technical staff only, so venue-only
   // staff cannot see it while the venue+technical account can. SPM-16: a week after the other events, so

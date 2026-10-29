@@ -1,12 +1,25 @@
 # ConnectSphere Project Context
 
-Last reviewed: 29 October 2026 (SPM-90 and SPM-19 integration; older implementation sections retain their historical dates)
+Last reviewed: 29 October 2026 (SPM-68 Lead assignment, SPM-90 and SPM-19 integration; older implementation sections retain their historical dates)
 
 ## Current implementation map (27 October 2026)
 
 The browser has routes for authentication, profiles, requests and drafts, venue catalogue and bookings, equipment inventory and requests, reservations, and notifications (`frontend/src/App.jsx`). Express mounts health, profile, event request, scoped request, venue, equipment, and notification APIs (`backend/src/app.js`). `shared/` holds policy and validation used by both applications. Product request data goes through the Express API; the browser reads its own `users/{uid}` profile under Firestore rules. See `docs/architecture/` for current diagrams and data boundaries.
 
-The implemented role model includes Safety Officer; Coordinator Lead remains absent. Submission still assigns a Coordinator automatically. SPM-90 has local primary-venue selection, confirmation gating, attendee location projection and change history. SPM-19 adds Attendee registration and an Organiser's registration settings at Confirmed or Preparation. Confirm also requires the recorded SPM-91/92 safety approval. Live-project backfill and human acceptance remain outstanding. The available backlog workbook is a reference for story interactions; its status is not used to judge application implementation. CI has three jobs for code checks, Firestore emulator transactions, and Playwright. The earlier September observations below are historical checkpoints, not a current inventory of routes, seed counts, or CI.
+The implemented role model includes Safety Officer and, since SPM-68, Event Coordinator Lead. Submission no longer assigns a Coordinator; the Lead assigns one from the unassigned queue. SPM-90 has local primary-venue selection, confirmation gating, attendee location projection and change history. SPM-19 adds Attendee registration and an Organiser's registration settings at Confirmed or Preparation. Confirm also requires the recorded SPM-91/92 safety approval. Live-project backfill and human acceptance remain outstanding. The available backlog workbook is a reference for story interactions; its status is not used to judge application implementation. CI has three jobs for code checks, Firestore emulator transactions, and Playwright. The earlier September observations below are historical checkpoints, not a current inventory of routes, seed counts, or CI.
+
+## Current SPM-68 state (29 October 2026)
+
+SPM-68 is **implemented locally and not Done**: automated checks pass, but no manual acceptance, live-project API run or live seed has been performed, and the team decisions below await PO confirmation.
+
+- **Role:** `coordinator_lead` ("Event Coordinator Lead") in `shared/permissions.js`. It views only submitted requests with no Coordinator (`core` plus `organisationName`), edits nothing and has no SPM-9 actions. A user who is both Lead and Coordinator acts as a Coordinator only on events assigned to them.
+- **Submit:** a first submission stays Submitted with `assignedCoordinatorUid: null` and a `submittedAt` time. A resubmitted Returned request keeps its Coordinator. The SPM-8 empty-pool 500 is gone.
+- **Queue and assignment:** `GET /api/requests/unassigned` (Lead only, oldest first); `GET /api/event-requests/:id/assignment/candidates` (Coordinators with their active-event counts, excluding the Lead and the submitter); `POST /api/event-requests/:id/assignment` (one transaction: 409 unless still unassigned, assignment lock, `assignedByUid`, `assignedAt`, `coordinator_assigned` entry with the Lead as actor). Rules: `shared/coordinatorLeadAssignment.js`; service: `backend/src/services/coordinatorLeadAssignmentService.js`; page: `/requests/unassigned`.
+- **Display:** the Organiser's Event Coordinator row reads "Unassigned" (was "Not yet assigned"). It is the only place an Organiser sees the Coordinator.
+- **Seed:** `coordinator-lead@seed.connectsphere.test` and `seed-req-a2-unassigned`. Existing seeded assignments are kept. Only a dry run was performed.
+- **Team decisions pending PO:** effective-requirements.md §4.5, SPM-68.
+- **Known gaps:** no assignment notifications (SPM-84/85); SPM-26 still lets the assigned Coordinator reassign (CL3 says Lead-only); the Lead cannot see events after assigning them (G8!C41); assignment entries are recorded but not shown in any page; concurrent assignment by two Leads is covered only by the in-transaction re-check and an in-memory test, not an emulator test.
+- **Evidence:** `tests/spm-68/` (unit, API integration, page, navigation, Playwright `tests/spm-68/e2e/spm68.assignFromQueue.spec.js`).
 
 ## Current SPM-90 state (29 October 2026)
 

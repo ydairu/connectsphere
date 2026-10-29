@@ -9,8 +9,8 @@ This is a manual checklist. It has not been run in a browser as written; record 
 - [ ] Reset the seed so earlier demos are cleared: `SEED_ACCOUNT_PASSWORD=… node backend/scripts/seed.js --write --project=<FIREBASE_PROJECT_ID>` (run it without `--write` first for a dry run).
 - [ ] Every seeded account is `<slug>@seed.connectsphere.test` with the password in `SEED_ACCOUNT_PASSWORD`. Set the browser to Singapore time (SGT): date/time fields use the browser's timezone.
 - [ ] **Log in:** `/login` → **Email address**, **Password** → **Log in**; you land on `/profile`. **Switch user:** `/profile` → **Log out**.
-- [ ] **Assignments the app makes.** Each is shown on screen; use the account the page names. With freshly seeded data:
-  - Coordinator: **Seed Coordinator 3** (`coordinator-3@…`), who has the lightest workload.
+- [ ] **Assignments.** Each is shown on screen; use the account the page names. With freshly seeded data:
+  - Coordinator: chosen by the Event Coordinator Lead (`coordinator-lead@…`) in step 1b. Choose **Seed Coordinator 3** (`coordinator-3@…`), who has the lightest workload; the later steps assume it.
   - Venue Staff: usually **Seed Venue Staff** (`venue-staff@…`), named in the booking confirmation.
   - Technical Support Staff: almost certainly **Seed Venue + Technical Staff** (`venue-technical-staff@…`), not Seed Technical Staff, who already has the two seeded Pending Review requests. Named in the equipment request confirmation.
 
@@ -22,7 +22,14 @@ This is a manual checklist. It has not been run in a browser as written; record 
    - [ ] **Save unsubmitted request** → toast **Draft saved**, "Your event request has been saved as a draft. You can continue editing it on this page."; the URL becomes `/event-requests/<id>/edit` and the heading **Edit Draft Event Request**.
    - [ ] Optional: **My drafts** (`/requests/drafts`, heading **Saved drafts**) lists it.
    - [ ] **Submit request** → toast **Request submitted**, "Your event request is now available for the next staff workflow."; card **Submitted for review** with **Back to requests**.
-   - [ ] **Back to requests** (`/requests`, heading **Event requests**) → **View**. Note the `<id>`. Status **Submitted**; the **Event Coordinator** row names the Coordinator.
+   - [ ] **Back to requests** (`/requests`, heading **Event requests**) → **View**. Note the `<id>`. Status **Submitted**; the **Event Coordinator** row reads **Unassigned** (SPM-68: nothing is assigned on submission).
+
+1b. **The Event Coordinator Lead assigns a Coordinator (SPM-68)**
+   - [ ] As `coordinator-lead@…`, click **Unassigned requests** in the navbar (`/requests/unassigned`, heading **Unassigned requests**). "Walkthrough Seminar" is listed with **Date and time**, **Duration** "2 hours", **Expected attendees** `30`, **Organisation** and **Submitted**, after the seeded "A2 unassigned (waiting for a Coordinator)" (oldest first).
+   - [ ] On "Walkthrough Seminar", **Assign** → **Event Coordinator** lists "Seed Coordinator · 6 active events", "Seed Coordinator 2 · 2 active events", "Seed Coordinator 3 · 1 active event", with **Choose a Coordinator** selected and **Confirm assignment** disabled. The Lead is not listed.
+   - [ ] Choose **Seed Coordinator 3** → **Confirm assignment** → "“Walkthrough Seminar” was assigned to Seed Coordinator 3."; the card disappears.
+   - [ ] Optional: as `coordinator-3@…`, `/requests/unassigned` shows **You do not have access to this page**, and there is no **Unassigned requests** link.
+   - [ ] As `organiser-a1@…`, reopen the event: the **Event Coordinator** row now reads **Seed Coordinator 3**.
 
 2. **Review, return for clarification, resubmit, approve to Planning**
    - [ ] As the assigned Coordinator (`coordinator-3@…`): **Requests** shows **Events assigned to you** → **View** (`/requests/<id>`).
@@ -30,7 +37,7 @@ This is a manual checklist. It has not been run in a browser as written; record 
    - [ ] **Return for clarification** → prompt "Return this request to the organiser for clarification or amendments?" → fill **Message to the organiser (required)** (the button stays disabled with "Enter a message to the organiser to continue." until it has text) → **Return for clarification** → **Status changed to Returned for clarification.**
    - [ ] As `organiser-a1@…`, open the event: a **Clarification requested** card shows the message. ⚠️ The Organiser gets no notification for this; they only see it on the request page.
    - [ ] Edit **Purpose** under **Event details** → **Save changes** → **Changes saved.**
-   - [ ] **Status actions** → **Resubmit request** → **Status changed to Submitted.**
+   - [ ] **Status actions** → **Resubmit request** → **Status changed to Submitted.** The **Event Coordinator** row still names Seed Coordinator 3: a resubmitted request keeps its Coordinator and does not return to the Lead's queue.
    - [ ] As the Coordinator: **Start review**, then **Approve for planning** → **Status changed to Planning.** **Arrangements and cancellation** shows **Venue arrangement** and **Technical arrangement** as **Awaiting approval**; under **Status actions**: "The event can be confirmed once all mandatory venue and technical arrangements are approved."
 
 3. **Coordinator requests a venue; a conflicting choice is blocked**

@@ -287,6 +287,27 @@ export function reassignCoordinator(user, id, { coordinatorUid, handoverAgreed }
   })
 }
 
+// SPM-68: the Event Coordinator Lead's unassigned queue, oldest first: { requests: [{ id, title,
+// preferredDateTime, durationHours, expectedAttendees, organisationName, submittedAt }] }. 403 for anyone else.
+export function listUnassignedRequests(user) {
+  return authenticatedRequest(user, '/api/requests/unassigned')
+}
+
+// SPM-68: the Coordinators the Lead may choose for a request: { candidates: [{ uid, name, activeEvents }] }.
+export function getAssignmentCandidates(user, id) {
+  return authenticatedRequest(user, `/api/event-requests/${id}/assignment/candidates`)
+}
+
+// SPM-68: assign the request to a Coordinator. Returns { id, assigned: true, coordinator: { name } }; the request
+// then leaves the queue. Refusals: 403 (not a Lead), 404 (missing), 409 (no longer waiting for a Coordinator)
+// or 400 (an invalid Coordinator), each with a message.
+export function assignCoordinator(user, id, { coordinatorUid }) {
+  return authenticatedRequest(user, `/api/event-requests/${id}/assignment`, {
+    method: 'POST',
+    body: JSON.stringify({ coordinatorUid }),
+  })
+}
+
 // SPM-47, SPM-63 — the signed-in user's own in-app notifications, newest first.
 export function listNotifications(user) {
   return authenticatedRequest(user, '/api/notifications')

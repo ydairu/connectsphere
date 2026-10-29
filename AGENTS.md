@@ -72,9 +72,9 @@ A story is Done only when its acceptance criteria and the team's Definition of D
 
 ## 6. Authentication and Authorisation Guardrails
 
-**Implementation boundary (27 October 2026):** The role constants and routes below implement the original five roles. Later customer requirements add Event Coordinator Lead and Safety Officer, but neither role is implemented in `shared/permissions.js` or the browser routes. Do not infer those roles, a Lead-managed queue, or a persisted safety review from this five-role guidance. The SPM-88 local Preparation status and edit condition exist; the production safety verifier fails closed pending SPM-91/92. See `project_context.md` and `docs/requirements/effective-requirements.md` before extending these workflows.
+**Implementation boundary (29 October 2026):** The role constants and routes below implement the original five roles plus the two Week 7 internal roles: Safety Officer (SPM-66) and Event Coordinator Lead (SPM-68, the unassigned queue and first assignment only). Lead-only reassignment, the Lead's view of the events they assigned, and assignment notifications are not implemented; do not infer them from this guidance. The SPM-88 local Preparation status and edit condition exist; the production safety verifier fails closed pending SPM-91/92. See `project_context.md` and `docs/requirements/effective-requirements.md` before extending these workflows.
 
-The five roles currently implemented in the repository are:
+The seven roles currently implemented in the repository are:
 
 - Event Organiser
 - Event Coordinator
@@ -82,6 +82,7 @@ The five roles currently implemented in the repository are:
 - Technical Support Staff
 - Attendee
 - Safety Officer (Week 7 Change #6; implemented by SPM-66 as `safety_officer`)
+- Event Coordinator Lead (Week 7 Change #5; implemented by SPM-68 as `coordinator_lead`)
 
 A user may hold multiple roles; effective access is the union of assigned roles. Enforce access in the backend/data layer as well as the UI. Hiding a control is not sufficient authorisation.
 
@@ -98,8 +99,8 @@ The customer did not prescribe password length, complexity, expiry, history, loc
 
   | Prefix | Routes | Story | Files |
   |---|---|---|---|
-  | `/api/event-requests` | `POST /` creates a draft; `PATCH /:id` updates the owner's own draft | SPM-7 | `backend/src/routes/eventRequestRoutes.js`, `backend/src/services/eventRequestService.js`, validation in `shared/eventRequest.js` |
-  | `/api/requests` | `GET /` scoped list; `GET /:id`; `PATCH /:id` role-based section edit (preparation values validated, SPM-48); `GET /:id/history` field change history (SPM-28, read-only); `GET`/`POST /:id/venue-bookings` venue booking requests (SPM-14, `backend/src/services/venueBookingService.js`); `GET`/`POST /:id/equipment-requests` equipment requests (SPM-17, `backend/src/services/equipmentRequestService.js`); `GET /:id/equipment-requests/:requestId/availability` availability check, read-only (SPM-18, `backend/src/services/equipmentAvailabilityService.js`); `POST /:id/equipment-requests/:requestId/actions` approve, re-confirm or reject an equipment request (SPM-56, SPM-36); `POST /:id/safety-review` the Safety Officer's review and `GET /:id/safety-review/venues` the booked venues' safety details (SPM-92, SPM-66, `backend/src/services/safetyReviewService.js`); `POST /:id/registrations` an Attendee registers, `GET /:id/registrations` the registered list for the owning Organiser and assigned Coordinator (SPM-19, `backend/src/services/registrationService.js`). `GET /api/registrations` (SPM-19) is the signed-in Attendee's own registrations | SPM-42 | `backend/src/routes/requestRoutes.js`, `backend/src/middleware/authorise.js`, `backend/src/services/eventRequestStore.js` |
+  | `/api/event-requests` | `POST /` creates a draft; `PATCH /:id` updates the owner's own draft; `GET /:id/assignment/candidates` and `POST /:id/assignment` the Lead assigns a Coordinator (SPM-68, `backend/src/services/coordinatorLeadAssignmentService.js`) | SPM-7 | `backend/src/routes/eventRequestRoutes.js`, `backend/src/services/eventRequestService.js`, validation in `shared/eventRequest.js` |
+  | `/api/requests` | `GET /` scoped list; `GET /:id`; `PATCH /:id` role-based section edit (preparation values validated, SPM-48); `GET /:id/history` field change history (SPM-28, read-only); `GET`/`POST /:id/venue-bookings` venue booking requests (SPM-14, `backend/src/services/venueBookingService.js`); `GET`/`POST /:id/equipment-requests` equipment requests (SPM-17, `backend/src/services/equipmentRequestService.js`); `GET /:id/equipment-requests/:requestId/availability` availability check, read-only (SPM-18, `backend/src/services/equipmentAvailabilityService.js`); `POST /:id/equipment-requests/:requestId/actions` approve, re-confirm or reject an equipment request (SPM-56, SPM-36); `POST /:id/safety-review` the Safety Officer's review and `GET /:id/safety-review/venues` the booked venues' safety details (SPM-92, SPM-66, `backend/src/services/safetyReviewService.js`); `POST /:id/registrations` an Attendee registers, `GET /:id/registrations` the registered list for the owning Organiser and assigned Coordinator (SPM-19, `backend/src/services/registrationService.js`). `GET /api/registrations` (SPM-19) is the signed-in Attendee's own registrations. `GET /unassigned` the Event Coordinator Lead's queue (SPM-68), registered before `/:id` | SPM-42 | `backend/src/routes/requestRoutes.js`, `backend/src/middleware/authorise.js`, `backend/src/services/eventRequestStore.js` |
 
 - **[Team decision] Which route set to use, by the request's status.** Proposed by Shaun and confirmed with the SPM-7/SPM-4 owner on 20 September 2026.
   - **A draft** is created and edited through `/api/event-requests` (SPM-7, SPM-4). It validates field values with `shared/eventRequest.js`, and its own owner-and-draft check matches what `shared/permissions.js` permits at that status. The UI sends drafts to `/event-requests/:id/edit`.
@@ -115,7 +116,12 @@ The customer did not prescribe password length, complexity, expiry, history, loc
 - **Ownership comes from the server.** On create, `ownerUid`, `organisationId` and `organisationName` are set from `req.user` (`buildDraftEventRequest` in `shared/eventRequest.js`). Never take them from the request body.
 - **Requests are stored by section.** Section data lives under `core`, `venue`, `equipment`, `registration`, `internal`, `venuePreparation` or `equipmentPreparation` (SPM-48), and a field's section is its top-level key. A field stored outside a section cannot be permission-checked. Record metadata stays at the top level: `status`, `ownerUid`, `organisationId`, `organisationName`, `assignedStaffUids` and `assignedCoordinatorUid` (SPM-8). Field names within each section are defined by `normaliseEventRequestInput` in `shared/eventRequest.js`.
 - **Statuses come from `shared/status.js`,** never string literals. Draft queries test `status === DRAFT` only, because the name of the submitted status is not yet ratified.
-- **Coordinator assignment (SPM-8) runs inside the submit transaction.** `submitDraftEventRequest` calls `assignCoordinatorInTransaction` in `backend/src/services/coordinatorAssignmentService.js`; the selection rule is in `shared/coordinatorAssignment.js`. Each assignment reads and writes the lock document `systemLocks/coordinatorAssignment` so overlapping submissions are serialised, and adds an entry to the `eventRequests/{id}/activity` subcollection with "System" as the actor. Reuse these for reassignment (SPM-26) rather than writing a second selection path.
+- **Coordinator assignment is done by the Event Coordinator Lead (SPM-68), not on submit.**
+  - **Submit:** `submitDraftEventRequest` no longer assigns anyone. A first submission is Submitted with `assignedCoordinatorUid: null` and a `submittedAt` time; a resubmitted Returned request keeps its Coordinator because submit never writes the field. "Unassigned" is derived (`awaitingCoordinatorAssignment` in `shared/coordinatorAssignment.js`), not a status.
+  - **Where the rules live:** who may assign, which requests are in the queue and whom the Lead may choose are decided only by `shared/coordinatorLeadAssignment.js` (it reuses SPM-26's target checks and adds "not the Lead themselves").
+  - **Assigning:** `assignCoordinator` in `backend/src/services/coordinatorLeadAssignmentService.js` re-reads the request in the transaction (409 unless still submitted and unassigned), reads and writes `systemLocks/coordinatorAssignment`, writes `assignedCoordinatorUid`, `assignedByUid` and `assignedAt` (top-level metadata) and a `coordinator_assigned` activity entry with the Lead as actor. Entries before SPM-68 carry "System".
+  - **Reuse:** `loadCoordinators` and `loadActiveCounts` in `backend/src/services/coordinatorAssignmentService.js` serve the Lead's picker and SPM-26. Any new path that sets `assignedCoordinatorUid` must take the same lock. SPM-8's `selectCoordinator` is kept but not called.
+  - **Not implemented:** assignment notifications (SPM-84/85), Lead-only reassignment (SPM-26 still lets the assigned Coordinator reassign) and the Lead's view of events they assigned.
 - **Section access by role** (`SECTION_ACCESS` in `shared/permissions.js`; change it there, never in a route). Scope and status gates apply on top: assigned events only for Coordinators and staff, and the per-role status gate. Finished events are read-only for every role.
 
   | Role | Views | Edits |
@@ -126,6 +132,7 @@ The customer did not prescribe password length, complexity, expiry, history, loc
   | Technical Support Staff | `core`, `equipment`, `equipmentPreparation` | `equipmentPreparation` only (SPM-48) |
   | Attendee | `core` | nothing |
   | Safety Officer | `core`, `venue`, `equipment`, only for events in the safety-review queue (SPM-66) | nothing |
+  | Event Coordinator Lead | `core` plus `organisationName`, only for submitted requests with no Coordinator (SPM-68) | nothing; never passes `isAssignedCoordinator` and has no `availableActions` |
 
   - **SPM-48 behaviour change:** staff no longer edit `venue` or `equipment`. This is a team decision of 7 Oct 2026, pending PO confirmation, with an open question in effective-requirements.md §7.
   - **Preparation is internal:** Organisers and Attendees never receive either preparation section or its history.

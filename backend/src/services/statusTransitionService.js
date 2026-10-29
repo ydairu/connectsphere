@@ -185,7 +185,7 @@ export function requireRequestScope(user, request) {
  */
 export async function transitionEventRequest(id, action, user, db = getAdminDb(), now = new Date(), options = {}) {
   if (action === SUBMIT || action === RESUBMIT) {
-    return transitionBySubmission(id, action, user, db, now, options)
+    return transitionBySubmission(id, action, user, db, now)
   }
 
   return db.runTransaction(async (tx) => {
@@ -351,7 +351,7 @@ async function assignedPreparationRecipients(tx, db, request, actor) {
 
 // The action named must match the request's status: "resubmit" on a draft is refused rather than silently
 // treated as "submit". The read is outside the submit transaction, which re-checks everything itself.
-async function transitionBySubmission(id, action, user, db, now, options) {
+async function transitionBySubmission(id, action, user, db, now) {
   const snapshot = await db.collection('eventRequests').doc(id).get()
   if (!snapshot.exists) throw new EventRequestNotFoundError()
 
@@ -360,5 +360,5 @@ async function transitionBySubmission(id, action, user, db, now, options) {
 
   refuse(canTransition(user, existing, action, now))
 
-  return submitDraftEventRequest(id, user, db, now, options)
+  return submitDraftEventRequest(id, user, db, now)
 }

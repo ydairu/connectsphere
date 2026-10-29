@@ -1,4 +1,4 @@
-import { ATTENDEE, COORDINATOR, ORGANISER, SAFETY_OFFICER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
+import { ATTENDEE, COORDINATOR, COORDINATOR_LEAD, ORGANISER, SAFETY_OFFICER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
 
 // Wording for the requests page. The page, its data and its permission rules are identical for every
 // role — only the words differ, because the same list means different things to each of them: the
@@ -7,7 +7,8 @@ import { ATTENDEE, COORDINATOR, ORGANISER, SAFETY_OFFICER, TECHNICAL_STAFF, VENU
 //
 // A user may hold several roles (SPM-42), so one wording has to be chosen. Precedence puts internal
 // roles first: coordinator, then staff, then organiser, then attendee. The permissions themselves are
-// still the union of all their roles — this only decides the heading.
+// still the union of all their roles — this only decides the heading. A Lead who is also a Coordinator keeps
+// the Coordinator heading; their queue is on its own page (SPM-68).
 const COPY = {
   [COORDINATOR]: {
     eyebrow: 'Coordination',
@@ -38,6 +39,15 @@ const COPY = {
     emptyTitle: 'No events awaiting a safety check',
     emptyBody: 'Events appear here when their coordinator submits them for safety review.',
   },
+  // SPM-68: the Lead's list is the unassigned queue — inScope() admits only submitted requests with no
+  // Coordinator. Assigning happens on /requests/unassigned.
+  [COORDINATOR_LEAD]: {
+    eyebrow: 'Coordinator assignment',
+    title: 'Unassigned requests',
+    description: 'Submitted requests waiting for an Event Coordinator. Assign them from the Unassigned requests page.',
+    emptyTitle: 'No requests waiting for a Coordinator',
+    emptyBody: 'Requests appear here when an organiser submits them, until a Coordinator is assigned.',
+  },
   [ATTENDEE]: {
     eyebrow: 'Events',
     title: 'Events open to you',
@@ -51,7 +61,7 @@ const COPY = {
 // both. Their sections differ, which the detail page shows — not this list.
 COPY[TECHNICAL_STAFF] = COPY[VENUE_STAFF]
 
-const PRECEDENCE = [COORDINATOR, SAFETY_OFFICER, VENUE_STAFF, TECHNICAL_STAFF, ORGANISER, ATTENDEE]
+const PRECEDENCE = [COORDINATOR, COORDINATOR_LEAD, SAFETY_OFFICER, VENUE_STAFF, TECHNICAL_STAFF, ORGANISER, ATTENDEE]
 
 const FALLBACK = {
   eyebrow: 'Your requests',

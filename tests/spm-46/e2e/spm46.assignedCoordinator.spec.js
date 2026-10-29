@@ -4,8 +4,9 @@
 //
 // This uses an event assigned to `coordinator`. Since SPM-26 the double also holds Seed Coordinator 2
 // (EXTRA_USERS.secondCoordinator); the name after a real reassignment is checked end to end in
-// tests/workflows/e2e/coordinatorReassignment.spec.js. "Not yet assigned" and "name unavailable" need records the
-// double cannot produce through the app, so they are covered in tests/spm-46/integration.
+// tests/workflows/e2e/coordinatorReassignment.spec.js. "Unassigned" (SPM-68's wording, formerly "Not yet assigned")
+// is checked end to end on the seeded unassigned request in tests/spm-68/e2e. "Name unavailable" needs a record the
+// double cannot produce through the app, so it is covered in tests/spm-46/integration.
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { SUBMITTED } from '../../../shared/status.js'
@@ -47,7 +48,7 @@ test.describe('SPM-46 — View the assigned Event Coordinator (E2E)', () => {
     await page.goto(`/requests/${draft.id}`)
     await expect(page).toHaveURL(new RegExp(`/event-requests/${draft.id}/edit$`))
     await expect(page.getByText('Event Coordinator', { exact: true })).toHaveCount(0)
-    await expect(page.getByText('Not yet assigned')).toHaveCount(0)
+    await expect(page.getByText('Unassigned', { exact: true })).toHaveCount(0)
   })
 
   test('spm46_out_of_scope_organiser_and_the_coordinator_see_no_coordinator_row', async ({ page }) => {

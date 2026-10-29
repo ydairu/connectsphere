@@ -23,6 +23,10 @@ export function createEventRequestRoutes({ authenticate, getDb, getUserDb = getD
   // shared/coordinatorReassignment.js decides who may reassign.
   router.get('/:id/reassignment/candidates', authenticate, controller.listReassignmentCandidates)
   router.post('/:id/reassignment', authenticate, controller.reassignEventRequest)
+  // SPM-68 Lead assignment from the unassigned queue. Not a transition either. No role check here:
+  // shared/coordinatorLeadAssignment.js decides who may assign (403 for anyone but a Lead).
+  router.get('/:id/assignment/candidates', authenticate, controller.listAssignmentCandidates)
+  router.post('/:id/assignment', authenticate, controller.assignCoordinator)
   // SPM-13 venue suitability, read-only. No role check here: shared/venueSuitability.js decides who may ask.
   router.get('/:id/venue-suitability', authenticate, suitabilityController.getVenueSuitability)
 

@@ -1,16 +1,24 @@
-// Coordinator selection — SPM-8 (initial assignment), reusable by SPM-26 (reassignment).
+// Coordinator selection and workload — SPM-8, reused by SPM-26 (reassignment) and SPM-68 (Lead assignment).
 //
-// Pure functions: no Firebase, no I/O. The backend loads coordinators and requests and applies the rule
-// inside the submit transaction (backend/src/services/coordinatorAssignmentService.js).
+// Pure functions: no Firebase, no I/O.
 //
-// "A submitted event is automatically assigned to an Event Coordinator." "Strictly no more than one
-// Coordinator is assigned to an event." — Clarification 1, Coordinator and Staff Assignment.
-// "Round-robin or load-based assignment are acceptable examples." "Detailed assignment criteria beyond
-// basic automatic assignment are a team choice." — Clarification 2, Coordinator Assignment.
-// The load-based rule below is SPM-8's business rule: fewest active assigned events, random tie-break,
-// never the submitter. It is pending ratification in effective-requirements.md §5.
+// SPM-68 (W7-CUST Change #5): "Newly submitted event requests should no longer be assigned directly to an
+// Event Coordinator. Instead, they first enter an unassigned queue that can be viewed by the Event Coordinator
+// Lead." Submission therefore no longer runs selectCoordinator(); the Lead chooses, and the picker shows each
+// Coordinator's active workload from countActiveAssignments(). selectCoordinator() is kept as SPM-8's
+// documented rule — whether the Lead is offered it as a suggestion is an open customer gap
+// (effective-requirements.md §4.5, G8!B12).
 
 import { CONFIRMED, PLANNING, PREPARATION, RETURNED, SUBMITTED, UNDER_REVIEW } from './status.js'
+
+/**
+ * Is this request in the Event Coordinator Lead's unassigned queue? Submitted and no Coordinator — the field
+ * null or absent (SPM-68 [Team decision]: "unassigned" is derived, not a status). A returned request that is
+ * resubmitted keeps its Coordinator (CL3 G8!C15), so it is never in the queue.
+ */
+export function awaitingCoordinatorAssignment(request) {
+  return request?.status === SUBMITTED && !request.assignedCoordinatorUid
+}
 
 // Statuses that count towards a coordinator's workload. Draft, Completed, Cancelled and Rejected do not.
 export const ACTIVE_ASSIGNMENT_STATUSES = Object.freeze([SUBMITTED, UNDER_REVIEW, RETURNED, PLANNING, CONFIRMED, PREPARATION])

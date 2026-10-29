@@ -44,9 +44,11 @@ describe('SPM-3 — submit event request service (integration)', () => {
     expect(submitted.ownerUid).toBe(organiser.uid)
     expect(submitted.core.title).toBe('Ready request')
     expect(submitted.updatedAt).toBe(now.toISOString())
-    expect(submitted.assignedCoordinatorUid).toBe('coordinator-1')
+    // SPM-68: a submission is no longer assigned automatically; it waits in the Event Coordinator Lead's queue.
+    expect(submitted.assignedCoordinatorUid ?? null).toBeNull()
     expect(db.store.get('request-1').status).toBe(SUBMITTED)
-    expect(db.store.get('request-1').assignedCoordinatorUid).toBe('coordinator-1')
+    expect(db.store.get('request-1').assignedCoordinatorUid ?? null).toBeNull()
+    expect(db.store.get('request-1').submittedAt).toBe(now.toISOString())
   })
 
   it('spm3_rejects_submission_with_every_missing_mandatory_field_and_leaves_draft_unchanged', async () => {
