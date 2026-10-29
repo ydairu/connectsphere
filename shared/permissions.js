@@ -314,8 +314,8 @@ function isPlainObject(value) {
 }
 
 /**
- * The request reduced to what this user may view, or null if it is out of scope. Only `id`, `status`
- * and viewable sections are kept. Record-level metadata (ownerUid, organisationId, assignedStaffUids,
+ * The request reduced to what this user may view, or null if it is out of scope. `id`, `status`,
+ * viewable sections and the public primary venue location are kept. Other record-level metadata (ownerUid, organisationId, assignedStaffUids,
  * ...) is treated as internal and kept only for callers who may view the `internal` section.
  *
  * Implements: an attendee must not receive internal planning fields "even unrendered" (plan, Phase 2);
@@ -333,6 +333,13 @@ export function projectRequest(user, request) {
       if (preparationShown(request)) body[section] = preparationSection(request, section)
     } else if (Object.hasOwn(request, section)) {
       body[section] = request[section]
+    }
+  }
+  if (request.primaryVenue && sections.includes(CORE)) {
+    const { bookingId, venueName, location, startsAt, endsAt } = request.primaryVenue
+    body.primaryVenue = {
+      ...((isAssignedCoordinator(user, request) || inScopeAs(ORGANISER, user, request)) ? { bookingId } : {}),
+      venueName, location: location ?? null, startsAt, endsAt,
     }
   }
   if (sections.includes(INTERNAL)) {

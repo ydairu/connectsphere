@@ -59,9 +59,17 @@ test('Coordinator resolves two venue needs independently before Confirm', async 
   expect(replacement.venueNeedId).toBe(room.venueNeedId)
   expect((await confirm()).status()).toBe(409)
   expect((await decide(replacement.id, 'approve', null, EXTRA_USERS.venueTechnicalStaff)).status()).toBe(200)
+  expect((await confirm()).status()).toBe(409)
+  const primary = await request.put(`${DOUBLE_ORIGIN}/api/requests/${eventId}/primary-venue`, {
+    headers: auth(ROLE_USERS.coordinator.uid), data: { bookingId: hall.id, expectedPrimaryVenueBookingId: null },
+  })
+  expect(primary.status(), await primary.text()).toBe(200)
   // SPM-91/92: Confirm also needs a safety approval, recorded through the double here.
   await recordSafetyApproval(request, eventId)
   const readyView = await request.get(`${DOUBLE_ORIGIN}/api/requests/${eventId}`, { headers: auth(ROLE_USERS.coordinator.uid) })
-  expect((await readyView.json()).availableActions).toContain('confirm')
+  const ready = await readyView.json()
+  expect(ready.venueBookingReadiness).toMatchObject({ ready: true })
+  expect(ready.primaryVenueRequired).toBe(false)
+  expect(ready.availableActions, JSON.stringify(ready)).toContain('confirm')
   expect((await confirm()).status()).toBe(200)
 })

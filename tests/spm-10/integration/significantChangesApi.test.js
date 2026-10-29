@@ -18,6 +18,7 @@ import { CHECK_SATISFACTORY, INVALIDATED_BY_SIGNIFICANT_CHANGE, SAFETY_APPROVED,
 import { CANCELLATION_REQUEST_OPEN, SIGNIFICANT_CHANGE } from '../../../shared/significantChanges.js'
 import { COMPLETED, CONFIRMED, PLANNING, SUBMITTED, UNDER_REVIEW } from '../../../shared/status.js'
 import { createFakeFirestoreEventRequestStore } from '../../shared/firebase-double/fakeFirestoreEventRequestStore.js'
+import { addApprovedVenue } from '../../spm-90/approvedVenueFixture.js'
 
 const TOKEN_PREFIX = 'test-token:'
 const { attendee, coordinator, coordinator3, organiserA1, safetyOfficer, technicalStaff, venueStaff, venueTechnicalStaff } = SEED_ACCOUNTS
@@ -198,7 +199,7 @@ describe('SPM-10 AC4/AC5 — Confirmed: back to Planning, sign-offs cleared, Con
     await patch(coordinator3, CONFIRMED_ID, { core: { preferredDateTime: '2026-11-27T09:00:00+08:00' } })
     expect(record(CONFIRMED_ID).safetyReview).toMatchObject({ status: SAFETY_INVALIDATED, invalidatedReason: INVALIDATED_BY_SIGNIFICANT_CHANGE })
     expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(ARRANGEMENTS_NOT_APPROVED)
-    db.collectionData('venueBookingRequests').set(`approved-${CONFIRMED_ID}`, { eventRequestId: CONFIRMED_ID, status: 'approved' })
+    addApprovedVenue(db, CONFIRMED_ID, `approved-${CONFIRMED_ID}`)
     expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(ARRANGEMENTS_NOT_APPROVED)
     expect((await act(technicalStaff, CONFIRMED_ID, 'approve_technical')).status).toBe(200)
     expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(SAFETY_APPROVAL_REQUIRED)

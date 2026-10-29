@@ -60,6 +60,7 @@ export const TERMINAL_STATUS = 'terminal_status'
 export const WRONG_STATUS = 'wrong_status'
 export { NOT_PERMITTED }
 export const ARRANGEMENTS_NOT_APPROVED = 'arrangements_not_approved'
+export const PRIMARY_VENUE_REQUIRED = 'primary_venue_required'
 export const EVENT_NOT_ENDED = 'event_not_ended'
 export const INSUFFICIENT_INFORMATION = 'insufficient_information'
 export const SAFETY_APPROVAL_REQUIRED = 'safety_approval_required'
@@ -128,8 +129,9 @@ const TRANSITIONS = Object.freeze({
     from: [PLANNING],
     to: CONFIRMED,
     actor: isAssignedCoordinator,
-    guard: (request) =>
-      !arrangementsApproved(request) ? ARRANGEMENTS_NOT_APPROVED : safetyApproved(request) ? null : SAFETY_APPROVAL_REQUIRED,
+    guard: (request) => !arrangementsApproved(request) ? ARRANGEMENTS_NOT_APPROVED
+      : request.primaryVenueReadiness?.ready !== true ? PRIMARY_VENUE_REQUIRED
+        : safetyApproved(request) ? null : SAFETY_APPROVAL_REQUIRED,
   },
   // SPM-88: preparation needs the safety approval recorded by SPM-92 (CL3 G8!C45). A Confirmed event confirmed
   // before SPM-91 has none, so it cannot start preparation until it is reviewed.

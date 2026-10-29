@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { approveVenueBooking, rejectVenueBooking, submitVenueBooking } from '../../backend/src/services/venueBookingService.js'
 import { transitionEventRequest } from '../../backend/src/services/statusTransitionService.js'
+import { setPrimaryVenue } from '../../backend/src/services/primaryVenueService.js'
 import { normaliseVenueBooking, venueBookingReadiness, venueNeedId } from '../../shared/venueBooking.js'
 import { APPROVE_VENUE } from '../../shared/requestActions.js'
 import { CONFIRM } from '../../shared/statusTransitions.js'
@@ -49,6 +50,7 @@ describe('SPM-79 booking and Confirm transactions', () => {
     expect(next.venueNeedId).toBe(room.id)
     await expect(confirm()).rejects.toMatchObject({ reason: 'arrangements_not_approved' })
     await approveVenueBooking('event', next.id, { action: 'approve' }, secondStaff, db, now)
+    await setPrimaryVenue('event', { bookingId: hall.id, expectedPrimaryVenueBookingId: null }, coordinator, db, now)
     expect((await confirm()).status).toBe(CONFIRMED)
   })
   it('rejects invalid interval, capacity and legacy venue action without writes', async () => {

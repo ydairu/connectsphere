@@ -9,6 +9,7 @@ import { checkVenueHoldInTransaction, venueBookingLockPath, VenueValidationError
 import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
 import { CONFIRMED, PLANNING, PREPARATION } from '../../../shared/status.js'
+import { recordPrimaryVenueChange } from './primaryVenueHistory.js'
 import { INVALIDATED_BY_VENUE_BOOKING_CANCELLED, INVALIDATED_BY_VENUE_BOOKING_REQUESTED, safetyReviewInvalidation } from '../../../shared/safetyReviewState.js'
 
 export const BOOKINGS = 'venueBookingRequests'
@@ -252,6 +253,12 @@ export async function cancelVenueBooking(eventId, bookingId, input, user, db = g
     tx.set(lockRef, { venueId: booking.venueId, updatedAt: at })
     const returnsToPlanning = event.status === CONFIRMED || event.status === PREPARATION
     const eventUpdate = { ...(returnsToPlanning ? { status: PLANNING } : {}), updatedAt: at }
+    if (event.primaryVenue?.bookingId === bookingId) {
+      eventUpdate.primaryVenue = null
+      eventUpdate.primaryVenueSelectionRequired = true
+      recordPrimaryVenueChange(tx, eventRef, event.primaryVenue, null,
+        { type: 'user', uid: user.uid, name: user.name ?? null, role: COORDINATOR }, at)
+    }
     if (event.arrangementApprovals?.venue) {
       eventUpdate.arrangementApprovals = Object.fromEntries(Object.entries(event.arrangementApprovals).filter(([key]) => key !== 'venue'))
     }

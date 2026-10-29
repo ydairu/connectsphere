@@ -10,7 +10,7 @@ import { validatePreparation } from '../middleware/validatePreparation.js'
 import { validateVenueRequirements } from '../middleware/validateVenueRequirements.js'
 import { refuseSignificantChangeWhileCancellationOpen, validateSignificantFields } from '../middleware/validateSignificantFields.js'
 import { createStaffRecipientLoader } from '../services/staffRecipientService.js'
-import { loadVenueBookingReadiness } from '../services/venueBookingService.js'
+import { loadVenueBookingState, PrimaryVenueError, setPrimaryVenue } from '../services/primaryVenueService.js'
 import { presentRequest } from '../middleware/authorise.js'
 import { createRegistrationController } from '../controllers/registrationController.js'
 import { createValidateRegistration } from '../middleware/validateRegistration.js'
@@ -37,6 +37,13 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   router.get('/:id/venue-bookings', authenticate, bookings.list)
   router.post('/:id/venue-bookings', authenticate, bookings.submit)
   router.post('/:id/venue-bookings/:bookingId/actions', authenticate, bookings.decide)
+  router.put('/:id/primary-venue', authenticate, async (req, res, next) => {
+    try { res.json({ primaryVenue: await setPrimaryVenue(req.params.id, req.body, req.user, getEventRequestDb()) }) }
+    catch (error) {
+      if (error instanceof PrimaryVenueError) return res.status(error.status).json({ message: error.message })
+      next(error)
+    }
+  })
   // SPM-17: the event's equipment requests. Who may read and submit is decided in the service
   // (shared/equipmentRequest.js), as SPM-14's booking routes do.
   const equipmentRequests = createEquipmentRequestController(getEventRequestDb)
@@ -61,8 +68,8 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead,
     async (req, res, next) => {
       try {
-        const venueBookingReadiness = await loadVenueBookingReadiness(req.params.id, getEventRequestDb())
-        res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName, ownerNames: req.ownerNames, venueBookingReadiness })
+        const bookingState = await loadVenueBookingState(req.params.id, req.eventRequest, getEventRequestDb())
+        res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName, ownerNames: req.ownerNames, ...bookingState })
         // SPM-19: whether this Attendee can register now, and why not. Loaded only for an Attendee in scope.
         res.locals.body.attendeeRegistration = inScopeAs(ATTENDEE, req.user, req.eventRequest)
           ? attendeeRegistrationSummary(req.user, req.eventRequest, await loadRegistrationContext(getEventRequestDb(), req.eventRequest, req.user))

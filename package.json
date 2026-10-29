@@ -71,6 +71,8 @@
     "test:spm79:emulator": "node tests/spm-79/runEmulatorTests.js",
     "test:spm81": "vitest run tests/spm-81/ && playwright test tests/spm-81/",
     "test:spm81:emulator": "node tests/spm-81/runEmulatorTests.js",
+    "test:spm90": "vitest run tests/spm-90/ && playwright test tests/spm-90/",
+    "test:spm90:emulator": "node tests/spm-90/runEmulatorTests.js",
     "test:spm77": "vitest run tests/spm-77/ && playwright test tests/spm-77/",
     "test:spm36": "vitest run tests/spm-36/",
     "test:spm61": "vitest run tests/spm-61/ && playwright test tests/spm-61/",

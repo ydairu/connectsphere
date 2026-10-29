@@ -113,6 +113,34 @@ describe('SPM-19 AC2 — the Organiser\'s period, and the capacity limit', () =>
     expect((await listFor(organiserA1)).json).toMatchObject({ registeredCount: 1, capacity: 1 })
   })
 
+  it('spm90_primary_venue_controls_registration_capacity_and_confirmation', async () => {
+    approvedVenue(2, SMALL_ID, 'Primary Room')
+    approvedVenue(10, SMALL_ID, 'Larger Hall')
+    api.updateStored(SMALL_ID, { primaryVenue: { bookingId: `booking-${SMALL_ID}-2`, venueName: 'Primary Room' } })
+
+    expect((await patchRegistration(organiserA1, { capacity: 3 })).json.errors).toHaveProperty('registration.capacity')
+    expect(await summary(attendee)).toMatchObject({ placesLeft: 2, venueNames: ['Primary Room'] })
+    expect((await listFor(coordinator)).json.capacity).toBe(2)
+    const first = await register(attendee)
+    expect(first.status).toBe(201)
+    expect(first.json.registration.venueNames).toEqual(['Primary Room'])
+    expect((await api.notificationsOf(attendee))[0].message).toContain('at Primary Room.')
+    expect((await register(attendee2)).status).toBe(201)
+    expect((await register(attendee3)).json.reason).toBe('full')
+  })
+
+  it('spm90_a_primary_venue_switch_changes_new_registrations_but_keeps_prior_snapshots', async () => {
+    approvedVenue(2, SMALL_ID, 'Primary Room')
+    approvedVenue(10, SMALL_ID, 'Larger Hall')
+    api.updateStored(SMALL_ID, { primaryVenue: { bookingId: `booking-${SMALL_ID}-2`, venueName: 'Primary Room' } })
+    expect((await register(attendee)).json.registration.venueNames).toEqual(['Primary Room'])
+
+    api.updateStored(SMALL_ID, { primaryVenue: { bookingId: `booking-${SMALL_ID}-10`, venueName: 'Larger Hall' } })
+    expect(await summary(attendee2)).toMatchObject({ venueNames: ['Larger Hall'], placesLeft: 1 })
+    expect((await register(attendee2)).json.registration.venueNames).toEqual(['Larger Hall'])
+    expect((await mine(attendee))[0].venueNames).toEqual(['Primary Room'])
+  })
+
   it('spm19_the_owner_sets_the_period_and_capacity_after_confirmation_and_nothing_else', async () => {
     const saved = await patchRegistration(organiserA1, { capacity: '5', closesAt: iso(10 * DAY) })
     expect(saved.status).toBe(200)

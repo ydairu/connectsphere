@@ -54,19 +54,28 @@ export async function loadApprovedVenues(db, eventId, now = new Date(), tx = nul
   return Promise.all(approved.map(async (booking) => {
     const venue = booking.venueId ? await read(tx, db.collection('venues').doc(booking.venueId)) : null
     const data = venue?.exists ? venue.data() : null
-    return { venueName: booking.venueName ?? data?.name ?? null, maximumCapacity: data?.maximumCapacity ?? null }
+    return { bookingId: booking.id, venueName: booking.venueName ?? data?.name ?? null, maximumCapacity: data?.maximumCapacity ?? null }
   }))
 }
 
 const venueNamesOf = (venues) => venues.map((venue) => venue.venueName).filter(Boolean)
+
+// SPM-90: once a primary venue is selected, it alone determines the Attendee's venue and venue capacity.
+// A stale selection must not expose a different approved venue as the event location.
+export function registrationVenueContext(event, approvedVenues) {
+  const venues = event.primaryVenue?.bookingId
+    ? approvedVenues.filter((venue) => venue.bookingId === event.primaryVenue.bookingId)
+    : approvedVenues
+  return { venueCapacity: venueCapacityOf(venues), venueNames: venueNamesOf(venues) }
+}
 
 async function loadActiveRegistrations(db, eventId, tx = null) {
   return rows(await read(tx, db.collection(REGISTRATIONS_COLLECTION).where('eventRequestId', '==', eventId))).filter(isActiveRegistration)
 }
 
 /**
- * What the event page needs to tell this user about registration: the active count, the venue capacity and
- * names, and the user's own registration. Read outside any transaction; the register transaction re-reads it all.
+ * What the event page needs to tell this user about registration: the active count, the effective venue capacity
+ * and names, and the user's own registration. Read outside any transaction; the register transaction re-reads it all.
  */
 export async function loadRegistrationContext(db, event, user, now = new Date()) {
   const [venues, active, own] = await Promise.all([
@@ -74,10 +83,10 @@ export async function loadRegistrationContext(db, event, user, now = new Date())
     loadActiveRegistrations(db, event.id),
     user?.uid ? db.collection(REGISTRATIONS_COLLECTION).doc(registrationId(event.id, user.uid)).get() : null,
   ])
+  const venue = registrationVenueContext(event, venues)
   return {
     registeredCount: active.length,
-    venueCapacity: venueCapacityOf(venues),
-    venueNames: venueNamesOf(venues),
+    ...venue,
     existing: own?.exists ? own.data() : null,
     now,
   }
@@ -102,17 +111,18 @@ export async function registerForEvent(id, user, db = getAdminDb(), now = new Da
     const existing = await tx.get(registrationRef)
     const active = await loadActiveRegistrations(db, id, tx)
     const venues = await loadApprovedVenues(db, id, now, tx)
+    const venue = registrationVenueContext(event, venues)
 
     const decision = canRegister(user, event, {
       existing: existing.exists ? existing.data() : null,
       registeredCount: active.length,
-      venueCapacity: venueCapacityOf(venues),
+      venueCapacity: venue.venueCapacity,
       now,
     })
     if (!decision.allowed) throw new RegistrationError(decision.reason === NOT_ATTENDEE ? 403 : 409, decision.reason)
 
     const at = now.toISOString()
-    const registration = buildRegistration(event, user, { venueNames: venueNamesOf(venues), at })
+    const registration = buildRegistration(event, user, { venueNames: venue.venueNames, at })
     tx.set(registrationRef, registration)
     tx.set(lockRef, { eventRequestId: id, registeredCount: active.length + 1, updatedAt: at })
     addNotifications(tx, db, registrationConfirmedNotifications(event, user, { venueNames: registration.venueNames, at }))
@@ -142,7 +152,7 @@ export async function listEventRegistrations(id, user, db = getAdminDb(), now = 
   const [active, venues] = await Promise.all([loadActiveRegistrations(db, id), loadApprovedVenues(db, id, now)])
   return {
     registeredCount: active.length,
-    capacity: effectiveCapacity(event.registration ?? {}, venueCapacityOf(venues)),
+    capacity: effectiveCapacity(event.registration ?? {}, registrationVenueContext(event, venues).venueCapacity),
     registrations: active.sort((a, b) => String(a.registeredAt).localeCompare(String(b.registeredAt))).map(presentRegistrant),
   }
 }

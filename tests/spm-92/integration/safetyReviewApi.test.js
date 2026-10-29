@@ -57,8 +57,13 @@ async function approveArrangements() {
   })
   api.putDocument('venueBookingRequests', 'safety-booking', {
     eventRequestId: EVENT_ID, status: 'approved', venueId: 'safety-hall', venueName: 'Safety Hall', attendeeCount: 80,
-    requirements: 'Theatre layout', specialRequests: '', startsAt: '2026-11-20T01:00:00.000Z', endsAt: '2026-11-20T05:00:00.000Z',
+    requirements: 'Theatre layout', specialRequests: '', holdId: 'safety-hold', startsAt: '2026-11-20T01:00:00.000Z', endsAt: '2026-11-20T05:00:00.000Z',
     createdAt: '2026-10-01T00:00:00.000Z',
+  })
+  api.putDocument('venueAvailability', 'safety-hold', {
+    eventRequestId: EVENT_ID, bookingRequestId: 'safety-booking', venueId: 'safety-hall',
+    status: 'confirmed_booking', lifecycleStatus: 'active',
+    startsAt: '2026-11-20T01:00:00.000Z', endsAt: '2026-11-20T05:00:00.000Z',
   })
   expect((await act(technicalStaff, APPROVE_TECHNICAL)).status).toBe(200)
 }

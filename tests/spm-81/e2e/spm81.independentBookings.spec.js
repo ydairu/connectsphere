@@ -32,6 +32,10 @@ test('one approved venue can be cancelled and replaced without releasing the oth
   }
   await approve(hall)
   await approve(room)
+  const primary = await request.put(`${DOUBLE_ORIGIN}/api/requests/${eventId}/primary-venue`, {
+    headers: auth(coordinator.uid), data: { bookingId: room.id, expectedPrimaryVenueBookingId: null },
+  })
+  expect(primary.status(), await primary.text()).toBe(200)
   await loginAs(page, coordinator)
   await expect(page).toHaveURL(/\/profile$/)
   await page.goto(`${pageUrl}?bookingId=${hall.id}`)

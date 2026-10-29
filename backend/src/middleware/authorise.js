@@ -14,6 +14,7 @@ import { canViewChangeHistory, visibleChangeHistory } from '../../../shared/chan
 import { requestOwnerFields } from '../../../shared/requestOwner.js'
 import { preparationEditing } from '../../../shared/preparationAccess.js'
 import { canCheckVenueSuitability } from '../../../shared/venueSuitability.js'
+import { CONFIRMED, PLANNING } from '../../../shared/status.js'
 import { canDecideSafetyReview, safetyReviewListStatus, safetyReviewSummary } from '../../../shared/safetyReview.js'
 import { canViewRegistrations } from '../../../shared/registration.js'
 import {
@@ -71,14 +72,18 @@ function outOfScope(user, res) {
  * `canViewRegistrations` (SPM-19) says whether this user may read GET /api/requests/:id/registrations: the owning
  * Organiser and the assigned Coordinator. GET /api/requests/:id adds `attendeeRegistration` for an Attendee.
  */
-export function presentRequest(user, request, { coordinatorName = null, ownerNames, venueBookingReadiness = null } = {}) {
-  const current = { ...request, venueBookingReadiness }
+export function presentRequest(user, request, { coordinatorName = null, ownerNames, venueBookingReadiness = null, primaryVenueReadiness = null } = {}) {
+  const current = { ...request, venueBookingReadiness, primaryVenueReadiness }
   return {
     request: projectRequest(user, request),
     editableSections: SECTIONS.filter((section) => canEdit(user, request, section)),
     availableActions: allAvailableActions(user, current, new Date()),
     arrangements: arrangementsSummary(user, current),
     venueBookingReadiness: venueBookingReadiness && viewableSectionsFor(user, request).includes('venue') ? venueBookingReadiness : null,
+    primaryVenueRequired: primaryVenueReadiness?.ready === false && venueBookingReadiness?.ready === true &&
+      rolesOf(user).includes(COORDINATOR) && request.assignedCoordinatorUid === user.uid,
+    canSetPrimaryVenue: rolesOf(user).includes(COORDINATOR) && request.assignedCoordinatorUid === user.uid &&
+      [PLANNING, CONFIRMED].includes(request.status),
     cancellationRequest: cancellationSummary(user, request),
     clarificationRequests: clarificationSummary(user, request),
     canReassignCoordinator: canReassignCoordinator(user, request),

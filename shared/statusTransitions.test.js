@@ -90,7 +90,7 @@ const safetyApproval = { safetyReview: { status: SAFETY_APPROVED } }
 
 // What a request needs, beyond its status, for an action's guard to pass.
 const GUARD_SETUP = {
-  [CONFIRM]: { arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true }, ...safetyApproval },
+  [CONFIRM]: { arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true }, primaryVenueReadiness: { ready: true }, ...safetyApproval },
   [START_PREPARATION]: safetyApproval,
   [CANCEL]: upcoming,
   [APPROVE_CANCELLATION]: { ...upcoming, cancellationRequest: pendingCancellation },
@@ -254,7 +254,7 @@ describe('SPM-9 — confirm guard: mandatory venue and technical arrangements', 
   })
 
   test('confirm is allowed once venue and required technical arrangements and safety are approved', () => {
-    const request = requestAt(PLANNING, { equipment: { technicalSupportNeeded: true }, arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true }, ...safetyApproval })
+    const request = requestAt(PLANNING, { equipment: { technicalSupportNeeded: true }, arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true }, primaryVenueReadiness: { ready: true }, ...safetyApproval })
     assert.deepEqual(canTransition(assigned, request, CONFIRM, NOW), { allowed: true, from: PLANNING, to: CONFIRMED })
     assert.deepEqual(availableActions(assigned, request, NOW), [CONFIRM, REJECT])
   })
@@ -264,6 +264,7 @@ describe('SPM-9 — confirm guard: mandatory venue and technical arrangements', 
       equipment: { requirements: [], technicalSupportNeeded: false },
       arrangementApprovals: { venue: approved(venueStaff) },
       venueBookingReadiness: { ready: true },
+      primaryVenueReadiness: { ready: true },
       ...safetyApproval,
     })
     assert.equal(canTransition(assigned, request, CONFIRM, NOW).allowed, true)
@@ -271,7 +272,7 @@ describe('SPM-9 — confirm guard: mandatory venue and technical arrangements', 
 
   // SPM-91: "The event cannot become Confirmed without a valid safety approval."
   test('confirm needs a valid safety approval once the arrangements are approved', () => {
-    const ready = { equipment: { technicalSupportNeeded: true }, arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true } }
+    const ready = { equipment: { technicalSupportNeeded: true }, arrangementApprovals: bothApproved, venueBookingReadiness: { ready: true }, primaryVenueReadiness: { ready: true } }
     for (const status of [undefined, SAFETY_REVIEW_PENDING, SAFETY_CHANGES_REQUESTED, SAFETY_INVALIDATED, 'rejected']) {
       const request = requestAt(PLANNING, { ...ready, ...(status ? { safetyReview: { status } } : {}) })
       assert.equal(canTransition(assigned, request, CONFIRM, NOW).reason, SAFETY_APPROVAL_REQUIRED, String(status))

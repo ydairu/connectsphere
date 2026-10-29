@@ -1,6 +1,20 @@
 # ConnectSphere Project Context
 
-Last reviewed: 28 October 2026 (SPM-19 Attendee registration); previously 27 October 2026 (SPM-66/91/92 safety review increment; SPM-88 local increment and SPM-61 Organiser notifications; older sections retain their historical dates)
+Last reviewed: 29 October 2026 (SPM-90 and SPM-19 integration; older implementation sections retain their historical dates)
+
+## Current implementation map (27 October 2026)
+
+The browser has routes for authentication, profiles, requests and drafts, venue catalogue and bookings, equipment inventory and requests, reservations, and notifications (`frontend/src/App.jsx`). Express mounts health, profile, event request, scoped request, venue, equipment, and notification APIs (`backend/src/app.js`). `shared/` holds policy and validation used by both applications. Product request data goes through the Express API; the browser reads its own `users/{uid}` profile under Firestore rules. See `docs/architecture/` for current diagrams and data boundaries.
+
+The implemented role model includes Safety Officer; Coordinator Lead remains absent. Submission still assigns a Coordinator automatically. SPM-90 has local primary-venue selection, confirmation gating, attendee location projection and change history. SPM-19 adds Attendee registration and an Organiser's registration settings at Confirmed or Preparation. Confirm also requires the recorded SPM-91/92 safety approval. Live-project backfill and human acceptance remain outstanding. The available backlog workbook is a reference for story interactions; its status is not used to judge application implementation. CI has three jobs for code checks, Firestore emulator transactions, and Playwright. The earlier September observations below are historical checkpoints, not a current inventory of routes, seed counts, or CI.
+
+## Current SPM-90 state (29 October 2026)
+
+The assigned Coordinator can choose a current approved venue booking as primary through `PUT /api/requests/:id/primary-venue`. Confirm requires a primary venue for a multi-venue event and automatically selects the sole approved booking for a single venue need. Attendees receive only the primary venue name, catalogue location and event times; Organisers retain all associated bookings. Switching the primary booking while Confirmed preserves the event status. Cancelling the primary booking clears it, returns a Confirmed event to Planning through the existing cancellation behavior, and requires an explicit replacement choice. The existing change history records selection, switching and clearing. The selection API uses an expected previous booking ID to reject stale competing updates.
+
+The backfill script is dry-run-first and was not run against a live project. Already Confirmed multi-venue events without primary metadata need Coordinator selection before rollout. The locally available Product Backlog workbook was consulted for story interactions and left unchanged. The SPM-90 implementation meets the acceptance criteria in local automated checks; manual acceptance remains pending in `docs/testing/spm-90-manual-testing.md`. Acceptance mapping and the 29 October verification results are in `docs/evidence/spm-90-traceability.md`. No Firestore rules were changed or deployed.
+
+**SPM-19 integration (29 October 2026):** Once an approved primary venue is selected, new registrations use only that venue's capacity and name in availability, validation, confirmation and notices. Existing registration snapshots are retained. Events without a selected primary venue retain SPM-19's largest-approved-venue capacity rule.
 
 ## Current SPM-88 state (26 October 2026)
 
@@ -21,8 +35,8 @@ Detailed requirements and their provenance are maintained in [`docs/requirements
 Use the following priority when sources differ:
 
 1. Latest explicit team decision for a team-controlled choice
-2. Clarification Session 2
-3. Clarification Session 1
+2. Later customer clarifications and changes, including Session 3 and the Week 7 update as distilled in `docs/requirements/effective-requirements.md`
+3. Earlier customer clarifications, including Sessions 1 and 2
 4. Week 4 Project Instructions and Week 1 Customer Briefing
 5. Current Product Backlog and Sprint records
 6. Engineering recommendation
@@ -53,7 +67,7 @@ The repository currently uses:
 - Cloud Firestore
 - Firebase Admin SDK for backend token verification
 
-Tracked application routes currently include:
+At the original September checkpoint, tracked application routes included:
 
 - `/`
 - `/login`
@@ -62,9 +76,9 @@ Tracked application routes currently include:
 
 The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. The [CI workflow](.github/workflows/ci.yml) defines three independent jobs on every push and on pull requests into `main`: code checks and build, seven local Firestore emulator transaction suites, and the full Playwright E2E suite. The opt-in live API harness is not part of CI. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for commands, artifacts, and verification boundaries.
 
-## Independently Observed Implementation State
+## Independently Observed Implementation State (September checkpoint)
 
-The current code provides a useful authentication prototype, but it does **not** yet match the complete customer/backlog role model.
+At that checkpoint, the code provided an authentication prototype but did **not** yet match the complete customer/backlog role model. Later sections and the current implementation map above supersede these observations where implementation changed.
 
 Observed facts:
 
