@@ -12,6 +12,11 @@ import { refuseSignificantChangeWhileCancellationOpen, validateSignificantFields
 import { createStaffRecipientLoader } from '../services/staffRecipientService.js'
 import { loadVenueBookingReadiness } from '../services/venueBookingService.js'
 import { presentRequest } from '../middleware/authorise.js'
+import { createRegistrationController } from '../controllers/registrationController.js'
+import { createValidateRegistration } from '../middleware/validateRegistration.js'
+import { loadRegistrationContext } from '../services/registrationService.js'
+import { attendeeRegistrationSummary } from '../../../shared/registration.js'
+import { ATTENDEE, inScopeAs } from '../../../shared/permissions.js'
 
 // SPM-42's minimum API surface: list, read and section edit. No create, submit or draft-save routes —
 // those are SPM-7, SPM-3 and SPM-4.
@@ -46,6 +51,11 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   const safetyReviews = createSafetyReviewController(getEventRequestDb)
   router.get('/:id/safety-review/venues', authenticate, safetyReviews.listVenues)
   router.post('/:id/safety-review', authenticate, safetyReviews.decide)
+  // SPM-19: an Attendee registers; the owning Organiser and assigned Coordinator read the registered list.
+  // Who may do either is decided in shared/registration.js.
+  const registrations = createRegistrationController(getEventRequestDb)
+  router.get('/:id/registrations', authenticate, registrations.listForEvent)
+  router.post('/:id/registrations', authenticate, registrations.register)
 
   router.get('/', authenticate, controller.loadAll, controller.loadOwnerNames, authoriseList, controller.sendList)
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead,
@@ -53,6 +63,10 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
       try {
         const venueBookingReadiness = await loadVenueBookingReadiness(req.params.id, getEventRequestDb())
         res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName, ownerNames: req.ownerNames, venueBookingReadiness })
+        // SPM-19: whether this Attendee can register now, and why not. Loaded only for an Attendee in scope.
+        res.locals.body.attendeeRegistration = inScopeAs(ATTENDEE, req.user, req.eventRequest)
+          ? attendeeRegistrationSummary(req.user, req.eventRequest, await loadRegistrationContext(getEventRequestDb(), req.eventRequest, req.user))
+          : null
         next()
       } catch (error) { next(error) }
     }, controller.sendOne)
@@ -65,6 +79,7 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
     controller.loadOne,
     authoriseWrite,
     validatePreparation,
+    createValidateRegistration(getEventRequestDb),
     validateVenueRequirements,
     validateSignificantFields,
     refuseSignificantChangeWhileCancellationOpen,

@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 27 October 2026 (SPM-66/91/92 safety review increment; SPM-88 local increment and SPM-61 Organiser notifications; older sections retain their historical dates)
+Last reviewed: 28 October 2026 (SPM-19 Attendee registration); previously 27 October 2026 (SPM-66/91/92 safety review increment; SPM-88 local increment and SPM-61 Organiser notifications; older sections retain their historical dates)
 
 ## Current SPM-88 state (26 October 2026)
 
@@ -60,7 +60,7 @@ Tracked application routes currently include:
 - `/register`
 - protected `/profile`
 
-The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. The [CI workflow](.github/workflows/ci.yml) defines three independent jobs on every push and on pull requests into `main`: code checks and build, six local Firestore emulator transaction suites, and the full Playwright E2E suite. The opt-in live API harness is not part of CI. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for commands, artifacts, and verification boundaries.
+The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. The [CI workflow](.github/workflows/ci.yml) defines three independent jobs on every push and on pull requests into `main`: code checks and build, seven local Firestore emulator transaction suites, and the full Playwright E2E suite. The opt-in live API harness is not part of CI. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for commands, artifacts, and verification boundaries.
 
 ## Independently Observed Implementation State
 
@@ -830,3 +830,14 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Status:** SPM-66, SPM-91 and SPM-92 are **In Progress**. Every acceptance criterion has code and automated tests (`docs/evidence/spm-66-91-92-traceability.md`), but human acceptance, peer review and the team decisions are outstanding. Manual checks: `docs/testing/spm-66-91-92-manual-testing.md`.
 - **Evidence:** `npm run test:spm92`. Local run on 27 Oct 2026 (Windows): `npm run lint` and `npm run build` passed (existing large-chunk warning); Node suites 134 passed; frontend suite 101 passed; root Vitest 1,927 passed with 49 opt-in skips; Playwright 111 of 111 passed (after the code-review fixes).
 - **Not verified:** API tests use mocked identity and in-memory persistence, and browser tests use the Firebase double. There was no live-project check. Firestore rules were neither edited nor deployed; none is needed because staff roles were already excluded from self-registration.
+
+## SPM-19 Attendee registration — 28 October 2026
+
+- **Built:** an Attendee registers from the event page while the event is Confirmed or Preparation, registration is enabled, the Organiser's period is open and places remain. They get a confirmation with the event name, date/time and venue and an in-app notice, and see each registration's status on "My registrations" (`/registrations`). The owning Organiser and the assigned Coordinator see the count and the list of registrants on the event page.
+- **Code:** rules `shared/registration.js`; settings `normaliseRegistrationSettings` in `shared/eventRequest.js` and `backend/src/middleware/validateRegistration.js`; service `backend/src/services/registrationService.js` (lock `systemLocks/registration-{eventId}`); routes `POST`/`GET /api/requests/:id/registrations` and `GET /api/registrations`. Summarised in AGENTS.md §6.
+- **Team decisions (28 Oct 2026, pending PO confirmation):** D1 the owner edits only `registration` at Confirmed or Preparation; D2 capacity is the smaller of the Organiser's number and the largest approved venue; D3 only the owning Organiser and assigned Coordinator see registrants; D4 confirmation on the page plus an in-app notice; D5 an event moved back to Planning keeps registrations but takes no new ones (effective-requirements.md §3, §4.18).
+- **Changed behaviour:** the SPM-64 and SPM-42 tests that expected an owner's Confirmed or Preparation event to be fully read-only now expect `registration` to be editable. The seed gains two Attendees and a two-place Confirmed event, so Seed Coordinator's workload is 6 (was 5).
+- **Status:** In Progress, Sprint 4. Every acceptance criterion has code and automated tests (`docs/evidence/spm-19-traceability.md`); human acceptance and peer review are pending.
+- **Local verification (28 Oct 2026, macOS):** lint and build passed; Node 134, frontend 101, root Vitest 1,978 (51 skipped) and Playwright 112/112 passed.
+- **Not verified:** the emulator concurrency test cannot run on this machine (no Java) and runs in CI only. API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No live-project check; Firestore rules were neither edited nor deployed.
+- **Date risk:** the seeded two-place event's registration closes 25 Nov 2026, so the SPM-19 E2E spec fails after that date, as the seeded cancellation specs do after 20 Nov. The API suite sets its dates from the real clock.

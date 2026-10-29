@@ -1,3 +1,4 @@
+import { registrationSettingsErrors } from './registration.js'
 import { DRAFT } from './status.js'
 
 const MAX_SHORT_TEXT_LENGTH = 160
@@ -55,12 +56,35 @@ function collect(errors, path, result) {
   return result.value
 }
 
+// SPM-19: the registration period and capacity, set by the Organiser. How they relate to each other, the event
+// start and the venue capacity is checked by registrationSettingsErrors() in shared/registration.js.
+const REGISTRATION_SETTINGS = Object.freeze({
+  opensAt: dateTimeOrNull,
+  closesAt: dateTimeOrNull,
+  capacity: positiveIntegerOrNull,
+})
+
+/**
+ * The registration settings present in `input`, normalised, with errors keyed 'registration.<field>'. Only the
+ * fields given are returned, so a partial section edit (PATCH /api/requests/:id) can be checked on its own.
+ */
+export function normaliseRegistrationSettings(input = {}) {
+  const errors = {}
+  const value = {}
+  for (const [field, normalise] of Object.entries(REGISTRATION_SETTINGS)) {
+    if (Object.hasOwn(input, field)) value[field] = collect(errors, `registration.${field}`, normalise(input[field]))
+  }
+  return { value, errors }
+}
+
 export function normaliseEventRequestInput(input = {}) {
   const errors = {}
   const coreInput = input.core ?? {}
   const venueInput = input.venue ?? {}
   const equipmentInput = input.equipment ?? {}
   const registrationInput = input.registration ?? {}
+  const registrationSettings = normaliseRegistrationSettings({ opensAt: null, closesAt: null, capacity: null, ...registrationInput })
+  Object.assign(errors, registrationSettings.errors)
 
   const eventRequest = {
     core: {
@@ -83,7 +107,12 @@ export function normaliseEventRequestInput(input = {}) {
     registration: {
       enabled: booleanOrFalse(registrationInput.enabled),
       notes: collect(errors, 'registration.notes', textOrNull(registrationInput.notes)),
+      ...registrationSettings.value,
     },
+  }
+  // SPM-19: opens before it closes, closes by the event start. The venue capacity is unknown before booking.
+  for (const [path, message] of Object.entries(registrationSettingsErrors(eventRequest.registration, eventRequest.core))) {
+    errors[path] ??= message
   }
 
   return { eventRequest, errors }

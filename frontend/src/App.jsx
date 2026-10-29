@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../shared/permissions.js'
+import { ATTENDEE, COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../shared/permissions.js'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import CreateEventRequestPage from './pages/CreateEventRequestPage.jsx'
 import CreateVenuePage from './pages/CreateVenuePage.jsx'
@@ -11,6 +11,7 @@ import EquipmentReservationsPage from './pages/EquipmentReservationsPage.jsx'
 import EditVenuePage from './pages/EditVenuePage.jsx'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+import MyRegistrationsPage from './pages/MyRegistrationsPage.jsx'
 import NotificationsPage from './pages/NotificationsPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 import RequestDetailPage from './pages/RequestDetailPage.jsx'
@@ -33,6 +34,10 @@ function App() {
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/requests/:id" element={<RequestDetailPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
+      </Route>
+      {/* SPM-19: an Attendee's own registrations. The API returns only the caller's own. */}
+      <Route element={<ProtectedRoute allowedRoles={[ATTENDEE]} />}>
+        <Route path="/registrations" element={<MyRegistrationsPage />} />
       </Route>
       {/* Drafts and the request form belong to Event Organisers. The API enforces this too:
           requireRole(ORGANISER) on /api/event-requests, and owner-only scope on drafts. */}

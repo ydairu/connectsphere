@@ -27,7 +27,9 @@
 //   start preparation                assigned Venue and Technical Support Staff   (SPM-88)
 //   safety review recorded           the assigned Coordinator, with the Safety     (SPM-92)
 //                                    Officer's comments
-// The user who acted is never notified of their own action.
+//   attendee registers                the Attendee, with the event's start and venue (SPM-19)
+// The user who acted is never notified of their own action, except the SPM-19 registration confirmation,
+// which is the Attendee's own record of what they registered for.
 
 import { REFUSE_CANCELLATION, REQUEST_CANCELLATION, RESUBMIT_CANCELLATION, RETURN_CANCELLATION } from './requestActions.js'
 import { APPROVE_SAFETY, REJECT_SAFETY_ARRANGEMENT, REQUEST_SAFETY_CHANGES } from './safetyReview.js'
@@ -61,6 +63,8 @@ export const REQUEST_RETURNED_NOTICE = 'request_returned'
 export const SAFETY_APPROVED_NOTICE = 'safety_approved'
 export const SAFETY_CHANGES_REQUESTED_NOTICE = 'safety_changes_requested'
 export const SAFETY_REJECTED_NOTICE = 'safety_arrangement_rejected'
+// SPM-19: the Attendee's registration was confirmed.
+export const REGISTRATION_CONFIRMED_NOTICE = 'registration_confirmed'
 
 function titleOf(request) {
   const title = request.core?.title
@@ -253,4 +257,26 @@ export function equipmentRequestRejectedNotifications(event, actor, { equipmentR
   const message = `The equipment request for “${title}” was rejected. Submit a revised request.${suggestedAlternative ? ` Suggested alternative: ${suggestedAlternative}` : ''}`
   const notices = [{ recipientUid: event.assignedCoordinatorUid, type: EQUIPMENT_REQUEST_REJECTED_NOTICE, message, reason, equipmentRequestId }]
   return addressed(notices, event, actor, title, at)
+}
+
+/**
+ * SPM-19 — the notice confirming `attendee`'s registration for `event`, with the event information they register
+ * for: its start (`eventStartsAt`, shown in the reader's time zone by the page) and its venues. Addressed to the
+ * Attendee who acted, so it does not go through addressed().
+ */
+export function registrationConfirmedNotifications(event, attendee, { venueNames = [], at }) {
+  if (!attendee?.uid) return []
+  const title = titleOf(event)
+  const where = venueNames.length > 0 ? ` at ${venueNames.join(', ')}` : ''
+  return [{
+    recipientUid: attendee.uid,
+    type: REGISTRATION_CONFIRMED_NOTICE,
+    message: `You are registered for “${title}”${where}.`,
+    reason: null,
+    eventStartsAt: event.core?.preferredDateTime ?? null,
+    eventRequestId: event.id,
+    eventTitle: title,
+    createdAt: at,
+    readAt: null,
+  }]
 }

@@ -203,6 +203,8 @@ Sprint 1 focuses on the first three functionality areas and contains seven stori
 
 **[Deferred/KIV]** Registration settings after submission. The Organiser controls whether registration is enabled and when it closes (CL2), but cannot edit a request once submitted unless it is returned. Changes to a Confirmed event otherwise belong to Event Change Requests (§4.19).
 
+**[Team decision, 28 Oct 2026 — SPM-19, pending PO confirmation]** Resolves the KIV above. Once the event is Confirmed or Preparation, the owning Organiser may edit the `registration` section, and only that section: the period, capacity, notes and whether registration is enabled. Registration opens only at those statuses, and CL2 gives the Organiser the opening and closing times and the choice to close registration when it is full. Every other section stays locked after submission, and a same-organisation colleague still cannot edit. Implemented in `roleEditableSections` in `shared/permissions.js`. See §4.18.
+
 **[Team decision, 7 Oct 2026 — SPM-48, pending PO confirmation]** Staff edit rights changed after SPM-42 shipped. Venue Staff and Technical Support Staff still view the Organiser's requested venue (`venue`) or equipment (`equipment`), but no longer edit it. Each now edits only its own preparation section (`venuePreparation` / `equipmentPreparation`), and only while that section's condition holds. The assigned Coordinator views both preparation sections read-only. See §4.7, SPM-48.
 
 **[Boundary]** SPM-42 cannot be Done until all named roles and their relevant information surfaces exist and are tested. **Week 7 note:** the two new internal roles (Event Coordinator Lead, Safety Officer) add permission surfaces that this story's completion claim cannot cover; they belong to new Release 1 PBIs, not to SPM-42.
@@ -799,6 +801,19 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 **[Customer-confirmed]** The Organiser configures whether/when registration is open. A person must register to attend, though attendee-facing information may remain visible without registration. Capacity is capped at the event/venue maximum. Waiting-list priority is first-come, first-served; the next person is invited to apply rather than automatically registered.
 
 **[Team decision pending]** Registration form fields, QR/link/form mechanism, withdrawal rules, waitlist acceptance window, and detailed consent flow.
+
+**[Implemented — SPM-19, 28 Oct 2026]** An Attendee registers from the event page while the event is Confirmed or Preparation (SPM-88), registration is enabled, the Organiser's period is open and places remain. Each Attendee holds at most one registration per event, in the `eventRegistrations` collection. A successful registration shows a confirmation with the event name, date/time and venue, and sends an in-app notice. Attendees see their registrations on "My registrations". Rules: `shared/registration.js`; service: `backend/src/services/registrationService.js`, which serialises registrations through `systemLocks/registration-{eventId}`.
+
+**[Team decisions, 28 Oct 2026 — SPM-19, pending PO confirmation]**
+
+- **D1, settings after confirmation:** see §3, SPM-42 (the Organiser edits `registration` only, at Confirmed or Preparation).
+- **D2, capacity:** the limit is the smaller of the Organiser's capacity and the largest approved venue's `maximumCapacity`, worked out when someone registers. A capacity above the venue's is refused when saved. SPM-90's primary venue is to replace "largest" when it exists. With no approved venue, the Organiser's capacity is the limit.
+- **D3, who sees registrants:** the owning Organiser and the assigned Coordinator see the count and each Attendee's name, email, status and registration time. Everyone else is refused at the API.
+- **D4, event information:** a confirmation on the event page and an in-app notification, both with the event name, date/time and venue.
+- **D5, event moved back to Planning (SPM-10):** existing registrations are kept, and no new ones are taken until the event is Confirmed again.
+- **Period required:** registration is unavailable until the opening time, closing time and capacity are all set. Registration must open before it closes and close by the event start.
+
+**[Known gaps — SPM-19]** Lowering the capacity below the current count is allowed and keeps every registration. Registrations made before a later capacity cut are not revisited. Withdrawal (SPM-59), the waiting list (SPM-39) and Attendee notices of cancellation or rescheduling (SPM-41) are separate stories.
 
 ### 4.19 Event Change Requests
 
