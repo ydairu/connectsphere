@@ -18,7 +18,7 @@
 
 import { DRAFT, RETURNED, PREPARATION, COMPLETED, CANCELLED, REJECTED, registrationEligibleStatus } from './status.js'
 import { awaitingSafetyReview } from './safetyReviewState.js'
-import { awaitingCoordinatorAssignment } from './coordinatorAssignment.js'
+import { awaitingCoordinatorAssignment, supervisedByLead } from './coordinatorAssignment.js'
 import {
   EQUIPMENT_PREPARATION,
   PREPARATION_CONDITIONS,
@@ -197,8 +197,10 @@ function roleInScope(role, user, request) {
       return awaitingSafetyReview(request)
     case COORDINATOR_LEAD:
       // SPM-68: the unassigned queue — submitted requests with no Coordinator. Any Lead may see them (CL3
-      // G8!C33: no single hard-coded Lead). Once assigned, the request leaves the queue and this scope.
-      return awaitingCoordinatorAssignment(request)
+      // G8!C33: no single hard-coded Lead). Once assigned, the request leaves the queue.
+      // SPM-69: plus the active events this Lead assigned or reassigned, and those assigned before SPM-68
+      // (supervisedByLead, CL3 G8!C41, C38), so the Lead can reassign them. The view stays basic information.
+      return awaitingCoordinatorAssignment(request) || supervisedByLead(user, request)
     default:
       return false
   }

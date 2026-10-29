@@ -71,7 +71,10 @@ describe('SPM-68 AC4 — the Lead selects a Coordinator and confirms', () => {
     await api.assign(coordinatorLead, UNASSIGNED_ID, { coordinatorUid: coordinator3.uid })
 
     expect((await api.queue(coordinatorLead)).json.requests.map((item) => item.id)).not.toContain(UNASSIGNED_ID)
-    expect((await api.view(coordinatorLead, UNASSIGNED_ID)).status).toBe(403)
+    // SPM-69: the Lead who assigned it keeps it in view (CL3 G8!C41), still with no actions.
+    const leadView = await api.view(coordinatorLead, UNASSIGNED_ID)
+    expect(leadView.status).toBe(200)
+    expect(leadView.json.availableActions).toEqual([])
     expect((await api.list(coordinator3)).json.requests.map((request) => request.id)).toContain(UNASSIGNED_ID)
     const started = await api.transition(coordinator3, UNASSIGNED_ID, START_REVIEW)
     expect(started.status).toBe(200)
@@ -171,8 +174,12 @@ describe('SPM-68 AC5/AC9 — only Leads assign; a Lead never assigns to themselv
 
   it('a Lead who is also a Coordinator can assign to another Coordinator, then has no Coordinator powers on it', async () => {
     expect((await api.assign(LEAD_COORDINATOR, UNASSIGNED_ID, { coordinatorUid: coordinator2.uid })).status).toBe(200)
-    expect((await api.view(LEAD_COORDINATOR, UNASSIGNED_ID)).status).toBe(404)
-    expect((await api.transition(LEAD_COORDINATOR, UNASSIGNED_ID, START_REVIEW)).status).toBe(404)
+    // SPM-69: it stays in view through the Lead role (they assigned it), with Lead powers only.
+    const view = await api.view(LEAD_COORDINATOR, UNASSIGNED_ID)
+    expect(view.status).toBe(200)
+    expect(view.json.availableActions).toEqual([])
+    expect(view.json.editableSections).toEqual([])
+    expect((await api.transition(LEAD_COORDINATOR, UNASSIGNED_ID, START_REVIEW)).status).toBe(403)
   })
 
   it('a Lead cannot act as a Coordinator on a queued request: no review, no edits', async () => {
