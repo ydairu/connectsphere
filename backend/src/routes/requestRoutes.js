@@ -3,6 +3,7 @@ import { createVenueBookingController } from '../controllers/venueBookingControl
 import { createEquipmentRequestController } from '../controllers/equipmentRequestController.js'
 import { createRequestController } from '../controllers/requestController.js'
 import { createSafetyReviewController } from '../controllers/safetyReviewController.js'
+import { createSignOffReviewController } from '../controllers/signOffReviewController.js'
 import { authoriseHistory, authoriseList, authoriseRead, authoriseWrite, sendHistory } from '../middleware/authorise.js'
 import { createCoordinatorNameLoader } from '../services/assignedCoordinatorService.js'
 import { createOwnerNameLoader } from '../services/requestOwnerService.js'
@@ -68,6 +69,9 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   const safetyReviews = createSafetyReviewController(getEventRequestDb)
   router.get('/:id/safety-review/venues', authenticate, safetyReviews.listVenues)
   router.post('/:id/safety-review', authenticate, safetyReviews.decide)
+  // SPM-87: the Coordinator chooses which sign-offs changed since approval go back for re-approval. Who may
+  // choose and what a choice writes are decided in shared/signOffReview.js.
+  router.post('/:id/sign-off-review', authenticate, createSignOffReviewController(getEventRequestDb).decide)
   // SPM-19: an Attendee registers; the owning Organiser and assigned Coordinator read the registered list.
   // Who may do either is decided in shared/registration.js.
   const registrations = createRegistrationController(getEventRequestDb)

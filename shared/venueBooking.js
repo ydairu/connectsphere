@@ -13,6 +13,15 @@ export const BOOKING_CANCELLED = 'cancelled'
 export const BOOKING_EXPIRED = 'expired'
 export const VENUE_BOOKING_CANCELLED = 'venue_booking_cancelled'
 
+/**
+ * SPM-87: an approved booking the Coordinator sent back for re-approval after a significant change. It keeps
+ * its confirmed reservation, but counts as Awaiting approval until its Venue Staff member approves or rejects
+ * it again.
+ */
+export function awaitingReapproval(booking) {
+  return booking?.status === BOOKING_APPROVED && typeof booking.reapprovalRequestedAt === 'string'
+}
+
 export function effectiveVenueBookingStatus(booking, now = new Date()) {
   return booking.status === BOOKING_PENDING && typeof booking.holdExpiresAt === 'string' &&
     Number.isFinite(Date.parse(booking.holdExpiresAt)) && Date.parse(booking.holdExpiresAt) <= now.getTime()
@@ -45,7 +54,7 @@ export function venueBookingReadiness(bookings, now = new Date()) {
   let approved = 0
   for (const chain of needs.values()) {
     const current = chain.filter((item) => !chain.some((other) => other.replacesId === item.id))
-    if (current.length === 1 && effectiveVenueBookingStatus(current[0], now) === BOOKING_APPROVED) approved++
+    if (current.length === 1 && effectiveVenueBookingStatus(current[0], now) === BOOKING_APPROVED && !awaitingReapproval(current[0])) approved++
   }
   return { ready: needs.size > 0 && approved === needs.size, total: needs.size, approved }
 }
@@ -73,11 +82,18 @@ export function venueBookingStatusLabel(status) {
     [BOOKING_CANCELLED]: 'Cancelled', [BOOKING_EXPIRED]: 'Expired' })[status] ?? status
 }
 
+/** The label for one booking: as its status, except "Awaiting re-approval" for one sent back (SPM-87). */
+export function venueBookingLabel(booking) {
+  return booking?.awaitingReapproval === true || awaitingReapproval(booking) ? 'Awaiting re-approval' : venueBookingStatusLabel(booking?.status)
+}
+
 export function venueBookingNextStep(booking, eventStatus) {
   if (eventStatus === CANCELLED || eventStatus === REJECTED) return 'The event is closed; no replacement is needed.'
   switch (booking.status) {
     case BOOKING_PENDING: return 'Await Venue Staff review.'
-    case BOOKING_APPROVED: return 'Venue booked; no booking action needed.'
+    case BOOKING_APPROVED: return awaitingReapproval(booking)
+      ? 'Sent back for re-approval after a significant change. Await Venue Staff review.'
+      : 'Venue booked; no booking action needed.'
     case BOOKING_REJECTED: return 'The Coordinator will request a replacement venue.'
     case BOOKING_EXPIRED: return 'The Coordinator will submit a new request for this venue need.'
     case BOOKING_CANCELLED: return 'The Coordinator will arrange a replacement if the event continues.'
@@ -89,7 +105,7 @@ export function venueBookingNextStep(booking, eventStatus) {
 // The stored decision is preserved; a pending request becomes effectively expired at its deadline,
 // before the hourly task records the expired status.
 export function pendingVenueBookings(bookings, now = new Date()) {
-  return bookings.filter((booking) => effectiveVenueBookingStatus(booking, now) === BOOKING_PENDING)
+  return bookings.filter((booking) => effectiveVenueBookingStatus(booking, now) === BOOKING_PENDING || awaitingReapproval(booking))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
 }
 
@@ -103,9 +119,10 @@ export function canReadVenueBooking(user, event, booking) {
     (rolesOf(user).includes(VENUE_STAFF) && booking.assignedVenueStaffUid === user.uid)
 }
 
+// A pending booking with an unexpired hold, or (SPM-87) an approved one sent back for re-approval.
 export function canRejectVenueBooking(user, event, booking, now = new Date()) {
   return rolesOf(user).includes(VENUE_STAFF) && booking.assignedVenueStaffUid === user.uid &&
-    event.status === PLANNING && effectiveVenueBookingStatus(booking, now) === BOOKING_PENDING
+    event.status === PLANNING && (effectiveVenueBookingStatus(booking, now) === BOOKING_PENDING || awaitingReapproval(booking))
 }
 
 export function canApproveVenueBooking(user, event, booking, now = new Date()) {

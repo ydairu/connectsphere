@@ -68,7 +68,8 @@ async function setAttendees(user, value) {
 const confirmation = () => screen.queryByRole('alertdialog', { name: 'Confirm significant change' })
 
 describe('SPM-10 — the confirmation step', () => {
-  it('Confirmed: a significant change asks first, explaining the reset and the move back to Planning; nothing is sent yet', async () => {
+  // SPM-87: the sign-offs are kept and marked Changed since approval; the Coordinator chooses which go back.
+  it('Confirmed: a significant change asks first, explaining the marking and the move back to Planning; nothing is sent yet', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm')
     const user = showRequest(response('confirmed'))
     await setAttendees(user, '120')
@@ -77,18 +78,18 @@ describe('SPM-10 — the confirmation step', () => {
     const dialog = confirmation()
     expect(dialog).toBeTruthy()
     expect(dialog.textContent).toMatch(/Expected attendees/)
-    expect(dialog.textContent).toMatch(/resets the venue and technical sign-offs to Awaiting approval/)
-    expect(dialog.textContent).toMatch(/moves the event back to Planning/)
+    expect(dialog.textContent).toMatch(/keeps the recorded venue and technical sign-offs but marks them Changed since approval/)
+    expect(dialog.textContent).toMatch(/moves back from Confirmed to Planning/)
     expect(updateRequest).not.toHaveBeenCalled()
     expect(confirmSpy).not.toHaveBeenCalled()
   })
 
-  it('Planning: the confirmation mentions the reset, not a move back', async () => {
+  it('Planning: the confirmation mentions the marking, not a move back', async () => {
     const user = showRequest(response('planning'))
     await setAttendees(user, '120')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
-    expect(confirmation().textContent).toMatch(/resets the venue and technical sign-offs/)
-    expect(confirmation().textContent).not.toMatch(/moves the event back/)
+    expect(confirmation().textContent).toMatch(/marks them Changed since approval/)
+    expect(confirmation().textContent).not.toMatch(/moves back/)
   })
 
   it('"Keep editing" closes it, sends nothing and keeps the input', async () => {
@@ -107,7 +108,7 @@ describe('SPM-10 — the confirmation step', () => {
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
     updateRequest.mockResolvedValueOnce(response('planning', { request: { ...response('planning').request, core: { ...CORE, expectedAttendees: 120 } }, arrangements: AWAITING }))
-    await user.click(within(confirmation()).getByRole('button', { name: 'Save and reset sign-offs' }))
+    await user.click(within(confirmation()).getByRole('button', { name: 'Save significant change' }))
 
     await waitFor(() => expect(updateRequest).toHaveBeenCalledWith({ uid: 'u-1' }, 'req-1', { core: { expectedAttendees: 120 } }))
     expect(await screen.findByText('Changes saved.')).toBeTruthy()
@@ -155,7 +156,7 @@ describe('SPM-10 — refused saves', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     updateRequest.mockRejectedValueOnce(new ApiRequestError('API_REQUEST_FAILED', { status: 409, details: { reason: 'cancellation_request_open', message: AC7_MESSAGE } }))
-    await user.click(within(confirmation()).getByRole('button', { name: 'Save and reset sign-offs' }))
+    await user.click(within(confirmation()).getByRole('button', { name: 'Save significant change' }))
 
     expect(await screen.findByText(`${AC7_MESSAGE} Your significant changes were undone. Other edits are still unsaved.`)).toBeTruthy()
     expect(updateRequest).toHaveBeenCalledTimes(1)

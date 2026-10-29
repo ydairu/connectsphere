@@ -22,7 +22,8 @@ import {
   significantChanges,
   significantFieldsIn,
 } from '../../../shared/significantChanges.js'
-import { CANCELLED, COMPLETED, CONFIRMED, DRAFT, PLANNING, REJECTED, RETURNED, SUBMITTED, UNDER_REVIEW } from '../../../shared/status.js'
+import { CANCELLED, COMPLETED, CONFIRMED, DRAFT, PLANNING, PREPARATION, REJECTED, RETURNED, SUBMITTED, UNDER_REVIEW } from '../../../shared/status.js'
+import { SIGN_OFF_REVIEW_PENDING, signOffReviewPending } from '../../../shared/signOffReview.js'
 import { actionLabel } from '../../../frontend/src/utils/statusActions.js'
 import { SECTION_FIELDS } from '../../../frontend/src/utils/requestSections.js'
 import { toFormValues, withSavedValues } from '../../../frontend/src/utils/requestPatch.js'
@@ -181,39 +182,50 @@ describe('SPM-10 AC2–AC5 — effects of a significant change', () => {
     expect(effects).toEqual({ significantFields: ['core.expectedAttendees'], metadata: {}, statusChange: null, notifications: [] })
   })
 
-  it('Planning: recorded decisions cleared, status kept, staff notified', () => {
+  // SPM-87 supersedes SPM-10's automatic reset (CL3 G8!C51): the sign-offs are kept and marked for the Coordinator.
+  const technicalItem = { key: 'technical', kind: 'technical', label: 'Technical arrangement' }
+
+  it('Planning: recorded sign-offs kept and marked Changed since approval, status kept, staff notified', () => {
     const before = request({ status: PLANNING })
     const effects = significantChangeEffects(coordinator, before, withField(before, 'venue.layoutPreference', 'banquet'), { at, staffRecipientUids: ['venue-1', 'tech-1'] })
-    expect(effects.metadata).toEqual({ arrangementApprovals: {} })
+    expect(effects.metadata).toEqual({
+      signOffReview: { status: SIGN_OFF_REVIEW_PENDING, changedAt: at, changedFields: ['venue.layoutPreference'], items: [technicalItem] },
+    })
+    expect(effects.metadata.arrangementApprovals).toBeUndefined()
     expect(effects.statusChange).toBeNull()
     expect(effects.notifications.map((notice) => notice.recipientUid)).toEqual(['venue-1', 'tech-1'])
     expect(effects.notifications[0]).toMatchObject({ type: SIGNIFICANT_CHANGE_NOTICE, status: PLANNING, changedFields: ['Layout preference'], createdAt: at })
   })
 
-  it('Confirmed: decisions cleared, status back to Planning, with the status change described', () => {
-    const before = request()
+  it.each([CONFIRMED, PREPARATION])('%s: sign-offs marked, status back to Planning, with the status change described', (status) => {
+    const before = request({ status })
     const after = withField(withField(before, 'core.durationHours', 6), 'equipment.requirements', ['projector', 'mic'])
     const effects = significantChangeEffects(coordinator, before, after, { at, staffRecipientUids: ['tech-1'] })
-    expect(effects.metadata).toEqual({ arrangementApprovals: {}, status: PLANNING })
-    expect(effects.statusChange).toEqual({ fromStatus: CONFIRMED, toStatus: PLANNING, fields: ['core.durationHours', 'equipment.requirements'] })
+    expect(effects.metadata).toMatchObject({ status: PLANNING, signOffReview: { status: SIGN_OFF_REVIEW_PENDING, items: [technicalItem] } })
+    expect(effects.statusChange).toEqual({ fromStatus: status, toStatus: PLANNING, fields: ['core.durationHours', 'equipment.requirements'] })
     expect(effects.notifications[0].message).toMatch(/moved back to Planning/)
+    expect(effects.notifications[0].message).toMatch(/Changed since approval/)
   })
 
-  it('"Not required" is derived, not cleared: after the reset, an event that needs no technical support needs only the venue sign-off', () => {
+  it('"Not required" is still derived from the equipment fields; the kept sign-offs still count once decided', () => {
     const before = request({ status: PLANNING })
     const after = withField(withField(before, 'equipment.requirements', []), 'equipment.technicalSupportNeeded', false)
-    const cleared = { ...after, ...significantChangeEffects(coordinator, before, after, { at }).metadata }
-    expect(requiredArrangements(cleared)).toEqual(['venue'])
-    expect(arrangementsApproved(cleared)).toBe(false)
-    expect(arrangementsApproved({ ...cleared, venueBookingReadiness: { ready: true } })).toBe(true)
+    const saved = { ...after, ...significantChangeEffects(coordinator, before, after, { at }).metadata }
+    expect(requiredArrangements(saved)).toEqual(['venue'])
+    expect(arrangementsApproved({ ...saved, venueBookingReadiness: { ready: true } })).toBe(true)
   })
 
-  it('AC5: after the reset, Confirm needs both approvals again', () => {
+  it('SPM-87 AC4: until the Coordinator decides, the marked sign-offs are pending review', () => {
     const before = request({ status: PLANNING })
     const after = withField(before, 'core.expectedAttendees', 150)
-    const cleared = { ...after, ...significantChangeEffects(coordinator, before, after, { at }).metadata }
-    expect(arrangementsApproved(cleared)).toBe(false)
-    expect(arrangementsApproved({ ...cleared, arrangementApprovals: { venue: { decision: 'approved' } } })).toBe(false)
+    const saved = { ...after, ...significantChangeEffects(coordinator, before, after, { at }).metadata }
+    expect(arrangementsApproved({ ...saved, venueBookingReadiness: { ready: true } })).toBe(true)
+    expect(signOffReviewPending(saved)).toBe(true)
+  })
+
+  it('nothing is marked when no sign-off is recorded', () => {
+    const before = request({ status: PLANNING, arrangementApprovals: undefined })
+    expect(significantChangeEffects(coordinator, before, withField(before, 'core.expectedAttendees', 150), { at }).metadata).toEqual({})
   })
 
   it('the actor is never notified, nor anyone twice', () => {

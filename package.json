@@ -55,6 +55,7 @@
     "test:spm62": "vitest run tests/spm-62/ && playwright test tests/spm-62",
     "test:spm57": "vitest run tests/spm-57/",
     "test:spm66": "vitest run tests/spm-66/",
+    "test:spm87": "vitest run tests/spm-87/ && playwright test tests/spm-87",
     "test:spm92": "vitest run tests/spm-66/ tests/spm-92/ && playwright test tests/spm-92",
     "test:coverage": "vitest run --coverage",
     "install:all": "npm install",

@@ -25,6 +25,8 @@
 //   approve / reject / confirm /     the owning Organiser only, with the rejection reason or the
 //   return for clarification         clarification message                        (SPM-61)
 //   start preparation                assigned Venue and Technical Support Staff   (SPM-88)
+//   sign-offs sent back for          the Venue Staff member of each booking sent   (SPM-87)
+//   re-approval                      back, and the technical reviewers
 //   safety review recorded           the assigned Coordinator, with the Safety     (SPM-92)
 //                                    Officer's comments
 //   attendee registers                the Attendee, with the event's start and venue (SPM-19)
@@ -64,6 +66,8 @@ export const REQUEST_APPROVED_NOTICE = 'request_approved'
 export const REQUEST_REJECTED_NOTICE = 'request_rejected'
 export const REQUEST_CONFIRMED_NOTICE = 'request_confirmed'
 export const REQUEST_RETURNED_NOTICE = 'request_returned'
+// SPM-87: the Coordinator sent sign-offs back for re-approval after a significant change.
+export const SIGN_OFF_REAPPROVAL_REQUESTED_NOTICE = 'sign_off_reapproval_requested'
 // SPM-92: the Safety Officer recorded the event's safety review.
 export const SAFETY_APPROVED_NOTICE = 'safety_approved'
 export const SAFETY_CHANGES_REQUESTED_NOTICE = 'safety_changes_requested'
@@ -236,7 +240,21 @@ export function safetyReviewDecidedNotifications(event, actor, { outcome, commen
   return addressed([{ recipientUid: event.assignedCoordinatorUid, type, message, reason: comments || null }], event, actor, title, at)
 }
 
-const STATUS_NAMES = Object.freeze({ planning: 'Planning', confirmed: 'Confirmed' })
+/**
+ * SPM-87 — the notices for the staff whose sign-offs the Coordinator sent back for re-approval. `recipients`
+ * is [{ recipientUid, labels }], one entry per staff member, naming what they are asked to review again.
+ */
+export function signOffReapprovalNotifications(event, actor, { recipients = [], at }) {
+  const title = titleOf(event)
+  return addressed(recipients.map(({ recipientUid, labels }) => ({
+    recipientUid,
+    type: SIGN_OFF_REAPPROVAL_REQUESTED_NOTICE,
+    message: `After a significant change to “${title}”, the event coordinator sent ${labels.join(', ')} back for your re-approval.`,
+    reason: null,
+  })), event, actor, title, at)
+}
+
+const STATUS_NAMES = Object.freeze({ planning: 'Planning', confirmed: 'Confirmed', preparation: 'Preparation' })
 
 /**
  * SPM-10 — the notices for a significant change saved on `request` (the record before the edit), to
@@ -247,7 +265,8 @@ export function significantChangeNotifications(request, actor, { recipientUids =
   const title = titleOf(request)
   const moved = request.status !== status
   const where = moved ? `It has moved back to ${STATUS_NAMES[status] ?? status}` : `It remains in ${STATUS_NAMES[status] ?? status}`
-  const message = `“${title}” has had a significant change (${fieldLabels.join(', ')}). ${where}, and the venue and technical sign-off must be approved again.`
+  // SPM-87: the sign-offs are kept and marked "Changed since approval"; the Coordinator decides which go back.
+  const message = `“${title}” has had a significant change (${fieldLabels.join(', ')}). ${where}. Recorded venue and technical sign-offs are marked "Changed since approval"; the event coordinator will decide which need re-approval.`
   const notices = recipientUids.map((uid) => ({
     recipientUid: uid,
     type: SIGNIFICANT_CHANGE_NOTICE,

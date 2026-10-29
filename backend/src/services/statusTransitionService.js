@@ -52,6 +52,7 @@ import {
   APPROVE_CANCELLATION,
   ARRANGEMENTS_NOT_APPROVED,
   PRIMARY_VENUE_REQUIRED,
+  SIGN_OFF_REVIEW_UNDECIDED,
   CANCEL,
   CONFIRM,
   COMPLETE,
@@ -69,6 +70,7 @@ import {
   WRONG_STATUS,
   canTransition,
 } from '../../../shared/statusTransitions.js'
+import { NO_SIGN_OFF_REVIEW } from '../../../shared/signOffReview.js'
 import { cancellationNotifications, preparationStartedNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
 import {
   ARRANGEMENTS_NOT_READY,
@@ -114,6 +116,8 @@ const MESSAGES = Object.freeze({
   [NOT_PERMITTED]: 'You are not permitted to perform this action on this request.',
   [ARRANGEMENTS_NOT_APPROVED]: 'All mandatory venue and technical arrangements must be approved before confirmation.',
   [PRIMARY_VENUE_REQUIRED]: 'Choose one current approved primary venue before confirming this event.',
+  [SIGN_OFF_REVIEW_UNDECIDED]: 'Sign-offs have changed since approval. Choose which need re-approval, or record that none do, first.',
+  [NO_SIGN_OFF_REVIEW]: 'There are no sign-offs changed since approval to decide on.',
   [EVENT_NOT_ENDED]: 'An event can be marked complete only after it has taken place.',
   [INSUFFICIENT_INFORMATION]: 'The request is missing required details or has invalid ones. Complete them, or return it for clarification.',
   [SAFETY_APPROVAL_REQUIRED]: 'A valid safety approval from the Safety Officer is required first.',
