@@ -307,6 +307,23 @@ See §10, Superseded Legacy Register.
 
 **[Not in SPM-68]** assignment notifications (G8!C43; SPM-84/85), Lead-only reassignment (G8!C12, C35, C39; SPM-26 still lets the assigned Coordinator reassign) and the Lead's view of active events they assigned (G8!C41).
 
+#### SPM-85 — Notify the Event Coordinator Lead when a new request is submitted
+
+**[Evidence]** The notice comes from the SPM-85 backlog story (from SPM-21, Change #5). No customer statement distilled in this file asks for the Lead to be notified of a new submission: W7-CUST Change #5 asks for notices "when assignments or reassignments occur", and G8!C43 makes notifying *other* Leads optional and only "when they own that queue/scope". The rules below are therefore team decisions, not customer requirements.
+
+**[Team decisions, 29 Oct 2026 — pending PO confirmation]**
+
+- **Recipients: every Event Coordinator Lead.** There is one shared unassigned queue (SPM-68) and no per-Lead scope is recorded, so every Lead is notified. A Lead who submitted the request is not. If per-Lead supervisory scopes are recorded later (G8!C33), the recipients would narrow to the Leads covering the queue.
+- **Trigger: a first submission that enters the unassigned queue.** A resubmitted Returned request goes back to its current Coordinator (G8!C15) and notifies no Lead.
+- **Content:** "New request “{title}” from {organisation} is waiting for assignment." ("from …" is left out when the organisation is unknown), with the event's start, shown in the reader's time zone as the SPM-19 and SPM-41 notices are. Each notice names its own event.
+- **Link:** the notice opens the unassigned queue (`/requests/unassigned`), not the event, which a Lead cannot open once it is assigned.
+- **No Lead accounts:** the submission still succeeds; no notice is written.
+- **Same transaction:** the notices are written in the submit transaction, so a notice exists only for a saved submission.
+
+**[Known limitation — SPM-85]** A notice is not updated when the request is assigned: it still says the request "is waiting for assignment". The queue it links to shows the current state.
+
+**[Correction to the SPM-68 note above]** SPM-85 is this new-request notice, not an assignment notification. Assignment and reassignment notifications (G8!C43) remain unimplemented.
+
 #### SPM-26 — Reassign an Event to a Different Event Coordinator
 
 **[Customer-confirmed — live]** Exactly one Coordinator is assigned to an event — except the new Week 7 state in which a newly submitted request sits in the **Unassigned queue** before the Lead assigns a Coordinator (G8!C2, C12).

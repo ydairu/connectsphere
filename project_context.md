@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 29 October 2026 (SPM-68 Lead assignment, SPM-90 and SPM-19 integration; older implementation sections retain their historical dates)
+Last reviewed: 29 October 2026 (SPM-68 Lead assignment, SPM-85 Lead new-request notice, SPM-90 and SPM-19 integration; older implementation sections retain their historical dates)
 
 ## Current implementation map (27 October 2026)
 
@@ -18,7 +18,7 @@ SPM-68 is **implemented locally and not Done**: automated checks pass, but no ma
 - **Display:** the Organiser's Event Coordinator row reads "Unassigned" (was "Not yet assigned"). It is the only place an Organiser sees the Coordinator.
 - **Seed:** `coordinator-lead@seed.connectsphere.test` and `seed-req-a2-unassigned`. Existing seeded assignments are kept. Only a dry run was performed.
 - **Team decisions pending PO:** effective-requirements.md §4.5, SPM-68.
-- **Known gaps:** no assignment notifications (SPM-84/85); SPM-26 still lets the assigned Coordinator reassign (CL3 says Lead-only); the Lead cannot see events after assigning them (G8!C41); assignment entries are recorded but not shown in any page; concurrent assignment by two Leads is covered only by the in-transaction re-check and an in-memory test, not an emulator test.
+- **Known gaps:** no assignment or reassignment notifications (G8!C43; the Lead's new-request notice is SPM-85, below); SPM-26 still lets the assigned Coordinator reassign (CL3 says Lead-only); the Lead cannot see events after assigning them (G8!C41); assignment entries are recorded but not shown in any page; concurrent assignment by two Leads is covered only by the in-transaction re-check and an in-memory test, not an emulator test.
 - **Evidence:** `tests/spm-68/` (unit, API integration, page, navigation, Playwright `tests/spm-68/e2e/spm68.assignFromQueue.spec.js`).
 
 ## Current SPM-90 state (29 October 2026)
@@ -879,3 +879,13 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Status:** In Progress, Sprint 4. Human acceptance and peer review are pending.
 - **Local verification (29 Oct 2026, macOS):** lint and build passed; Node 136, frontend 101 and root Vitest 2,015 (55 skipped) passed; Playwright 115 of 115. Earlier runs failed only because the disk was full (Playwright could not save its trace); they passed once space was freed.
 - **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No live-project check; Firestore rules were neither edited nor deployed. The E2E spec shares SPM-19's 25 Nov 2026 date risk.
+
+## SPM-85 notify the Event Coordinator Lead of new requests — 29 October 2026
+
+- **Built:** a first submission that enters the unassigned queue notifies every Event Coordinator Lead in-app: "New request “{title}” from {organisation} is waiting for assignment.", with the event's start, linking to `/requests/unassigned`. A resubmitted Returned request, a failed submission and a submitter who is also a Lead get no notice. With no Lead accounts the submission still succeeds.
+- **Code:** `newUnassignedRequestNotifications` (`shared/notifications.js`); `submitDraftEventRequest` (`backend/src/services/eventRequestService.js`) reads the Leads with `loadUsersWithRole` (`backend/src/services/coordinatorAssignmentService.js`, which `loadCoordinators` now wraps) before any write and adds the notices in the same transaction; the `linkFor` branch in `frontend/src/pages/NotificationsPage.jsx`. Summarised in AGENTS.md §6.
+- **Team decisions (29 Oct 2026, pending PO confirmation):** effective-requirements.md §4.5, SPM-85, with the evidence note that no distilled customer statement asks for this notice.
+- **Gaps:** a notice still says the request is waiting after it has been assigned. Assignment and reassignment notifications (G8!C43) are not built.
+- **Status:** implemented locally, not Done. Human acceptance and peer review are pending; the backlog workbook was not updated.
+- **Local verification (29 Oct 2026, macOS):** see `docs/evidence/spm-85-traceability.md`.
+- **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No emulator or live-project check; Firestore rules were neither edited nor deployed.
