@@ -130,11 +130,17 @@ export async function registerForEvent(id, user, db = getAdminDb(), now = new Da
   })
 }
 
-/** The signed-in Attendee's registrations, soonest event first. The uid comes from the verified token. */
+/**
+ * The signed-in Attendee's registrations, soonest event first. The uid comes from the verified token. SPM-41: each
+ * is shown with its event as it now is — rescheduled, back in Planning or cancelled — even when the Attendee can no
+ * longer open the event itself; presentOwnRegistration() sends only the event's title, time and status.
+ */
 export async function listMyRegistrations(user, db = getAdminDb()) {
   const snapshot = await db.collection(REGISTRATIONS_COLLECTION).where('attendeeUid', '==', user.uid).get()
-  return rows(snapshot)
-    .map(presentOwnRegistration)
+  const registrations = rows(snapshot)
+  const events = await Promise.all(registrations.map((record) => db.collection('eventRequests').doc(record.eventRequestId).get()))
+  return registrations
+    .map((record, index) => presentOwnRegistration(record, events[index].exists ? events[index].data() : null))
     .sort((a, b) => String(a.eventStartsAt).localeCompare(String(b.eventStartsAt)))
 }
 

@@ -868,3 +868,14 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Local verification (28 Oct 2026, macOS):** lint and build passed; Node 134, frontend 101, root Vitest 1,978 (51 skipped) and Playwright 112/112 passed.
 - **Not verified:** the emulator concurrency test cannot run on this machine (no Java) and runs in CI only. API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No live-project check; Firestore rules were neither edited nor deployed.
 - **Date risk:** the seeded two-place event's registration closes 25 Nov 2026, so the SPM-19 E2E spec fails after that date, as the seeded cancellation specs do after 20 Nov. The API suite sets its dates from the real clock.
+
+## SPM-41 notify registered Attendees of cancellations and reschedules — 29 October 2026
+
+- **Built:** registered Attendees get an in-app notice when their event is cancelled (Coordinator cancel or approved Organiser request, from Confirmed or Preparation; E5 also a rejection after a reschedule moved it back to Planning) and when the Coordinator changes its date, time or duration (SPM-10 edit). A reschedule notice gives the new and previous start and end; no notice carries a reason. Attendee notices link to "My registrations", which now shows each event's current date/time and status. Events with no registrations send no Attendee notices.
+- **Code:** `attendeeChangeNotifications` (`shared/notifications.js`), `eventRescheduled` and `eventEndsAt` (`shared/registration.js`), `loadRegisteredAttendeeUids` (`backend/src/services/registeredAttendees.js`), read at the start of the status transaction and before the section-edit save. Summarised in AGENTS.md §6.
+- **Team decisions (29 Oct 2026, pending PO confirmation):** E1–E5 in effective-requirements.md §4.20. E3 keeps the venue as registered, matching SPM-90's retained registration snapshots.
+- **Built tests-first:** the SPM-41 tests were written from the acceptance criteria before the code (`docs/evidence/spm-41-traceability.md`).
+- **Gaps:** SPM-20 change requests do not exist yet; they must save accepted date changes through the section-edit path, or notify registered Attendees the same way. Venue changes are not announced (SPM-74).
+- **Status:** In Progress, Sprint 4. Human acceptance and peer review are pending.
+- **Local verification (29 Oct 2026, macOS):** lint and build passed; Node 136, frontend 101 and root Vitest 2,015 (55 skipped) passed; Playwright 115 of 115. Earlier runs failed only because the disk was full (Playwright could not save its trace); they passed once space was freed.
+- **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No live-project check; Firestore rules were neither edited nor deployed. The E2E spec shares SPM-19's 25 Nov 2026 date risk.

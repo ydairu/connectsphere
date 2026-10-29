@@ -822,7 +822,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 **[Team decisions, 28 Oct 2026 — SPM-19, pending PO confirmation]**
 
 - **D1, settings after confirmation:** see §3, SPM-42 (the Organiser edits `registration` only, at Confirmed or Preparation).
-- **D2, capacity:** the limit is the smaller of the Organiser's capacity and the largest approved venue's `maximumCapacity`, worked out when someone registers. A capacity above the venue's is refused when saved. SPM-90's primary venue is to replace "largest" when it exists. With no approved venue, the Organiser's capacity is the limit.
+- **D2, capacity:** the limit is the smaller of the Organiser's capacity and the venue's `maximumCapacity`, worked out when someone registers. A capacity above the venue's is refused when saved. With no approved venue, the Organiser's capacity is the limit.
+  - **Follow-up (SPM-90, 29 Oct 2026):** once the Coordinator selects a primary venue, that venue alone is used. Before one is selected, the largest approved venue is used.
 - **D3, who sees registrants:** the owning Organiser and the assigned Coordinator see the count and each Attendee's name, email, status and registration time. Everyone else is refused at the API.
 - **D4, event information:** a confirmation on the event page and an in-app notification, both with the event name, date/time and venue.
 - **D5, event moved back to Planning (SPM-10):** existing registrations are kept, and no new ones are taken until the event is Confirmed again.
@@ -843,6 +844,19 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 **[Team decision pending]** Select channels, delivery preferences, acknowledgement, and optional mentions. Offline communication may be manually recorded as event comments.
 
 **[Implemented, pending ratification — SPM-63/SPM-47, 3 Oct 2026 — historical record]** A minimal in-app channel for cancellation only: each notification is a document in the top-level `notifications` collection, one per recipient, written in the same transaction; each user reads their own via `GET /api/notifications` and marks read with `POST /api/notifications/:id/read`. No email, SMS, delivery preference or unread badge.
+
+**[Implemented — SPM-41, 29 Oct 2026]** Registered Attendees (active registrations only) are notified in-app when their event is cancelled — by the Coordinator or by approving the Organiser's request, from Confirmed or Preparation — and when it is rescheduled through the Coordinator's edit (SPM-10). A cancellation notice names the event and says it was cancelled, without the reason. A reschedule notice names the event and gives the new and previous start and end. An event with no registrations sends no Attendee notices; Organiser and staff notices are unchanged. Cancellation notices are written in the status-change transaction; reschedule notices in the section edit's transaction, through `store.update(..., { consequences })`. Date changes at Preparation are still refused (SPM-87), so a reschedule comes from Planning or Confirmed.
+
+**[Team decisions, 29 Oct 2026 — SPM-41, pending PO confirmation]**
+
+- **E1:** a new duration is a reschedule, because the end time moves.
+- **E2:** any non-finished event with active registrations notifies, so a further change while back in Planning (D5) reaches its Attendees again.
+- **E3:** "My registrations" shows each event's current title, date/time and status ("Event cancelled", "Event being rearranged"), and links to the event only while an Attendee may open it. The venue stays as registered, as SPM-90 keeps.
+- **E4:** Attendee notices link to "My registrations", because an Attendee cannot open a cancelled event or one back in Planning.
+- **E5:** rejecting an event that still has registrations (possible only after a reschedule moved it back to Planning) sends its Attendees the cancellation notice.
+- **No reason to Attendees:** a cancellation or rejection reason may be internal or the Organiser's own, so Attendee notices carry none.
+
+**[Known gaps — SPM-41]** SPM-20 (Organiser change requests) does not exist yet. When it applies an accepted date change, it must go through the same section-edit save (`store.update` with `consequences`) for Attendees to be notified. A venue change (SPM-74, SPM-90 primary switch) is not announced to Attendees by SPM-41.
 
 **[Implemented — SPM-61, 25 Oct 2026]** The same channel now tells the owning Organiser, and nobody else, when the assigned Coordinator approves, rejects (with the reason), confirms or returns (with the clarification message) their request, in the status-change transaction. This closes the SPM-25 return-notice and SPM-45 rejection-notice gaps recorded in §4.4 and §4.6.
 
