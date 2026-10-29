@@ -1,12 +1,15 @@
 // SPM-26 unit suite — the reassignment rules (shared/coordinatorReassignment.js) and the reassignment
 // service (backend/src/services/coordinatorReassignmentService.js) against the in-memory Firestore fake,
 // whose transaction log shows what one transaction read and wrote. Not a Firestore emulator: concurrent
-// retries are not modelled.
+// retries are not modelled. SPM-69 made reassignment Lead-only (CL3 G8!C35, C39), removed the handover-agreement
+// flag and added the expected-Coordinator check; Lead scope cases are in tests/spm-69.
 
 import { describe, expect, it } from 'vitest'
 
+import { TARGET_IS_SELF } from '../../../shared/coordinatorLeadAssignment.js'
 import {
-  HANDOVER_NOT_AGREED,
+  COORDINATOR_CHANGED,
+  EXPECTED_COORDINATOR_REQUIRED,
   NOT_PERMITTED,
   NOT_SUBMITTED,
   TARGET_IS_CURRENT,
@@ -15,14 +18,12 @@ import {
   TARGET_REQUIRED,
   TERMINAL_STATUS,
   canReassignCoordinator,
-  eligibleCoordinators,
-  handoverAgreed,
   mayReassignCoordinator,
   reassignmentStatusRefusal,
   reassignmentTargetRefusal,
 } from '../../../shared/coordinatorReassignment.js'
-import { ATTENDEE, COORDINATOR, ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
-import { CANCELLED, COMPLETED, CONFIRMED, DRAFT, PLANNING, REJECTED, RETURNED, SUBMITTED, UNDER_REVIEW } from '../../../shared/status.js'
+import { ATTENDEE, COORDINATOR, COORDINATOR_LEAD, ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
+import { CANCELLED, COMPLETED, CONFIRMED, DRAFT, PLANNING, PREPARATION, REJECTED, RETURNED, SUBMITTED, UNDER_REVIEW } from '../../../shared/status.js'
 import { ACTIVITY_SUBCOLLECTION, ASSIGNMENT_LOCK_PATH, loadCoordinators } from '../../../backend/src/services/coordinatorAssignmentService.js'
 import {
   COORDINATOR_REASSIGNED,
@@ -39,6 +40,7 @@ const other = { uid: 'coord-2', name: 'Coordinator Two', roles: [COORDINATOR] }
 const legacy = { uid: 'coord-legacy', name: 'Legacy Coordinator', role: COORDINATOR }
 const ownerCoordinator = { uid: 'owner-coord', name: 'Owner Coordinator', roles: [ORGANISER, COORDINATOR], organisationId: 'ORG-A' }
 const venue = { uid: 'venue-1', name: 'Venue Staff', roles: [VENUE_STAFF] }
+const lead = { uid: 'lead-1', name: 'Coordinator Lead', roles: [COORDINATOR_LEAD] }
 
 function request(overrides = {}) {
   return {
@@ -60,19 +62,21 @@ const NOW = new Date('2026-10-03T08:00:00.000Z')
 
 function fixture(requestOverrides = {}) {
   const { id, ...data } = request(requestOverrides)
-  const users = Object.fromEntries([current, other, legacy, ownerCoordinator, venue].map(({ uid, ...profile }) => [uid, profile]))
+  const users = Object.fromEntries([current, other, legacy, ownerCoordinator, venue, lead].map(({ uid, ...profile }) => [uid, profile]))
   return createFakeFirestore({ eventRequests: { [id]: data }, users })
 }
 
 const stored = (db) => ({ id: 'req-1', ...db.collectionData('eventRequests').get('req-1') })
 const activity = (db) => [...db.collectionData(`eventRequests/req-1/${ACTIVITY_SUBCOLLECTION}`).values()]
+const handTo = (uid) => ({ coordinatorUid: uid, expectedCoordinatorUid: current.uid })
 
-describe('SPM-26 — who may reassign', () => {
-  it('the assigned Coordinator may', () => {
-    expect(mayReassignCoordinator(current, request())).toBe(true)
+describe('SPM-26 / SPM-69 — who may reassign', () => {
+  it('an Event Coordinator Lead may', () => {
+    expect(mayReassignCoordinator(lead, request())).toBe(true)
   })
 
   it.each([
+    ['the assigned Coordinator (SPM-69)', current],
     ['another Coordinator', other],
     ['the owning Organiser (also a Coordinator, but not assigned)', ownerCoordinator],
     ['assigned Venue Staff', venue],
@@ -80,25 +84,21 @@ describe('SPM-26 — who may reassign', () => {
   ])('%s may not', (_label, user) => {
     expect(mayReassignCoordinator(user, request())).toBe(false)
   })
-
-  it('the uid alone is not enough without the Coordinator role', () => {
-    expect(mayReassignCoordinator({ uid: current.uid, roles: [VENUE_STAFF] }, request())).toBe(false)
-  })
 })
 
-describe('SPM-26 AC1/AC9 — when', () => {
-  it.each([SUBMITTED, UNDER_REVIEW, RETURNED, PLANNING, CONFIRMED])('allowed at %s', (status) => {
+describe('SPM-26 AC1/AC9, SPM-69 AC2 — when', () => {
+  it.each([SUBMITTED, UNDER_REVIEW, RETURNED, PLANNING, CONFIRMED, PREPARATION])('allowed at %s', (status) => {
     expect(reassignmentStatusRefusal(request({ status }))).toBeNull()
-    expect(canReassignCoordinator(current, request({ status }))).toBe(true)
+    expect(canReassignCoordinator(lead, request({ status }))).toBe(true)
   })
 
   it('allowed while an Organiser cancellation request is pending', () => {
-    expect(canReassignCoordinator(current, request({ status: CONFIRMED, cancellationRequest: { status: 'pending' } }))).toBe(true)
+    expect(canReassignCoordinator(lead, request({ status: CONFIRMED, cancellationRequest: { status: 'pending' } }))).toBe(true)
   })
 
   it.each([COMPLETED, CANCELLED, REJECTED])('refused at %s', (status) => {
     expect(reassignmentStatusRefusal(request({ status }))).toBe(TERMINAL_STATUS)
-    expect(canReassignCoordinator(current, request({ status }))).toBe(false)
+    expect(canReassignCoordinator(lead, request({ status }))).toBe(false)
   })
 
   it('a draft, which has no Coordinator, is refused', () => {
@@ -126,22 +126,6 @@ describe('SPM-26 AC3 — to whom', () => {
   ])('%s is refused with %s', (targetUid, reason) => {
     expect(refusal(targetUid)).toBe(reason)
   })
-
-  it('the agreement flag must be exactly true', () => {
-    expect(handoverAgreed(true)).toBe(true)
-    for (const flag of [undefined, null, false, 'true', 1]) expect(handoverAgreed(flag)).toBe(false)
-  })
-
-  it('the candidate list excludes the current Coordinator and the submitter, sorted by name, uid and name only', () => {
-    const list = eligibleCoordinators(
-      [current, other, legacy, ownerCoordinator].map(({ uid, name }) => ({ uid, name, email: 'x@example.test' })),
-      request(),
-    )
-    expect(list).toEqual([
-      { uid: other.uid, name: other.name },
-      { uid: legacy.uid, name: legacy.name },
-    ])
-  })
 })
 
 describe('SPM-26 — loading Coordinators (shared with SPM-8)', () => {
@@ -155,29 +139,29 @@ describe('SPM-26 — loading Coordinators (shared with SPM-8)', () => {
 describe('SPM-26 — reassignEventRequest', () => {
   it('Test 1 / AC2: updates assignedCoordinatorUid and returns the new Coordinator name', async () => {
     const db = fixture()
-    const result = await reassignEventRequest('req-1', current, { coordinatorUid: other.uid, handoverAgreed: true }, db, NOW)
+    const result = await reassignEventRequest('req-1', lead, handTo(other.uid), db, NOW)
     expect(result.coordinator).toEqual({ name: other.name })
     expect(stored(db).assignedCoordinatorUid).toBe(other.uid)
   })
 
-  it('Test 6 / AC7: status, sections, sign-off and cancellation request are unchanged', async () => {
+  it('Test 6 / AC7: status, sections, sign-off and cancellation request are unchanged; the Lead is recorded', async () => {
     const db = fixture({ status: CONFIRMED, cancellationRequest: { status: 'pending', reason: 'Budget' } })
     const before = stored(db)
-    await reassignEventRequest('req-1', current, { coordinatorUid: other.uid, handoverAgreed: true }, db, NOW)
+    await reassignEventRequest('req-1', lead, handTo(other.uid), db, NOW)
     const after = stored(db)
-    expect(after).toEqual({ ...before, assignedCoordinatorUid: other.uid, updatedAt: NOW.toISOString() })
+    expect(after).toEqual({ ...before, assignedCoordinatorUid: other.uid, assignedByUid: lead.uid, assignedAt: NOW.toISOString(), updatedAt: NOW.toISOString() })
   })
 
   it('Test 7 / AC6: records previous, new, actor and time in the same committed transaction as the update', async () => {
     const db = fixture()
-    await reassignEventRequest('req-1', { ...current, name: 'Coordinator One' }, { coordinatorUid: other.uid, handoverAgreed: true }, db, NOW)
+    await reassignEventRequest('req-1', lead, handTo(other.uid), db, NOW)
 
     expect(activity(db)).toEqual([
       {
         type: COORDINATOR_REASSIGNED,
         previousCoordinatorUid: current.uid,
         coordinatorUid: other.uid,
-        actor: { type: 'user', uid: current.uid, name: 'Coordinator One' },
+        actor: { type: 'user', uid: lead.uid, name: lead.name },
         at: NOW.toISOString(),
       },
     ])
@@ -202,33 +186,46 @@ describe('SPM-26 — reassignEventRequest', () => {
   }
 
   it.each([
-    ['Test 2: same Coordinator', { coordinatorUid: current.uid, handoverAgreed: true }, TARGET_IS_CURRENT],
-    ['Test 2: non-Coordinator', { coordinatorUid: venue.uid, handoverAgreed: true }, TARGET_NOT_COORDINATOR],
-    ['Test 2: unknown uid', { coordinatorUid: 'nobody', handoverAgreed: true }, TARGET_NOT_COORDINATOR],
-    ['the submitter', { coordinatorUid: ownerCoordinator.uid, handoverAgreed: true }, TARGET_IS_OWNER],
-    ['no target', { handoverAgreed: true }, TARGET_REQUIRED],
-    ['Test 3: missing agreement', { coordinatorUid: other.uid }, HANDOVER_NOT_AGREED],
-    ['Test 3: agreement false', { coordinatorUid: other.uid, handoverAgreed: false }, HANDOVER_NOT_AGREED],
-    ['Test 3: agreement as text', { coordinatorUid: other.uid, handoverAgreed: 'true' }, HANDOVER_NOT_AGREED],
+    ['Test 2: same Coordinator', handTo(current.uid), TARGET_IS_CURRENT],
+    ['Test 2: non-Coordinator', handTo(venue.uid), TARGET_NOT_COORDINATOR],
+    ['Test 2: unknown uid', handTo('nobody'), TARGET_NOT_COORDINATOR],
+    ['the submitter', handTo(ownerCoordinator.uid), TARGET_IS_OWNER],
+    ['the Lead themselves', handTo(lead.uid), TARGET_IS_SELF],
+    ['no target', { expectedCoordinatorUid: current.uid }, TARGET_REQUIRED],
+    ['SPM-69: no expected Coordinator', { coordinatorUid: other.uid }, EXPECTED_COORDINATOR_REQUIRED],
   ])('%s is refused (400) and nothing is written', async (_label, input, reason) => {
     const db = fixture()
     const before = stored(db)
-    await expectRefused(reassignEventRequest('req-1', current, input, db, NOW), (error) => error instanceof ReassignmentError && error.reason === reason && error.status === 400)
+    await expectRefused(reassignEventRequest('req-1', lead, input, db, NOW), (error) => error instanceof ReassignmentError && error.reason === reason && error.status === 400)
     expect(stored(db)).toEqual(before)
     expect(activity(db)).toEqual([])
     expect(db.transactions.every((tx) => !tx.committed)).toBe(true)
   })
 
+  it('SPM-69: a Coordinator that changed since the page loaded is refused (409) and nothing is written', async () => {
+    const db = fixture()
+    await expectRefused(reassignEventRequest('req-1', lead, { coordinatorUid: other.uid, expectedCoordinatorUid: legacy.uid }, db, NOW), (error) => error.reason === COORDINATOR_CHANGED && error.status === 409)
+    expect(stored(db).assignedCoordinatorUid).toBe(current.uid)
+    expect(activity(db)).toEqual([])
+  })
+
   it.each([COMPLETED, CANCELLED, REJECTED])('Test 5: %s is refused (409) and nothing is written', async (status) => {
     const db = fixture({ status })
-    await expectRefused(reassignEventRequest('req-1', current, { coordinatorUid: other.uid, handoverAgreed: true }, db, NOW), (error) => error.reason === TERMINAL_STATUS && error.status === 409)
+    await expectRefused(reassignEventRequest('req-1', lead, handTo(other.uid), db, NOW), (error) => error.reason === TERMINAL_STATUS && error.status === 409)
+    expect(stored(db).assignedCoordinatorUid).toBe(current.uid)
+    expect(activity(db)).toEqual([])
+  })
+
+  it('SPM-69: the assigned Coordinator is refused with not-permitted (403) and nothing is written', async () => {
+    const db = fixture()
+    await expectRefused(reassignEventRequest('req-1', current, handTo(other.uid), db, NOW), (error) => error.reason === NOT_PERMITTED && error.status === 403)
     expect(stored(db).assignedCoordinatorUid).toBe(current.uid)
     expect(activity(db)).toEqual([])
   })
 
   it('Test 4 / AC8: an unassigned Coordinator gets not-found, even with an invalid body, and nothing is written', async () => {
     const db = fixture()
-    await expectRefused(reassignEventRequest('req-1', other, { coordinatorUid: other.uid, handoverAgreed: true }, db, NOW), (error) => error instanceof EventRequestNotFoundError)
+    await expectRefused(reassignEventRequest('req-1', other, handTo(other.uid), db, NOW), (error) => error instanceof EventRequestNotFoundError)
     await expectRefused(reassignEventRequest('req-1', other, {}, db, NOW), (error) => error instanceof EventRequestNotFoundError)
     expect(stored(db).assignedCoordinatorUid).toBe(current.uid)
     expect(activity(db)).toEqual([])
@@ -236,43 +233,47 @@ describe('SPM-26 — reassignEventRequest', () => {
 
   it('an in-scope user who may not reassign (the owner) is refused with not-permitted', async () => {
     const organiserOnly = { uid: ownerCoordinator.uid, roles: [ORGANISER], organisationId: 'ORG-A' }
-    await expectRefused(reassignEventRequest('req-1', organiserOnly, { coordinatorUid: other.uid, handoverAgreed: true }, fixture(), NOW), (error) => error.reason === NOT_PERMITTED && error.status === 403)
+    await expectRefused(reassignEventRequest('req-1', organiserOnly, handTo(other.uid), fixture(), NOW), (error) => error.reason === NOT_PERMITTED && error.status === 403)
   })
 
   it('an out-of-scope non-Coordinator gets forbidden', async () => {
-    await expectRefused(reassignEventRequest('req-1', { uid: 'att', roles: [ATTENDEE] }, { coordinatorUid: other.uid, handoverAgreed: true }, fixture(), NOW), (error) => error instanceof EventRequestForbiddenError)
+    await expectRefused(reassignEventRequest('req-1', { uid: 'att', roles: [ATTENDEE] }, handTo(other.uid), fixture(), NOW), (error) => error instanceof EventRequestForbiddenError)
   })
 
   it('a missing event is not found', async () => {
-    await expectRefused(reassignEventRequest('nope', current, { coordinatorUid: other.uid, handoverAgreed: true }, fixture(), NOW), (error) => error instanceof EventRequestNotFoundError)
+    await expectRefused(reassignEventRequest('nope', lead, handTo(other.uid), fixture(), NOW), (error) => error instanceof EventRequestNotFoundError)
   })
 })
 
-describe('SPM-26 — reassignCoordinatorInTransaction has no permission check (Change 5 reuse)', () => {
-  it('applies the change for any caller that has authorised it', async () => {
+describe('SPM-26 — reassignCoordinatorInTransaction has no permission check', () => {
+  it('applies the change for any caller that has authorised it, recording the actor as the assigner', async () => {
     const db = fixture()
     const requestRef = db.collection('eventRequests').doc('req-1')
-    const lead = { type: 'user', uid: 'lead-1', name: 'Coordinator Lead' }
+    const actor = { type: 'user', uid: 'lead-1', name: 'Coordinator Lead' }
     const updated = await db.runTransaction((tx) =>
-      reassignCoordinatorInTransaction(tx, db, { requestRef, request: stored(db), toUid: other.uid, actor: lead, at: NOW.toISOString() }),
+      reassignCoordinatorInTransaction(tx, db, { requestRef, request: stored(db), toUid: other.uid, actor, at: NOW.toISOString() }),
     )
-    expect(updated.assignedCoordinatorUid).toBe(other.uid)
-    expect(activity(db)[0]).toMatchObject({ type: COORDINATOR_REASSIGNED, previousCoordinatorUid: current.uid, coordinatorUid: other.uid, actor: lead })
+    expect(updated).toMatchObject({ assignedCoordinatorUid: other.uid, assignedByUid: actor.uid, assignedAt: NOW.toISOString() })
+    expect(activity(db)[0]).toMatchObject({ type: COORDINATOR_REASSIGNED, previousCoordinatorUid: current.uid, coordinatorUid: other.uid, actor })
   })
 })
 
-describe('SPM-26 — listReassignmentCandidates', () => {
-  it('Test 9: the assigned Coordinator gets the other Coordinators as uid and name only', async () => {
-    const list = await listReassignmentCandidates('req-1', current, fixture())
-    expect(list).toEqual([
-      { uid: other.uid, name: other.name },
-      { uid: legacy.uid, name: legacy.name },
-    ])
+describe('SPM-26 — listReassignmentCandidates (SPM-69: for the Lead, with workload)', () => {
+  it('Test 9: the Lead gets the other Coordinators with their active events, and the current Coordinator', async () => {
+    const result = await listReassignmentCandidates('req-1', lead, fixture())
+    expect(result).toEqual({
+      coordinators: [
+        { uid: other.uid, name: other.name, activeEvents: 0 },
+        { uid: legacy.uid, name: legacy.name, activeEvents: 0 },
+      ],
+      currentCoordinator: { uid: current.uid, name: current.name },
+    })
   })
 
   it('is refused like a reassignment for anyone else', async () => {
     await expect(listReassignmentCandidates('req-1', other, fixture())).rejects.toBeInstanceOf(EventRequestNotFoundError)
+    await expect(listReassignmentCandidates('req-1', current, fixture())).rejects.toMatchObject({ reason: NOT_PERMITTED })
     await expect(listReassignmentCandidates('req-1', { uid: ownerCoordinator.uid, roles: [ORGANISER], organisationId: 'ORG-A' }, fixture())).rejects.toMatchObject({ reason: NOT_PERMITTED })
-    await expect(listReassignmentCandidates('req-1', current, fixture({ status: COMPLETED }))).rejects.toMatchObject({ reason: TERMINAL_STATUS })
+    await expect(listReassignmentCandidates('req-1', lead, fixture({ status: COMPLETED }))).rejects.toMatchObject({ reason: TERMINAL_STATUS })
   })
 })

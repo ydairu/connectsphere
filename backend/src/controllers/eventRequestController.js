@@ -112,23 +112,22 @@ export function createEventRequestController(getDb, loadCoordinatorName = async 
       }
     },
 
-    // SPM-26 — the Coordinators this event may be handed to: { coordinators: [{ uid, name }] }.
+    // SPM-26/SPM-69 — for the Lead: { coordinators: [{ uid, name, activeEvents }], currentCoordinator: { uid, name } }.
     async listReassignmentCandidates(req, res, next) {
       try {
-        const coordinators = await listReassignmentCandidates(req.params.id, req.user, getDb())
-        return res.json({ coordinators })
+        return res.json(await listReassignmentCandidates(req.params.id, req.user, getDb()))
       } catch (error) {
         return sendEventRequestError(error, res, next)
       }
     },
 
-    // SPM-26 — body { coordinatorUid, handoverAgreed: true }. The caller has just lost access to the event
-    // (SPM-65), so the response is not the projected request but only who now has it.
+    // SPM-26/SPM-69 — body { coordinatorUid, expectedCoordinatorUid }. The response says only who now has the
+    // event; the Lead's page reloads the event to show it.
     async reassignEventRequest(req, res, next) {
       try {
         const { coordinator } = await reassignEventRequest(req.params.id, req.user, {
           coordinatorUid: req.body?.coordinatorUid,
-          handoverAgreed: req.body?.handoverAgreed,
+          expectedCoordinatorUid: req.body?.expectedCoordinatorUid,
         }, getDb())
         return res.json({ reassigned: true, coordinator: { name: coordinator.name } })
       } catch (error) {

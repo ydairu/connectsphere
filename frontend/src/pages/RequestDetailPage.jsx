@@ -47,8 +47,9 @@ import { SECTION_ORDER, optionLabel, preparationReadOnlyText, sectionFields, sec
 // SPM-25: the Coordinator's clarification messages (clarificationRequests in the response) are shown
 // first, so a returned request's Organiser reads what to amend before editing.
 //
-// SPM-26: the assigned Coordinator can hand the event to another Coordinator (canReassignCoordinator in the
-// response). They lose access to it at once (SPM-65), so on success they are taken to their list.
+// SPM-26/SPM-69: the Event Coordinator Lead can hand the event to another Coordinator (canReassignCoordinator in
+// the response). The event stays in the Lead's scope, so the page reloads and names the new Coordinator; if the
+// Coordinator changed meanwhile (409) it reloads and says so.
 // SPM-46: an Organiser sees the event's assigned Coordinator (assignedCoordinator in the response) above
 // everything else. The API sends only the name, and null to other roles.
 // SPM-64: below it, an Organiser sees their event's arrangements — date and time, venue and equipment as
@@ -206,6 +207,17 @@ function RequestDetailPage() {
     setOwner(typeof response.isOwnRequest === 'boolean' ? { name: response.ownerName ?? null, isOwn: response.isOwnRequest } : null)
     setForm(toFormValues(response.request))
   }, [])
+
+  // SPM-69: after a reassignment, or a refusal because the event changed, show the event as it now is. An event
+  // that was finished meanwhile has left the Lead's view, so the Lead is taken to their list instead.
+  async function reloadAfterReassignment(type, message, { refreshed = false } = {}) {
+    try {
+      applyResponse(await getRequest(user, id))
+      setStatus({ type, message: refreshed ? `${message} The page has been refreshed.` : message })
+    } catch {
+      navigate('/requests', { replace: true, state: { notice: message } })
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -448,7 +460,8 @@ function RequestDetailPage() {
                 user={user}
                 requestId={id}
                 busy={acting || saving}
-                onReassigned={(name) => navigate('/requests', { replace: true, state: { notice: `Event reassigned to ${name}.` } })}
+                onReassigned={(name) => reloadAfterReassignment('success', `Event reassigned to ${name}.`)}
+                onStale={(message) => reloadAfterReassignment('error', message ?? 'This event has changed.', { refreshed: true })}
               />
             )}
             {renderSection('internal')}

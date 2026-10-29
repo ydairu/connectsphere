@@ -1,5 +1,7 @@
 // SPM-26 API suite — in-memory harness. Real HTTP against the real Express app, authenticate middleware,
-// shared/permissions.js and shared/coordinatorReassignment.js. Mocked: Firebase token verification (a test
+// shared/permissions.js and shared/coordinatorReassignment.js. SPM-69 made reassignment Lead-only (CL3 G8!C35,
+// C39) and removed the handover-agreement flag: the Event Coordinator Lead now reassigns, sending the Coordinator
+// their page showed, and the assigned Coordinator is refused. Lead-specific cases are in tests/spm-69. Mocked: Firebase token verification (a test
 // token names the uid) and persistence (backend/src/testing/fakeFirestore.js, holding the seeded requests
 // and profiles). This is not database verification, and there is no live-project variant: a live run would
 // reassign seeded events and leave activity entries behind.
@@ -12,8 +14,10 @@ import { createAuthenticate } from '../../../backend/src/middleware/authenticate
 import { ASSIGNMENT_LOCK_PATH } from '../../../backend/src/services/coordinatorAssignmentService.js'
 import { COORDINATOR_REASSIGNED } from '../../../backend/src/services/coordinatorReassignmentService.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
+import { countActiveAssignments } from '../../../shared/coordinatorAssignment.js'
+import { TARGET_IS_SELF } from '../../../shared/coordinatorLeadAssignment.js'
 import {
-  HANDOVER_NOT_AGREED,
+  EXPECTED_COORDINATOR_REQUIRED,
   NOT_PERMITTED,
   TARGET_IS_CURRENT,
   TARGET_NOT_COORDINATOR,
@@ -24,7 +28,7 @@ import { START_REVIEW } from '../../../shared/statusTransitions.js'
 import { createFakeFirestoreEventRequestStore } from '../../shared/firebase-double/fakeFirestoreEventRequestStore.js'
 
 const TOKEN_PREFIX = 'test-token:'
-const { attendee, coordinator, coordinator2, coordinator3, organiserA1, organiserB1, venueStaff } = SEED_ACCOUNTS
+const { attendee, coordinator, coordinator2, coordinator3, coordinatorLead: lead, organiserA1, organiserB1, venueStaff } = SEED_ACCOUNTS
 
 const SUBMITTED_ID = 'seed-req-a1-submitted'
 const PLANNING_ID = 'seed-req-a1-planning'
@@ -83,19 +87,20 @@ const view = (account, id) => call('GET', `/api/requests/${id}`, account)
 const listIds = async (account) => (await call('GET', '/api/requests', account)).json.requests.map((request) => request.id)
 const stored = (id) => structuredClone(db.store.get(id))
 const activity = (id) => [...db.collectionData(`eventRequests/${id}/activity`).values()]
-const agreedTo = (account) => ({ coordinatorUid: account.uid, handoverAgreed: true })
+// SPM-69: the body names the new Coordinator and the one the Lead's page showed (the event's current one).
+const handTo = (account, id = SUBMITTED_ID) => ({ coordinatorUid: account.uid, expectedCoordinatorUid: stored(id).assignedCoordinatorUid })
 
-describe('SPM-26 AC2 — the assigned Coordinator reassigns the event (Test 1)', () => {
+describe('SPM-26 AC2 — the Lead reassigns the event (Test 1; SPM-69: Lead-only)', () => {
   it('updates assignedCoordinatorUid and returns only the new Coordinator name', async () => {
-    const response = await reassign(coordinator, SUBMITTED_ID, agreedTo(coordinator2))
+    const response = await reassign(lead, SUBMITTED_ID, handTo(coordinator2))
     expect(response.status).toBe(200)
     expect(response.json).toEqual({ reassigned: true, coordinator: { name: coordinator2.name } })
     expect(stored(SUBMITTED_ID).assignedCoordinatorUid).toBe(coordinator2.uid)
   })
 
-  it('AC1: there is still exactly one Coordinator, and the new one can reassign again', async () => {
-    await reassign(coordinator, SUBMITTED_ID, agreedTo(coordinator2))
-    const again = await reassign(coordinator2, SUBMITTED_ID, agreedTo(coordinator3))
+  it('AC1: there is still exactly one Coordinator, and the Lead can reassign it again', async () => {
+    await reassign(lead, SUBMITTED_ID, handTo(coordinator2))
+    const again = await reassign(lead, SUBMITTED_ID, handTo(coordinator3))
     expect(again.status).toBe(200)
     expect(stored(SUBMITTED_ID).assignedCoordinatorUid).toBe(coordinator3.uid)
     expect(activity(SUBMITTED_ID).map((entry) => [entry.previousCoordinatorUid, entry.coordinatorUid])).toEqual([
@@ -104,26 +109,28 @@ describe('SPM-26 AC2 — the assigned Coordinator reassigns the event (Test 1)',
     ])
   })
 
-  it('the event page offers Reassign to the assigned Coordinator only', async () => {
-    expect((await view(coordinator, SUBMITTED_ID)).json.canReassignCoordinator).toBe(true)
+  it('the event page offers Reassign to the Lead only, never to the assigned Coordinator', async () => {
+    expect((await view(lead, SUBMITTED_ID)).json.canReassignCoordinator).toBe(true)
+    expect((await view(coordinator, SUBMITTED_ID)).json.canReassignCoordinator).toBe(false)
     expect((await view(organiserA1, SUBMITTED_ID)).json.canReassignCoordinator).toBe(false)
     expect((await view(venueStaff, PLANNING_ID)).json.canReassignCoordinator).toBe(false)
-    expect((await view(coordinator, 'seed-req-a1-completed')).json.canReassignCoordinator).toBe(false)
+    // A finished event has left the Lead's view (CL3 G8!C41: active events).
+    expect((await view(lead, 'seed-req-a1-completed')).status).toBe(403)
   })
 })
 
-describe('SPM-26 — invalid targets and agreement are refused, record unchanged (Tests 2–3)', () => {
+describe('SPM-26 — invalid targets are refused, record unchanged (Tests 2–3)', () => {
   it.each([
-    ['a non-Coordinator', () => agreedTo(venueStaff), TARGET_NOT_COORDINATOR],
-    ['the current Coordinator', () => agreedTo(coordinator), TARGET_IS_CURRENT],
-    ['an unknown uid', () => ({ coordinatorUid: 'seed-nobody', handoverAgreed: true }), TARGET_NOT_COORDINATOR],
-    ['no Coordinator chosen', () => ({ handoverAgreed: true }), TARGET_REQUIRED],
-    ['a missing agreement flag', () => ({ coordinatorUid: coordinator2.uid }), HANDOVER_NOT_AGREED],
-    ['an agreement flag of false', () => ({ coordinatorUid: coordinator2.uid, handoverAgreed: false }), HANDOVER_NOT_AGREED],
-    ['an empty body', () => undefined, HANDOVER_NOT_AGREED],
+    ['a non-Coordinator', () => handTo(venueStaff), TARGET_NOT_COORDINATOR],
+    ['the current Coordinator', () => handTo(coordinator), TARGET_IS_CURRENT],
+    ['an unknown uid', () => ({ ...handTo(coordinator2), coordinatorUid: 'seed-nobody' }), TARGET_NOT_COORDINATOR],
+    ['no Coordinator chosen', () => ({ expectedCoordinatorUid: coordinator.uid }), TARGET_REQUIRED],
+    ['the Lead themselves', () => handTo(lead), TARGET_IS_SELF],
+    ['no current Coordinator sent (SPM-69)', () => ({ coordinatorUid: coordinator2.uid }), EXPECTED_COORDINATOR_REQUIRED],
+    ['an empty body', () => undefined, EXPECTED_COORDINATOR_REQUIRED],
   ])('%s → 400', async (_label, body, reason) => {
     const before = stored(SUBMITTED_ID)
-    const response = await reassign(coordinator, SUBMITTED_ID, body())
+    const response = await reassign(lead, SUBMITTED_ID, body())
     expect(response.status).toBe(400)
     expect(response.json.reason).toBe(reason)
     expect(response.json.message).toEqual(expect.any(String))
@@ -132,57 +139,65 @@ describe('SPM-26 — invalid targets and agreement are refused, record unchanged
   })
 })
 
-describe('SPM-26 AC8 — an unassigned Coordinator is denied with 404 (Test 4)', () => {
-  it('reassigning another Coordinator\'s event is 404, like a missing event, and nothing changes', async () => {
+describe('SPM-26 AC8 / SPM-69 — Coordinators and other roles cannot reassign (Test 4)', () => {
+  it('SPM-69: the assigned Coordinator is refused with 403 and nothing changes', async () => {
     const before = stored(SUBMITTED_ID)
-    const response = await reassign(coordinator2, SUBMITTED_ID, agreedTo(coordinator3))
-    const missing = await reassign(coordinator2, 'seed-req-does-not-exist', agreedTo(coordinator3))
-    expect(response.status).toBe(404)
-    expect(response.json).toEqual(missing.json)
+    const response = await reassign(coordinator, SUBMITTED_ID, handTo(coordinator2))
+    expect(response.status).toBe(403)
+    expect(response.json.reason).toBe(NOT_PERMITTED)
     expect(stored(SUBMITTED_ID)).toEqual(before)
     expect(activity(SUBMITTED_ID)).toEqual([])
   })
 
-  it('even naming themselves as the target, or with no body, it is still 404', async () => {
-    expect((await reassign(coordinator2, SUBMITTED_ID, agreedTo(coordinator2))).status).toBe(404)
+  it('a Coordinator who cannot see the event gets 404, like a missing event, and nothing changes', async () => {
+    const before = stored(SUBMITTED_ID)
+    const response = await reassign(coordinator2, SUBMITTED_ID, handTo(coordinator3))
+    const missing = await reassign(coordinator2, 'seed-req-does-not-exist', handTo(coordinator3))
+    expect(response.status).toBe(404)
+    expect(response.json).toEqual(missing.json)
+    expect(stored(SUBMITTED_ID)).toEqual(before)
+    expect(activity(SUBMITTED_ID)).toEqual([])
     expect((await reassign(coordinator2, SUBMITTED_ID)).status).toBe(404)
   })
 
   it('other roles are refused without a change', async () => {
-    expect((await reassign(organiserA1, SUBMITTED_ID, agreedTo(coordinator2))).json.reason).toBe(NOT_PERMITTED)
-    expect((await reassign(organiserA1, SUBMITTED_ID, agreedTo(coordinator2))).status).toBe(403)
-    expect((await reassign(venueStaff, PLANNING_ID, agreedTo(coordinator2))).status).toBe(403)
-    expect((await reassign(organiserB1, SUBMITTED_ID, agreedTo(coordinator2))).status).toBe(403)
-    expect((await reassign(attendee, CONFIRMED_ID, agreedTo(coordinator2))).status).toBe(403)
+    expect((await reassign(organiserA1, SUBMITTED_ID, handTo(coordinator2))).json.reason).toBe(NOT_PERMITTED)
+    expect((await reassign(organiserA1, SUBMITTED_ID, handTo(coordinator2))).status).toBe(403)
+    expect((await reassign(venueStaff, PLANNING_ID, handTo(coordinator2, PLANNING_ID))).status).toBe(403)
+    expect((await reassign(organiserB1, SUBMITTED_ID, handTo(coordinator2))).status).toBe(403)
+    expect((await reassign(attendee, CONFIRMED_ID, handTo(coordinator2, CONFIRMED_ID))).status).toBe(403)
     expect(stored(SUBMITTED_ID).assignedCoordinatorUid).toBe(coordinator.uid)
   })
 })
 
-describe('SPM-26 AC9 — terminal events cannot be reassigned (Test 5)', () => {
+describe('SPM-26 AC9 / SPM-69 AC2 — terminal events cannot be reassigned (Test 5)', () => {
   it.each(TERMINAL)('%s → 409, unchanged', async (_status, id, assigned) => {
     const target = assigned.uid === coordinator.uid ? coordinator3 : coordinator
     const before = stored(id)
-    const response = await reassign(assigned, id, agreedTo(target))
+    const response = await reassign(lead, id, handTo(target, id))
     expect(response.status).toBe(409)
     expect(response.json.reason).toBe(TERMINAL_STATUS)
     expect(stored(id)).toEqual(before)
-    expect((await candidates(assigned, id)).status).toBe(409)
+    expect((await candidates(lead, id)).status).toBe(409)
   })
 })
 
-describe('SPM-26 AC7 — nothing but the Coordinator changes (Test 6)', () => {
+describe('SPM-26 AC7 — nothing but the assignment changes (Test 6)', () => {
   it.each([
     ['planning', PLANNING_ID, coordinator],
     ['confirmed', CONFIRMED_ID, coordinator3],
   ])('at %s: status, venue, equipment and every other field are unchanged', async (_status, id, assigned) => {
     const before = stored(id)
     const target = assigned.uid === coordinator.uid ? coordinator2 : coordinator
-    const response = await reassign(assigned, id, agreedTo(target))
+    const response = await reassign(lead, id, handTo(target, id))
     expect(response.status).toBe(200)
 
-    const { assignedCoordinatorUid, updatedAt, ...rest } = stored(id)
+    // SPM-69: assignedByUid and assignedAt name the reassigning Lead.
+    const { assignedCoordinatorUid, assignedByUid, assignedAt, updatedAt, ...rest } = stored(id)
     const { assignedCoordinatorUid: _previous, updatedAt: _previousUpdate, ...restBefore } = before
     expect(assignedCoordinatorUid).toBe(target.uid)
+    expect(assignedByUid).toBe(lead.uid)
+    expect(assignedAt).toBe(updatedAt)
     expect(updatedAt).toEqual(expect.any(String))
     expect(rest).toEqual(restBefore)
     expect(rest.status).toBe(before.status)
@@ -194,7 +209,7 @@ describe('SPM-26 AC7 — nothing but the Coordinator changes (Test 6)', () => {
 
   it('a pending cancellation request stays pending for the new Coordinator', async () => {
     expect((await call('POST', `/api/event-requests/${CONFIRMED_ID}/transitions`, organiserA1, { action: 'request_cancellation', reason: 'Budget' })).status).toBe(200)
-    const response = await reassign(coordinator3, CONFIRMED_ID, agreedTo(coordinator))
+    const response = await reassign(lead, CONFIRMED_ID, handTo(coordinator, CONFIRMED_ID))
     expect(response.status).toBe(200)
     expect(stored(CONFIRMED_ID).cancellationRequest.status).toBe('pending')
     expect((await view(coordinator, CONFIRMED_ID)).json.availableActions).toContain('approve_cancellation')
@@ -204,13 +219,13 @@ describe('SPM-26 AC7 — nothing but the Coordinator changes (Test 6)', () => {
 describe('SPM-26 AC6 — activity history (Test 7)', () => {
   it('records previous, new, actor and timestamp, with the lock, in the request\'s committed transaction', async () => {
     const start = Date.now()
-    await reassign(coordinator, SUBMITTED_ID, agreedTo(coordinator2))
+    await reassign(lead, SUBMITTED_ID, handTo(coordinator2))
     const [entry] = activity(SUBMITTED_ID)
     expect(entry).toEqual({
       type: COORDINATOR_REASSIGNED,
       previousCoordinatorUid: coordinator.uid,
       coordinatorUid: coordinator2.uid,
-      actor: { type: 'user', uid: coordinator.uid, name: coordinator.name },
+      actor: { type: 'user', uid: lead.uid, name: lead.name },
       at: expect.any(String),
     })
     expect(Date.parse(entry.at)).toBeGreaterThanOrEqual(start - 1000)
@@ -229,7 +244,7 @@ describe('SPM-26 AC4–5 — visibility moves with the event (Test 8)', () => {
     expect(await listIds(coordinator)).toContain(SUBMITTED_ID)
     expect(await listIds(coordinator2)).not.toContain(SUBMITTED_ID)
 
-    await reassign(coordinator, SUBMITTED_ID, agreedTo(coordinator2))
+    await reassign(lead, SUBMITTED_ID, handTo(coordinator2))
 
     expect(await listIds(coordinator2)).toContain(SUBMITTED_ID)
     expect((await view(coordinator2, SUBMITTED_ID)).status).toBe(200)
@@ -238,40 +253,42 @@ describe('SPM-26 AC4–5 — visibility moves with the event (Test 8)', () => {
   })
 
   it('status actions move too: the new Coordinator can act, the previous one gets 404', async () => {
-    await reassign(coordinator, SUBMITTED_ID, agreedTo(coordinator2))
+    await reassign(lead, SUBMITTED_ID, handTo(coordinator2))
     expect((await call('POST', `/api/event-requests/${SUBMITTED_ID}/transitions`, coordinator, { action: START_REVIEW })).status).toBe(404)
     expect((await call('POST', `/api/event-requests/${SUBMITTED_ID}/transitions`, coordinator2, { action: START_REVIEW })).status).toBe(200)
   })
 
   it('the Organiser still sees the event, unchanged', async () => {
-    await reassign(coordinator, SUBMITTED_ID, agreedTo(coordinator2))
+    await reassign(lead, SUBMITTED_ID, handTo(coordinator2))
     const response = await view(organiserA1, SUBMITTED_ID)
     expect(response.status).toBe(200)
     expect(response.json.request.status).toBe('submitted')
   })
 })
 
-describe('SPM-26 AC3 — the eligible-Coordinator list (Test 9)', () => {
-  it('the assigned Coordinator gets every other Coordinator, as uid and name only', async () => {
-    const response = await candidates(coordinator, SUBMITTED_ID)
+describe('SPM-26 AC3 — the eligible-Coordinator list (Test 9; SPM-69: with workload and the current Coordinator)', () => {
+  it('the Lead gets every other Coordinator with their active events, and the current Coordinator', async () => {
+    const counts = countActiveAssignments(SEED_REQUESTS)
+    const response = await candidates(lead, SUBMITTED_ID)
     expect(response.status).toBe(200)
     expect(response.json).toEqual({
       coordinators: [
-        { uid: coordinator2.uid, name: coordinator2.name },
-        { uid: coordinator3.uid, name: coordinator3.name },
+        { uid: coordinator2.uid, name: coordinator2.name, activeEvents: counts.get(coordinator2.uid) ?? 0 },
+        { uid: coordinator3.uid, name: coordinator3.name, activeEvents: counts.get(coordinator3.uid) ?? 0 },
       ],
+      currentCoordinator: { uid: coordinator.uid, name: coordinator.name },
     })
-    expect(response.json.coordinators.map(({ uid }) => uid)).not.toContain(coordinator.uid)
     expect(response.text).not.toContain('@')
     expect(response.text).not.toContain('roles')
   })
 
   it('never lists non-Coordinators', async () => {
-    const uids = (await candidates(coordinator, SUBMITTED_ID)).json.coordinators.map(({ uid }) => uid)
-    for (const account of [venueStaff, attendee, organiserA1]) expect(uids).not.toContain(account.uid)
+    const uids = (await candidates(lead, SUBMITTED_ID)).json.coordinators.map(({ uid }) => uid)
+    for (const account of [venueStaff, attendee, organiserA1, lead]) expect(uids).not.toContain(account.uid)
   })
 
-  it('an unassigned Coordinator gets 404; other roles get 403', async () => {
+  it('the assigned Coordinator gets 403 (SPM-69); an unassigned Coordinator 404; other roles 403', async () => {
+    expect((await candidates(coordinator, SUBMITTED_ID)).status).toBe(403)
     expect((await candidates(coordinator2, SUBMITTED_ID)).status).toBe(404)
     expect((await candidates(organiserA1, SUBMITTED_ID)).status).toBe(403)
     expect((await candidates(organiserB1, SUBMITTED_ID)).status).toBe(403)
@@ -285,9 +302,9 @@ describe('SPM-26 AC3 — the eligible-Coordinator list (Test 9)', () => {
     const record = stored(SUBMITTED_ID)
     db.store.set(SUBMITTED_ID, { ...record, ownerUid: dual.uid })
 
-    const uids = (await candidates(coordinator, SUBMITTED_ID)).json.coordinators.map(({ uid }) => uid)
+    const uids = (await candidates(lead, SUBMITTED_ID)).json.coordinators.map(({ uid }) => uid)
     expect(uids).not.toContain(dual.uid)
-    const response = await reassign(coordinator, SUBMITTED_ID, agreedTo(dual))
+    const response = await reassign(lead, SUBMITTED_ID, handTo(dual))
     expect(response.status).toBe(400)
     expect(stored(SUBMITTED_ID).assignedCoordinatorUid).toBe(coordinator.uid)
   })

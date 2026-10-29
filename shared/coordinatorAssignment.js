@@ -24,6 +24,24 @@ export function awaitingCoordinatorAssignment(request) {
 export const ACTIVE_ASSIGNMENT_STATUSES = Object.freeze([SUBMITTED, UNDER_REVIEW, RETURNED, PLANNING, CONFIRMED, PREPARATION])
 
 /**
+ * SPM-69: is this event attributed to `lead`? The Lead who last assigned or reassigned it (`assignedByUid`), or —
+ * [Team decision, 29 Oct 2026, pending PO confirmation] — nobody, for an event assigned before SPM-68, which any
+ * Lead may take over (CL3 G8!C38: the Lead may reassign existing assignments). Status is not considered here.
+ */
+export function attributedToLead(lead, request) {
+  return request != null && (!request.assignedByUid || request.assignedByUid === lead?.uid)
+}
+
+/**
+ * SPM-69: is this an active assigned event under `lead`'s supervision? "The unassigned queue plus the active
+ * events that that Lead themselves previously assigned" (CL3 G8!C41), and events no Lead assigned
+ * (attributedToLead). Finished events leave the Lead's view.
+ */
+export function supervisedByLead(lead, request) {
+  return ACTIVE_ASSIGNMENT_STATUSES.includes(request?.status) && Boolean(request.assignedCoordinatorUid) && attributedToLead(lead, request)
+}
+
+/**
  * Active assigned events per coordinator, as a Map of uid → count. Requests at other statuses, or with no
  * coordinator, are ignored. Coordinators with no active events are simply absent (count 0).
  */

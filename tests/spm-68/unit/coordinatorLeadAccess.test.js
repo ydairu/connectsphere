@@ -1,6 +1,8 @@
 // SPM-68 — the Event Coordinator Lead in the shared permission model (shared/permissions.js). Pure functions,
-// no I/O. The Lead sees only the unassigned queue, receives basic event information, edits nothing and never
-// gains Coordinator powers — including through an account that also holds the Coordinator role.
+// no I/O. The Lead sees the unassigned queue, receives basic event information, edits nothing and never
+// gains Coordinator powers — including through an account that also holds the Coordinator role. SPM-69 widens the
+// Lead's scope to the active events they assigned (and those no Lead assigned); tests/spm-69 covers that, so the
+// assigned events here are attributed to another Lead.
 
 import { describe, expect, it } from 'vitest'
 
@@ -55,8 +57,8 @@ describe('SPM-68 AC1 — a new internal role, Event Coordinator Lead', () => {
     expect(roleLabel(COORDINATOR_LEAD)).toBe('Event Coordinator Lead')
   })
 
-  it('the Requests page heading: the queue for a Lead, the Coordinator wording for a Lead who is also a Coordinator', () => {
-    expect(requestListCopy([COORDINATOR_LEAD]).title).toBe('Unassigned requests')
+  it('the Requests page heading: the Lead\'s own wording (SPM-69), the Coordinator wording for a Lead who is also a Coordinator', () => {
+    expect(requestListCopy([COORDINATOR_LEAD]).title).toBe('Requests you oversee')
     expect(requestListCopy([COORDINATOR_LEAD, COORDINATOR]).title).toBe('Events assigned to you')
   })
 
@@ -68,6 +70,9 @@ describe('SPM-68 AC1 — a new internal role, Event Coordinator Lead', () => {
   })
 })
 
+// SPM-69: an event another Lead assigned is outside this Lead's scope (CL3 G8!C41).
+const OTHER_LEAD = 'lead-2'
+
 describe('SPM-68 AC3/AC5 — the Lead’s scope is the unassigned queue', () => {
   it('admits a submitted request whose Coordinator is null or absent (legacy records)', () => {
     expect(inScope(lead, request())).toBe(true)
@@ -78,13 +83,13 @@ describe('SPM-68 AC3/AC5 — the Lead’s scope is the unassigned queue', () => 
 
   it.each([
     ['a draft', { status: DRAFT }],
-    ['an assigned submitted request', { assignedCoordinatorUid: 'coord-1' }],
-    ['a resubmitted request that kept its Coordinator', { status: SUBMITTED, assignedCoordinatorUid: 'coord-1' }],
-    ['a returned request', { status: RETURNED, assignedCoordinatorUid: 'coord-1' }],
-    ['an under-review request', { status: UNDER_REVIEW, assignedCoordinatorUid: 'coord-1' }],
-    ['a planning event', { status: PLANNING, assignedCoordinatorUid: 'coord-1' }],
-    ['a confirmed event', { status: CONFIRMED, assignedCoordinatorUid: 'coord-1' }],
-    ['a preparation event', { status: PREPARATION, assignedCoordinatorUid: 'coord-1' }],
+    ['an assigned submitted request', { assignedCoordinatorUid: 'coord-1', assignedByUid: OTHER_LEAD }],
+    ['a resubmitted request that kept its Coordinator', { status: SUBMITTED, assignedCoordinatorUid: 'coord-1', assignedByUid: OTHER_LEAD }],
+    ['a returned request', { status: RETURNED, assignedCoordinatorUid: 'coord-1', assignedByUid: OTHER_LEAD }],
+    ['an under-review request', { status: UNDER_REVIEW, assignedCoordinatorUid: 'coord-1', assignedByUid: OTHER_LEAD }],
+    ['a planning event', { status: PLANNING, assignedCoordinatorUid: 'coord-1', assignedByUid: OTHER_LEAD }],
+    ['a confirmed event', { status: CONFIRMED, assignedCoordinatorUid: 'coord-1', assignedByUid: OTHER_LEAD }],
+    ['a preparation event', { status: PREPARATION, assignedCoordinatorUid: 'coord-1', assignedByUid: OTHER_LEAD }],
     ['a completed event', { status: COMPLETED, assignedCoordinatorUid: 'coord-1' }],
     ['a cancelled event', { status: CANCELLED, assignedCoordinatorUid: 'coord-1' }],
     ['a rejected event', { status: REJECTED, assignedCoordinatorUid: 'coord-1' }],
@@ -148,7 +153,7 @@ describe('SPM-68 — the Lead does not act as a Coordinator (CL3 G8!C13)', () =>
     const theirs = request({ assignedCoordinatorUid: leadCoordinator.uid })
     expect(isAssignedCoordinator(leadCoordinator, theirs)).toBe(true)
     expect(allAvailableActions(leadCoordinator, theirs, NOW)).toContain('start_review')
-    const someoneElses = request({ status: UNDER_REVIEW, assignedCoordinatorUid: 'coord-1' })
+    const someoneElses = request({ status: UNDER_REVIEW, assignedCoordinatorUid: 'coord-1', assignedByUid: OTHER_LEAD })
     expect(inScope(leadCoordinator, someoneElses)).toBe(false)
     expect(allAvailableActions(leadCoordinator, someoneElses, NOW)).toEqual([])
   })

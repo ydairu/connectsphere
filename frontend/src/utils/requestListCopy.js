@@ -39,14 +39,15 @@ const COPY = {
     emptyTitle: 'No events awaiting a safety check',
     emptyBody: 'Events appear here when their coordinator submits them for safety review.',
   },
-  // SPM-68: the Lead's list is the unassigned queue — inScope() admits only submitted requests with no
-  // Coordinator. Assigning happens on /requests/unassigned.
+  // SPM-68: the unassigned queue; assigning happens on /requests/unassigned. SPM-69: plus the active events the
+  // Lead assigned or reassigned, and those assigned before SPM-68 — inScope() decides — which are reassigned from
+  // the event page. A plain list: filtering and per-Coordinator counts are SPM-70's.
   [COORDINATOR_LEAD]: {
     eyebrow: 'Coordinator assignment',
-    title: 'Unassigned requests',
-    description: 'Submitted requests waiting for an Event Coordinator. Assign them from the Unassigned requests page.',
-    emptyTitle: 'No requests waiting for a Coordinator',
-    emptyBody: 'Requests appear here when an organiser submits them, until a Coordinator is assigned.',
+    title: 'Requests you oversee',
+    description: 'Submitted requests waiting for an Event Coordinator, and the active events you assigned. Assign from the Unassigned requests page; open an event to reassign it.',
+    emptyTitle: 'Nothing to oversee',
+    emptyBody: 'Requests appear here when an organiser submits them, and events stay here while they are active.',
   },
   [ATTENDEE]: {
     eyebrow: 'Events',

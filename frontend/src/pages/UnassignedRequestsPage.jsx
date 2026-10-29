@@ -5,6 +5,7 @@ import { assignCoordinator, getAssignmentCandidates, listUnassignedRequests } fr
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Navbar from '../components/Navbar.jsx'
+import { activeEventsLabel } from '../utils/coordinatorWorkload.js'
 
 // SPM-68 — the Event Coordinator Lead's unassigned queue: submitted requests waiting for an Event Coordinator,
 // oldest first, with basic event information. The Lead picks a Coordinator (each shown with their active
@@ -19,8 +20,6 @@ const displayTime = (value) =>
   !value || Number.isNaN(Date.parse(value)) ? 'Not set' : new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 const displayValue = (value, suffix = '') => (value === null || value === undefined || value === '' ? 'Not set' : `${value}${suffix}`)
-
-const activeEventsLabel = (count) => `${count} active event${count === 1 ? '' : 's'}`
 
 function Row({ label, children }) {
   return <div className="profile-row booking-row"><span>{label}</span><strong>{children}</strong></div>

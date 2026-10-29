@@ -6,11 +6,12 @@ import { describe, expect, it } from 'vitest'
 
 import { SEED_ACCOUNTS } from '../../../backend/scripts/seedData.js'
 import { COORDINATOR_LEAD } from '../../../shared/permissions.js'
-import { DRAFT, SUBMITTED } from '../../../shared/status.js'
+import { DRAFT, PLANNING, SUBMITTED } from '../../../shared/status.js'
 import { UNASSIGNED_ID, useApiHarness } from './apiHarness.js'
 
 const LEGACY_ID = 'spm68-legacy-unassigned'
 const OLDER_ID = 'spm68-older-unassigned'
+const OTHER_LEADS_ID = 'spm68-assigned-by-another-lead'
 const core = (title) => ({ title, preferredDateTime: '2026-12-01T10:00:00+08:00', durationHours: 2, expectedAttendees: 30, description: 'not in the queue' })
 
 const api = useApiHarness({
@@ -19,6 +20,8 @@ const api = useApiHarness({
     [LEGACY_ID]: { status: SUBMITTED, ownerUid: 'seed-organiser-b1', organisationId: 'org-b', organisationName: 'Seed Organisation B', core: core('Legacy record'), createdAt: '2026-10-20T00:00:00.000Z' },
     [OLDER_ID]: { status: SUBMITTED, ownerUid: 'seed-organiser-a1', organisationName: 'Seed Organisation A', assignedCoordinatorUid: null, core: core('Older'), submittedAt: '2026-10-01T00:00:00.000Z', createdAt: '2026-09-30T00:00:00.000Z' },
     'spm68-unassigned-draft': { status: DRAFT, ownerUid: 'seed-organiser-a1', assignedCoordinatorUid: null, core: core('Draft'), createdAt: '2026-09-01T00:00:00.000Z' },
+    // SPM-69: assigned by the second Lead, so outside the seeded Lead's scope (CL3 G8!C41).
+    [OTHER_LEADS_ID]: { status: PLANNING, ownerUid: 'seed-organiser-a1', organisationName: 'Seed Organisation A', assignedCoordinatorUid: 'seed-coordinator', assignedByUid: 'seed-coordinator-lead-2', core: core('Other Lead’s event'), createdAt: '2026-09-01T00:00:00.000Z' },
   },
   extraUsers: {
     'seed-coordinator-lead-2': { name: 'Second Lead', roles: [COORDINATOR_LEAD] },
@@ -59,9 +62,11 @@ describe('SPM-68 AC3 — the Lead opens the queue', () => {
     expect(response.json.requests).toHaveLength(3)
   })
 
-  it('the Lead’s request list holds the same unassigned requests, and the request page shows basic information', async () => {
-    const ids = (await api.list(coordinatorLead)).json.requests.map((request) => request.id).sort()
-    expect(ids).toEqual([LEGACY_ID, OLDER_ID, UNASSIGNED_ID].sort())
+  it('the Lead’s request list holds the unassigned requests, and the request page shows basic information', async () => {
+    // SPM-69 adds the active events the Lead supervises to the list (tests/spm-69); the queue is all here.
+    const ids = (await api.list(coordinatorLead)).json.requests.map((request) => request.id)
+    expect(ids).toEqual(expect.arrayContaining([LEGACY_ID, OLDER_ID, UNASSIGNED_ID]))
+    expect(ids).not.toContain('spm68-unassigned-draft')
 
     const page = await api.view(coordinatorLead, UNASSIGNED_ID)
     expect(page.status).toBe(200)
@@ -71,8 +76,8 @@ describe('SPM-68 AC3 — the Lead opens the queue', () => {
     expect(page.json.canReassignCoordinator).toBe(false)
   })
 
-  it('an assigned request is not readable by the Lead', async () => {
-    expect((await api.view(coordinatorLead, 'seed-req-a1-submitted')).status).toBe(403)
+  it('a request another Lead assigned is not readable by the Lead (SPM-69, CL3 G8!C41)', async () => {
+    expect((await api.view(coordinatorLead, OTHER_LEADS_ID)).status).toBe(403)
   })
 })
 

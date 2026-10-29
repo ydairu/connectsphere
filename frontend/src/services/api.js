@@ -270,20 +270,21 @@ export function transitionRequest(user, id, action, reason) {
   })
 }
 
-// SPM-26: the Coordinators this event may be handed to, as { coordinators: [{ uid, name }] }. Only the
-// event's assigned Coordinator receives it; anyone else gets the same refusals as reassignCoordinator.
+// SPM-26/SPM-69: for the Event Coordinator Lead, the Coordinators this event may be handed to, as
+// { coordinators: [{ uid, name, activeEvents }], currentCoordinator: { uid, name } }. Anyone else gets the same
+// refusals as reassignCoordinator.
 export function getReassignmentCandidates(user, id) {
   return authenticatedRequest(user, `/api/event-requests/${id}/reassignment/candidates`)
 }
 
-// SPM-26: hand the event to another Coordinator. Returns { reassigned: true, coordinator: { name } }; the
-// caller no longer has access to the event afterwards. Refusals: 404 (missing, or not the caller's event),
-// 403 (not permitted), 400 (no agreement, or an invalid Coordinator) or 409 (completed, cancelled or
-// rejected), each with a message.
-export function reassignCoordinator(user, id, { coordinatorUid, handoverAgreed }) {
+// SPM-69: the Lead hands the event to another Coordinator. `expectedCoordinatorUid` is currentCoordinator.uid from
+// the candidates. Returns { reassigned: true, coordinator: { name } }. Refusals: 404 or 403 (out of scope),
+// 403 (not a Lead who may reassign it), 400 (an invalid Coordinator) or 409 (finished event, or the Coordinator
+// changed since the candidates were loaded).
+export function reassignCoordinator(user, id, { coordinatorUid, expectedCoordinatorUid }) {
   return authenticatedRequest(user, `/api/event-requests/${id}/reassignment`, {
     method: 'POST',
-    body: JSON.stringify({ coordinatorUid, handoverAgreed }),
+    body: JSON.stringify({ coordinatorUid, expectedCoordinatorUid }),
   })
 }
 

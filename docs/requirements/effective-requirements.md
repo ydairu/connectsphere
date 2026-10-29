@@ -324,6 +324,30 @@ See §10, Superseded Legacy Register.
 
 **[Correction to the SPM-68 note above]** SPM-85 is this new-request notice, not an assignment notification. Assignment and reassignment notifications (G8!C43) remain unimplemented.
 
+#### SPM-69 — Event Coordinator Lead reassigns events between Coordinators
+
+**[Customer-confirmed — CL3]** Only the Lead performs a reassignment; the assigned Coordinator may request a transfer but not hand the event over (G8!C12, C35, C39). The Lead does not act as a Coordinator (G8!C13). The Lead sees the unassigned queue plus the active events that Lead previously assigned (G8!C41). The Lead may reassign existing assignments (G8!C38). Event-linked records follow the event (G8!C14).
+
+**[Implemented locally — SPM-69, 29 Oct 2026; not Done]**
+
+- **Who:** an Event Coordinator Lead, on a submitted event attributed to them. The assigned Coordinator is refused (403) and no longer offered Reassign; an unassigned Coordinator still gets 404. The transfer request is SPM-86 and is not built.
+- **When:** Submitted (with a Coordinator), Under Review, Returned, Planning, Confirmed and Preparation. Completed, Cancelled and Rejected are refused (409). A request still in the unassigned queue is assigned (SPM-68), not reassigned.
+- **To whom:** SPM-26's and SPM-68's checks: a Coordinator who is not the current one, not the submitter and not the Lead. The picker shows each Coordinator's active events, with nothing pre-selected.
+- **What is written:** in one transaction under the assignment lock, `assignedCoordinatorUid`, `assignedByUid` and `assignedAt` (the reassigning Lead) and a `coordinator_reassigned` activity entry (previous and new Coordinator, the Lead as actor, the time). Nothing else on the event changes; venue and equipment requests, holds, history and comments are keyed by the event and checked against its current Coordinator, so they follow it.
+- **Stale page:** the client sends the Coordinator its page showed (`expectedCoordinatorUid`, from the candidates' `currentCoordinator`); if it has changed, the reassignment is refused (409) and nothing is written.
+- **Finding events:** the Lead's Requests list holds the queue and the events in the Lead's scope, as a plain list. Filters and per-Coordinator counts are SPM-70's.
+- **What the Lead sees:** the basic event information of SPM-68 plus the assigned Coordinator's name; no edits and no status actions.
+
+**[Team decisions, 29 Oct 2026 — pending PO confirmation]**
+
+- **Events assigned before SPM-68:** an active event with no `assignedByUid` (assigned automatically before the Lead role existed) is in every Lead's scope and may be reassigned by any Lead. G8!C41 bounds a Lead's view to the events that Lead assigned, and G8!C38 says the Lead may reassign existing assignments, but no Lead assigned these, so neither row names whose they are.
+- **Reassigning moves supervision:** the reassigning Lead becomes `assignedByUid`, so the event joins their scope and leaves that of any other Lead. The earlier assigner remains in the activity history.
+- **No handover-agreement confirmation:** SPM-26's required "handover agreed outside the system" confirmation (from Clarification 2's Coordinator-initiated handover) is removed. CL3 rows 12, 35 and 39 replace that handover with the Lead's own decision.
+
+**[Superseded — SPM-26]** The assigned Coordinator no longer reassigns, and the agreement flag and its 400 refusal are gone. The SPM-26 record below is kept as history.
+
+**[Not in SPM-69]** reassignment notifications (G8!C43, C14), the Lead's overview with filters and per-Coordinator counts (SPM-70), the Coordinator's transfer request (SPM-86), and per-Lead supervisory scope beyond `assignedByUid` (G8!C33).
+
 #### SPM-26 — Reassign an Event to a Different Event Coordinator
 
 **[Customer-confirmed — live]** Exactly one Coordinator is assigned to an event — except the new Week 7 state in which a newly submitted request sits in the **Unassigned queue** before the Lead assigns a Coordinator (G8!C2, C12).

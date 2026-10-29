@@ -1,6 +1,6 @@
-// Cross-story: SPM-46 × SPM-26. After the assigned Coordinator reassigns an event through the real SPM-26
-// route, the Organiser's view of that event names the new Coordinator (SPM-46 AC3, which until SPM-26 was
-// tested only by changing assignedCoordinatorUid in the fixture). Not an SPM-64 test.
+// Cross-story: SPM-46 × SPM-26. After the event is reassigned through the real SPM-26 route — by the Event
+// Coordinator Lead since SPM-69 — the Organiser's view of that event names the new Coordinator (SPM-46 AC3, which
+// until SPM-26 was tested only by changing assignedCoordinatorUid in the fixture). Not an SPM-64 test.
 //
 // In-memory harness: real HTTP against the real Express app; Firebase token verification and persistence
 // (backend/src/testing/fakeFirestore.js, holding the seeded requests and profiles) are mocked. This is not
@@ -61,7 +61,9 @@ async function call(method, path, account, body) {
 }
 
 const view = (account) => call('GET', `/api/requests/${ID}`, account)
-const reassign = (account, to) => call('POST', `/api/event-requests/${ID}/reassignment`, account, { coordinatorUid: to.uid, handoverAgreed: true })
+// SPM-69: the Lead reassigns, naming the Coordinator the event has now (`from`) and the new one (`to`).
+const reassign = (from, to, account = SEED_ACCOUNTS.coordinatorLead) =>
+  call('POST', `/api/event-requests/${ID}/reassignment`, account, { coordinatorUid: to.uid, expectedCoordinatorUid: from.uid })
 
 describe('SPM-46 × SPM-26 — the Organiser sees the Coordinator an event was reassigned to', () => {
   it('after reassignment, the owner\'s GET names the new Coordinator and no uid', async () => {
@@ -88,7 +90,8 @@ describe('SPM-46 × SPM-26 — the Organiser sees the Coordinator an event was r
   })
 
   it('a refused reassignment leaves the Organiser seeing the original Coordinator', async () => {
-    expect((await reassign(coordinator2, coordinator3)).status).toBe(404)
+    // SPM-69: the assigned Coordinator may no longer reassign.
+    expect((await reassign(coordinator, coordinator3, coordinator)).status).toBe(403)
     expect((await view(organiserA1)).json.assignedCoordinator).toEqual({ assigned: true, name: coordinator.name })
   })
 

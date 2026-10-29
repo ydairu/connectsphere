@@ -175,7 +175,8 @@ describe('SPM-28 AC3/AC4 — nothing is recorded', () => {
 
   it('status transitions and reassignment keep their own activity types', async () => {
     expect((await call('POST', `/api/event-requests/${SUBMITTED_ID}/transitions`, coordinator, { action: 'start_review' })).status).toBe(200)
-    expect((await call('POST', `/api/event-requests/${SUBMITTED_ID}/reassignment`, coordinator, { coordinatorUid: coordinator2.uid, handoverAgreed: true })).status).toBe(200)
+    // SPM-69: reassignment is the Event Coordinator Lead's.
+    expect((await call('POST', `/api/event-requests/${SUBMITTED_ID}/reassignment`, SEED_ACCOUNTS.coordinatorLead, { coordinatorUid: coordinator2.uid, expectedCoordinatorUid: coordinator.uid })).status).toBe(200)
     expect(activity(SUBMITTED_ID).map((entry) => entry.type).sort()).toEqual(['coordinator_reassigned', 'status_changed'])
   })
 })
