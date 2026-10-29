@@ -19,6 +19,7 @@ import {
   transitionEventRequest,
 } from '../services/statusTransitionService.js'
 import { ReassignmentError, listReassignmentCandidates, reassignEventRequest } from '../services/coordinatorReassignmentService.js'
+import { EventStaffAssignmentError } from '../services/eventStaffAssignmentService.js'
 
 const FORBIDDEN_REASONS = Object.freeze([NOT_PERMITTED, NOT_ASSIGNED_STAFF])
 const BAD_REQUEST_REASONS = Object.freeze([UNKNOWN_ACTION, UNKNOWN_ARRANGEMENT, REASON_REQUIRED, REASON_INVALID])
@@ -38,6 +39,9 @@ export function sendEventRequestError(error, res, next) {
   // SPM-26: the status code comes with the refusal reason (shared/coordinatorReassignment.js).
   if (error instanceof ReassignmentError) {
     return res.status(error.status).json({ message: error.message, reason: error.reason })
+  }
+  if (error instanceof EventStaffAssignmentError) {
+    return res.status(error.status).json({ message: error.message })
   }
   if (error instanceof EventRequestValidationError) {
     return res.status(400).json({ message: 'Validation failed', errors: error.errors })

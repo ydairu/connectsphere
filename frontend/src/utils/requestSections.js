@@ -1,4 +1,5 @@
 import { CORE, EQUIPMENT, EQUIPMENT_PREPARATION, INTERNAL, REGISTRATION, VENUE, VENUE_PREPARATION } from '../../../shared/permissions.js'
+import { PREPARATION_NOT_EVENT_ASSIGNEE } from '../../../shared/preparationAccess.js'
 import {
   PREPARATION_EVENT_CLOSED,
   PREPARATION_NOTES_MAX_LENGTH,
@@ -90,6 +91,8 @@ export function preparationReadOnlyText(section, reason) {
       return 'This event is closed.'
     case PREPARATION_NOT_STARTED_YET:
       return 'Available once the event is in Preparation.'
+    case PREPARATION_NOT_EVENT_ASSIGNEE:
+      return 'Only the event’s assigned staff member can update this section.'
     default:
       return null
   }

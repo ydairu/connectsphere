@@ -50,6 +50,7 @@ import {
 } from '../../../shared/requestActions.js'
 import {
   APPROVE_CANCELLATION,
+  APPROVE,
   ARRANGEMENTS_NOT_APPROVED,
   PRIMARY_VENUE_REQUIRED,
   CANCEL,
@@ -69,7 +70,7 @@ import {
   WRONG_STATUS,
   canTransition,
 } from '../../../shared/statusTransitions.js'
-import { cancellationNotifications, preparationStartedNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
+import { cancellationNotifications, eventStaffAssignedNotifications, preparationStartedNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
 import {
   ARRANGEMENTS_NOT_READY,
   NOT_AWAITING_SAFETY_REVIEW,
@@ -95,6 +96,7 @@ import { primaryVenueFromBooking } from '../../../shared/primaryVenue.js'
 import { recordPrimaryVenueChange } from './primaryVenueHistory.js'
 import { prepareEquipmentRequestClose } from './equipmentRequestService.js'
 import { USERS_COLLECTION } from './assignedCoordinatorService.js'
+import { assignEventStaffInTransaction, EVENT_STAFF_ASSIGNED } from './eventStaffAssignmentService.js'
 
 export const REASON_REQUIRED = 'reason_required'
 export const REASON_INVALID = 'reason_invalid'
@@ -263,6 +265,15 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       refuse(decision)
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }
+      if (action === APPROVE) {
+        const assignment = await assignEventStaffInTransaction(tx, db, existing, at)
+        Object.assign(update, assignment.update)
+        for (const { role, staff } of assignment.assignments) {
+          addActivity(tx, docRef, { type: EVENT_STAFF_ASSIGNED, role, staffUid: staff.uid,
+            actor: { type: 'system', name: 'System', role: null }, at })
+        }
+        addNotifications(tx, db, eventStaffAssignedNotifications(existing, assignment.assignments, at))
+      }
       if (action === CONFIRM && bookingState.primaryVenueReadiness.automaticBooking) {
         update.primaryVenue = primaryVenueFromBooking(bookingState.primaryVenueReadiness.automaticBooking,
           bookingState.primaryVenueReadiness.automaticBooking.venueLocation)
@@ -343,7 +354,9 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
 }
 
 async function assignedPreparationRecipients(tx, db, request, actor) {
-  const uids = [...new Set(request.assignedStaffUids ?? [])].filter((uid) => uid && uid !== actor.uid)
+  const canonical = [request.assignedVenueStaffUid, request.assignedTechnicalStaffUid].filter(Boolean)
+  const uids = [...new Set(canonical.length ? canonical : request.assignedStaffUids ?? [])]
+    .filter((uid) => uid && uid !== actor.uid)
   const profiles = await Promise.all(uids.map((uid) => tx.get(db.collection(USERS_COLLECTION).doc(uid))))
   return uids.filter((_uid, index) => profiles[index].exists &&
     rolesOf(profiles[index].data()).some((role) => role === VENUE_STAFF || role === TECHNICAL_STAFF))

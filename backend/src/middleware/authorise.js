@@ -6,7 +6,7 @@
 // predicates, and combining them lets one role's open gate unlock another role's sections (the
 // multi-role leak; CLAUDE.md, "Evaluate per role, then union the results").
 
-import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf, viewableSectionsFor } from '../../../shared/permissions.js'
+import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, isAssignedCoordinator, projectRequest, rolesOf, viewableSectionsFor } from '../../../shared/permissions.js'
 import { canReassignCoordinator } from '../../../shared/coordinatorReassignment.js'
 import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.js'
 import { reservedEquipmentSummary } from '../../../shared/equipmentReservation.js'
@@ -88,6 +88,10 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
     clarificationRequests: clarificationSummary(user, request),
     canReassignCoordinator: canReassignCoordinator(user, request),
     assignedCoordinator: assignedCoordinatorSummary(user, request, coordinatorName),
+    assignedEventStaff: rolesOf(user).includes(COORDINATOR) && isAssignedCoordinator(user, request) ? {
+      venue: request.assignedVenueStaffUid ? request.assignedVenueStaffName ?? 'Venue Staff' : null,
+      technical: request.assignedTechnicalStaffUid ? request.assignedTechnicalStaffName ?? 'Technical Support Staff' : null,
+    } : null,
     cancellation: cancellationNotice(user, request),
     rejection: rejectionNotice(user, request),
     completion: completionNotice(user, request),

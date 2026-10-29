@@ -58,8 +58,13 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
     const allocation = await tx.get(allocationRef)
     const users = rows(await tx.get(db.collection('users'))).map((u) => ({ ...u, uid: u.id }))
     const pending = rows(await tx.get(db.collection(BOOKINGS).where('status', '==', BOOKING_PENDING)))
-    const assignee = old ? users.find((u) => u.uid === old.assignedVenueStaffUid && rolesOf(u).includes(VENUE_STAFF)) : chooseVenueStaff(users, pending, allocation.data()?.lastUid, now)
-    if (!assignee) throw new VenueBookingError(409, old ? 'The assigned Venue Staff account is unavailable. Restore its access before revising this request.' : 'No Venue Staff account is available. A request and hold have not been created.')
+    const assignedUid = event.assignedVenueStaffUid ?? old?.assignedVenueStaffUid
+    const assignee = assignedUid
+      ? users.find((u) => u.uid === assignedUid && rolesOf(u).includes(VENUE_STAFF))
+      : chooseVenueStaff(users, pending, allocation.data()?.lastUid, now)
+    if (!assignee) throw new VenueBookingError(409, assignedUid
+      ? 'The event’s assigned Venue Staff account is unavailable. Restore its access before submitting this request.'
+      : 'No Venue Staff account is available. A request and hold have not been created.')
 
     let oldHold = null
     let oldLock = null
@@ -102,7 +107,10 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
       status: AVAILABILITY_STATUS.TENTATIVE_HOLD, lifecycleStatus: 'active', holdExpiresAt: booking.holdExpiresAt,
       createdAt: at, createdByUid: user.uid })
     tx.set(lockRef, { venueId: value.venueId, lastCommitmentId: holdRef.id, updatedAt: at })
-    tx.set(allocationRef, { lastUid: old ? allocation.data()?.lastUid ?? assignee.uid : assignee.uid, updatedAt: at })
+    // Event-owned requests do not advance the older per-request rotation.
+    if (!event.assignedVenueStaffUid) {
+      tx.set(allocationRef, { lastUid: old ? allocation.data()?.lastUid ?? assignee.uid : assignee.uid, updatedAt: at })
+    }
     // SPM-91: a new or replacement venue has not been safety-reviewed, so the current review is withdrawn.
     const safetyReview = safetyReviewInvalidation(event, INVALIDATED_BY_VENUE_BOOKING_REQUESTED, at)
     tx.update(eventRef, { assignedStaffUids: [...new Set([...(event.assignedStaffUids ?? []), assignee.uid])], ...(safetyReview ? { safetyReview } : {}), updatedAt: at })

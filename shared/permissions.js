@@ -251,7 +251,14 @@ function roleGateOpen(role, user, request) {
  * is full (Clarification 2, Attendee Registration). Every other section stays locked after submission.
  */
 function roleEditableSections(role, user, request) {
-  if (roleGateOpen(role, user, request)) return SECTION_ACCESS[role]?.edit ?? []
+  if (roleGateOpen(role, user, request)) {
+    // SPM-71: legacy booking/request reviewers may still view their event, but only
+    // the event's designated member prepares it. Old records retain their prior
+    // access until the backfill sets canonical assignees.
+    if (role === VENUE_STAFF && request.assignedVenueStaffUid && request.assignedVenueStaffUid !== user.uid) return []
+    if (role === TECHNICAL_STAFF && request.assignedTechnicalStaffUid && request.assignedTechnicalStaffUid !== user.uid) return []
+    return SECTION_ACCESS[role]?.edit ?? []
+  }
   if (role === ORGANISER && isOwner(user, request) && registrationEligibleStatus(request.status)) return [REGISTRATION]
   return []
 }
