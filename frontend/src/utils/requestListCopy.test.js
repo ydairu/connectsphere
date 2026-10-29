@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { ATTENDEE, COORDINATOR, ORGANISER, ROLES, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
+import { ATTENDEE, COORDINATOR, COORDINATOR_LEAD, ORGANISER, ROLES, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
 import { requestListCopy } from './requestListCopy.js'
 
 describe('Requests page wording by role', () => {
@@ -16,9 +16,9 @@ describe('Requests page wording by role', () => {
     }
   })
 
-  it('Coordinator, staff, organiser and attendee each get their own wording', () => {
+  it('Coordinator, Lead (SPM-68), staff, organiser and attendee each get their own wording', () => {
     // Coordinator and staff share the "Events assigned to you" heading (SPM-65); the eyebrow tells them apart.
-    const labels = [COORDINATOR, VENUE_STAFF, ORGANISER, ATTENDEE].map((role) => {
+    const labels = [COORDINATOR, COORDINATOR_LEAD, VENUE_STAFF, ORGANISER, ATTENDEE].map((role) => {
       const { eyebrow, title } = requestListCopy([role])
       return `${eyebrow} / ${title}`
     })

@@ -37,11 +37,11 @@ function displayName(name) {
 /**
  * What the API returns as `assignedCoordinator`:
  *   null                                not visible to this user (every draft, every non-Organiser view)
- *   { assigned: false, name: null }     submitted but no Coordinator yet — shown as "Not yet assigned"
+ *   { assigned: false, name: null }     submitted but no Coordinator yet — shown as "Unassigned"
  *   { assigned: true, name: 'Ada' }     the Coordinator's display name
  *   { assigned: true, name: null }      assigned, but their profile has no usable name — [Team decision,
  *                                       3 Oct 2026] shown as "Assigned (name unavailable)", never as
- *                                       "Not yet assigned"
+ *                                       "Unassigned" (SPM-68 wording)
  *
  * `coordinatorName` is users/{assignedCoordinatorUid}.name, or null if it could not be read.
  */

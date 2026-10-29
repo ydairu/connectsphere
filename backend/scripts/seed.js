@@ -4,6 +4,12 @@
 // Usage (from the repo root):
 //   node backend/scripts/seed.js                                  dry run: reads, plans, writes nothing
 //   SEED_ACCOUNT_PASSWORD=... node backend/scripts/seed.js --write --project=<projectId>
+//   node backend/scripts/seed.js --only=<id>,<id>                 dry run of a subset (add --write --project=… to apply)
+//
+// --only takes seeded account uids (seed-coordinator-lead) and event request ids (seed-req-a2-unassigned). Only
+// those Auth users, users/{uid} documents and event requests are checked and written, with the same tag and
+// Auth-email checks; field history, stray clean-up, venues and equipment are skipped entirely. An id that names
+// nothing in seedData.js aborts the run before any read.
 //
 // Writes to the REAL Firebase project named in the root .env. It prints that project ID first, runs a
 // read-only preflight, and writes only with --write --project=<id> matching the configured project.
@@ -66,12 +72,25 @@ async function findAuthUser(lookup) {
   }
 }
 
-async function preflight(auth, db) {
+// The --only selection: null for the full seed, otherwise the chosen account uids and request ids.
+function selectSeed(only) {
+  if (only === undefined) return { ok: true, selection: null }
+  const ids = [...new Set(only.split(',').map((id) => id.trim()).filter(Boolean))]
+  const accountUids = new Set(Object.values(SEED_ACCOUNTS).map((account) => account.uid))
+  const requestIds = new Set(SEED_REQUESTS.map((request) => request.id))
+  const unknown = ids.filter((id) => !accountUids.has(id) && !requestIds.has(id))
+  if (ids.length === 0) return { ok: false, message: '--only needs at least one seeded account uid or event request id.' }
+  if (unknown.length > 0) return { ok: false, message: `--only names nothing in seedData.js: ${unknown.join(', ')}` }
+  return { ok: true, selection: new Set(ids) }
+}
+
+async function preflight(auth, db, selection = null) {
   const accounts = []
   const requests = []
   const blockers = []
+  const chosen = (id) => selection === null || selection.has(id)
 
-  for (const account of Object.values(SEED_ACCOUNTS)) {
+  for (const account of Object.values(SEED_ACCOUNTS).filter((account) => chosen(account.uid))) {
     const byUid = await findAuthUser(() => auth.getUser(account.uid))
     const byEmail = await findAuthUser(() => auth.getUserByEmail(account.email))
     if (byEmail && byEmail.uid !== account.uid) {
@@ -84,13 +103,16 @@ async function preflight(auth, db) {
     accounts.push({ account, authAction: byUid ? 'update' : 'create', docAction: profile.exists ? 'overwrite' : 'create' })
   }
 
-  for (const request of SEED_REQUESTS) {
+  for (const request of SEED_REQUESTS.filter((request) => chosen(request.id))) {
     const snapshot = await db.collection(EVENT_REQUESTS_COLLECTION).doc(request.id).get()
     if (snapshot.exists && snapshot.get('seedTag') !== SEED_TAG) {
       blockers.push(`${EVENT_REQUESTS_COLLECTION}/${request.id} exists and is not tagged ${SEED_TAG}`)
     }
     requests.push({ request, docAction: snapshot.exists ? 'overwrite' : 'create' })
   }
+
+  // A subset run (--only) touches nothing else.
+  if (selection !== null) return { accounts, requests, history: [], strays: [], venueDocuments: [], blockers }
 
   // SPM-28: the seeded history entries, and the stray field history that --write would remove.
   const history = []
@@ -160,9 +182,16 @@ function requestDocument(request) {
 
 async function main() {
   const { values } = parseArgs({
-    options: { write: { type: 'boolean', default: false }, project: { type: 'string' } },
+    options: { write: { type: 'boolean', default: false }, project: { type: 'string' }, only: { type: 'string' } },
     strict: true,
   })
+
+  const { ok: selectionOk, selection, message: selectionMessage } = selectSeed(values.only)
+  if (!selectionOk) {
+    console.error(selectionMessage)
+    process.exitCode = 1
+    return
+  }
 
   const mode = resolveWriteMode(values, env.firebaseProjectId)
   console.log(banner('seed — SPM-42 / SPM-24 demonstration data', env.firebaseProjectId, mode))
@@ -179,11 +208,12 @@ async function main() {
     return
   }
   console.log(`Seed tag: ${SEED_TAG}`)
+  console.log(`Selection: ${selection === null ? 'full seed' : `only ${[...selection].join(', ')}`}`)
   console.log(`SEED_ACCOUNT_PASSWORD: ${password ? 'set' : 'not set (required for --write)'}`)
 
   const auth = getAdminAuth()
   const db = getAdminDb()
-  const { accounts, requests, history, strays, venueDocuments, blockers } = await preflight(auth, db)
+  const { accounts, requests, history, strays, venueDocuments, blockers } = await preflight(auth, db, selection)
 
   console.log(`\nAccounts (${accounts.length}):`)
   for (const { account, authAction, docAction } of accounts) {
@@ -223,7 +253,8 @@ async function main() {
   }
 
   if (!mode.write) {
-    console.log(`\nDry run — nothing was written. To apply: SEED_ACCOUNT_PASSWORD=... --write --project=${env.firebaseProjectId}`)
+    const onlyFlag = selection === null ? '' : ` --only=${[...selection].join(',')}`
+    console.log(`\nDry run — nothing was written. To apply: SEED_ACCOUNT_PASSWORD=... --write --project=${env.firebaseProjectId}${onlyFlag}`)
     return
   }
 

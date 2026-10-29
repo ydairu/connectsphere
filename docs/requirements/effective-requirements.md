@@ -292,6 +292,21 @@ The 20-area order below follows §1. Week 7 deltas are integrated into the area 
 
 See §10, Superseded Legacy Register.
 
+#### SPM-68 — Event Coordinator Lead assigns submitted requests from an unassigned queue
+
+**[Team decisions, 29 Oct 2026 — pending PO confirmation]** made where the customer left the implementation open:
+
+- **Unassigned is derived, not a status.** A first submission stays **Submitted** with no Coordinator (`assignedCoordinatorUid` null or absent); the Organiser's status pill still reads "Submitted". Assigning a Coordinator is not a status change and does not go through the SPM-9 transitions route. This matches the customer's lifecycle "Submitted (Unassigned queue) → Assigned / Under Review" (G8!C2).
+- **Queue route and page.** `GET /api/requests/unassigned`, Event Coordinator Lead only (403 for every other role), oldest submission first. Each item carries the title, preferred date and time, duration, expected attendance, organisation name and submission time. The Lead's page is `/requests/unassigned` ("Unassigned requests"), linked from the navbar for Leads only.
+- **Workload shown, no auto-pick.** The Lead's picker lists every eligible Coordinator with their count of active events (SPM-8's count), with nothing pre-selected or ranked. This answers the §8.1 sub-question for now: the Lead chooses; the SPM-8 algorithm is not run. Whether the system may also *suggest* a Coordinator remains the customer gap above (G8!B12).
+- **Who may be chosen.** A user holding the Event Coordinator role who is neither the Lead making the assignment (G8!C13) nor the request's submitter (SPM-8's rule, kept by SPM-26).
+- **What is recorded.** `assignedByUid` and `assignedAt` on the request, and a `coordinator_assigned` activity entry naming the Lead and the time. `assignedByUid` is recorded so a later story can give a Lead the events they assigned (G8!C41); SPM-68 does not show them.
+- **Refusals.** A request that is no longer submitted-and-unassigned (for example, assigned meanwhile by another Lead) is refused with 409 and nothing is written. A draft id is refused as not found (404), so drafts stay private.
+- **What the Lead sees.** Only unassigned submitted requests, with `core` and the organisation name; no other section, no edits and no SPM-9 actions. A user who is both Lead and Coordinator acts as a Coordinator only on events assigned to them.
+- **Display.** The Organiser's "Event Coordinator" row reads **"Unassigned"** (G8!C42), replacing SPM-46's "Not yet assigned".
+
+**[Not in SPM-68]** assignment notifications (G8!C43; SPM-84/85), Lead-only reassignment (G8!C12, C35, C39; SPM-26 still lets the assigned Coordinator reassign) and the Lead's view of active events they assigned (G8!C41).
+
 #### SPM-26 — Reassign an Event to a Different Event Coordinator
 
 **[Customer-confirmed — live]** Exactly one Coordinator is assigned to an event — except the new Week 7 state in which a newly submitted request sits in the **Unassigned queue** before the Lead assigns a Coordinator (G8!C2, C12).
@@ -914,7 +929,7 @@ Before implementing affected functionality, resolve and record:
 2. Official Sprint 1 start date: 13 or 14 September 2026. *(open team choice)*
 3. ~~Same-organisation Organiser visibility.~~ Resolved — team decision, 3 Oct 2026 (§2.2).
 4. Exact multi-role storage and permission evaluation model. *(open team choice)*
-5. ~~Coordinator assignment algorithm.~~ The SPM-8 algorithm itself was PO-confirmed 20 Sep 2026; **its on-submit auto-trigger (and the empty-pool = server error rule) is superseded by Change #5** (§4.5, §10). Open sub-question: whether the Lead reuses the algorithm on manual assignment.
+5. ~~Coordinator assignment algorithm.~~ The SPM-8 algorithm itself was PO-confirmed 20 Sep 2026; **its on-submit auto-trigger (and the empty-pool = server error rule) is superseded by Change #5** (§4.5, §10). Open sub-question: whether the Lead reuses the algorithm on manual assignment — **SPM-68 team decision, 29 Oct 2026, pending PO confirmation: no; the Lead chooses and is shown each Coordinator's active workload** (§4.5, SPM-68).
 6. ~~Missing venue-facility block/warning policy.~~ **Resolved by SPM-13 AC2: a missing required facility makes a venue unsuitable** (§4.11).
 7. ~~Venue partial-match behaviour.~~ **Resolved by SPM-12 AC4: no results, with a clear no-matching-venues message** (§4.10).
 8. Notification channels and preferences. *(open)*

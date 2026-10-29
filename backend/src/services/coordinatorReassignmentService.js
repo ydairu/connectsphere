@@ -7,8 +7,8 @@
 //                                       No permission check — any caller that has authorised the change.
 //   reassignEventRequest()              the SPM-26 entry point: reads, authorises, validates, then calls it.
 //
-// Concurrency: reassignment reads and writes SPM-8's lock document, so it is serialised with automatic
-// assignment on submit and with other reassignments; Firestore retries the transaction if the request or
+// Concurrency: reassignment reads and writes SPM-8's lock document, so it is serialised with the Lead's
+// assignment (SPM-68) and with other reassignments; Firestore retries the transaction if the request or
 // the lock changed after it was read. AC7: only assignedCoordinatorUid (and updatedAt) change on the record.
 
 import {
