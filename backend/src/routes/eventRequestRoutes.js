@@ -8,8 +8,8 @@ import { createOwnerNameLoader } from '../services/requestOwnerService.js'
 
 // Draft create, load, save and submit (SPM-7, SPM-4, SPM-3). authenticate and getDb come from
 // createApp, like the /api/requests routes, so the API tests and the E2E double can serve these too.
-export function createEventRequestRoutes({ authenticate, getDb, getUserDb = getDb, getVenueDb = getDb, verifySafetyApproval = async () => false }) {
-  const controller = createEventRequestController(getDb, createCoordinatorNameLoader(getUserDb), createOwnerNameLoader(getUserDb), verifySafetyApproval)
+export function createEventRequestRoutes({ authenticate, getDb, getUserDb = getDb, getVenueDb = getDb }) {
+  const controller = createEventRequestController(getDb, createCoordinatorNameLoader(getUserDb), createOwnerNameLoader(getUserDb))
   const suitabilityController = createVenueSuitabilityController(getDb, getVenueDb)
   const router = Router()
 

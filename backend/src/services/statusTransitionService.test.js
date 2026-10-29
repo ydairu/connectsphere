@@ -13,7 +13,8 @@ import {
   CANCELLATION_REFUSED,
   CANCELLATION_REQUEST_PENDING,
 } from '../../../shared/cancellationRequests.js'
-import { COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
+import { COORDINATOR, ORGANISER, SAFETY_OFFICER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
+import { APPROVE_SAFETY, CHECK_SATISFACTORY, SAFETY_APPROVED, SAFETY_CHECKLIST_IDS, SUBMIT_SAFETY_REVIEW } from '../../../shared/safetyReview.js'
 import {
   APPROVE_TECHNICAL,
   APPROVE_VENUE,
@@ -45,6 +46,7 @@ import {
   REJECT,
   RESUBMIT,
   RETURN_FOR_CLARIFICATION,
+  SAFETY_APPROVAL_REQUIRED,
   START_REVIEW,
   SUBMIT,
   TERMINAL_STATUS,
@@ -53,6 +55,7 @@ import {
 } from '../../../shared/statusTransitions.js'
 import { createFakeFirestore } from '../testing/fakeFirestore.js'
 import { COORDINATOR_ASSIGNED } from './coordinatorAssignmentService.js'
+import { decideSafetyReview } from './safetyReviewService.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError, EventRequestValidationError } from './eventRequestService.js'
 import { STATUS_CHANGED } from './statusHistory.js'
 import {
@@ -71,6 +74,8 @@ const owner = Object.freeze({ uid: 'organiser-1', name: 'Olive Organiser', roles
 const outsider = Object.freeze({ uid: 'organiser-b', name: 'Other Org', roles: [ORGANISER], organisationId: 'org-b' })
 const assigned = Object.freeze({ uid: 'coord-1', name: 'Casey Coordinator', roles: [COORDINATOR] })
 const otherCoordinator = Object.freeze({ uid: 'coord-2', name: 'Other Coordinator', roles: [COORDINATOR] })
+const safetyOfficer = Object.freeze({ uid: 'safety-1', name: 'Sam Safety', roles: [SAFETY_OFFICER] })
+const ALL_SATISFACTORY = Object.fromEntries(SAFETY_CHECKLIST_IDS.map((id) => [id, { result: CHECK_SATISFACTORY }]))
 
 function readyRequest(status, overrides = {}) {
   return {
@@ -315,7 +320,7 @@ describe('SPM-65 — transition scope preserves multi-role permissions', () => {
 })
 
 describe('SPM-9 — approved venue bookings and technical sign-off unlock Confirm', () => {
-  test('an approved booking and technical sign-off allow the assigned Coordinator to confirm', async () => {
+  test('an approved booking, technical sign-off and safety approval allow the assigned Coordinator to confirm', async () => {
     const db = fakeDb(planningWithStaff())
 
     await assertRefused(transitionEventRequest('request-1', CONFIRM, assigned, db, NOW), ARRANGEMENTS_NOT_APPROVED)
@@ -341,6 +346,12 @@ describe('SPM-9 — approved venue bookings and technical sign-off unlock Confir
       ],
     )
 
+    // SPM-91/92: the arrangements are ready, but Confirm still waits for the Safety Officer's approval.
+    await assertRefused(transitionEventRequest('request-1', CONFIRM, assigned, db, NOW), SAFETY_APPROVAL_REQUIRED)
+    await transitionEventRequest('request-1', SUBMIT_SAFETY_REVIEW, assigned, db, NOW)
+    await decideSafetyReview('request-1', { outcome: APPROVE_SAFETY, checklist: ALL_SATISFACTORY }, safetyOfficer, db, NOW)
+    assert.equal(db.store.get('request-1').safetyReview.status, SAFETY_APPROVED)
+
     const confirmed = await transitionEventRequest('request-1', CONFIRM, assigned, db, NOW)
     assert.equal(confirmed.status, CONFIRMED)
     assert.deepEqual(
@@ -362,6 +373,8 @@ describe('SPM-9 — approved venue bookings and technical sign-off unlock Confir
     db.collectionData('venueAvailability').set('hold-2', { eventRequestId: 'request-1', bookingRequestId: 'venue-2',
       venueId: 'room', status: 'confirmed_booking', lifecycleStatus: 'active',
       startsAt: '2026-11-20T09:00:00+08:00', endsAt: '2026-11-20T12:00:00+08:00' })
+    await assertRefused(transitionEventRequest('request-1', CONFIRM, assigned, db, NOW), SAFETY_APPROVAL_REQUIRED)
+    db.store.set('request-1', { ...db.store.get('request-1'), safetyReview: { status: SAFETY_APPROVED } })
     assert.equal((await transitionEventRequest('request-1', CONFIRM, assigned, db, NOW)).status, CONFIRMED)
   })
 

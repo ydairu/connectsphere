@@ -1,4 +1,4 @@
-import { DOUBLE_ORIGIN, EXTRA_USERS, ROLE_USERS, expect, loginAs, logout, test } from '../../shared/e2e/fixtures.js'
+import { DOUBLE_ORIGIN, EXTRA_USERS, ROLE_USERS, expect, loginAs, logout, recordSafetyApproval, test } from '../../shared/e2e/fixtures.js'
 
 const eventId = 'seed-req-a1-planning'
 const coordinator = ROLE_USERS.coordinator
@@ -32,6 +32,7 @@ test('Coordinator selects a primary venue; Attendee sees only that location and 
   expect((await request.post(`${DOUBLE_ORIGIN}/api/event-requests/${eventId}/transitions`, {
     headers: auth(coordinator.uid), data: { action: 'confirm' },
   })).status()).toBe(409)
+  await recordSafetyApproval(request, eventId)
 
   await loginAs(page, coordinator)
   await expect(page).toHaveURL(/\/profile$/)
@@ -45,6 +46,7 @@ test('Coordinator selects a primary venue; Attendee sees only that location and 
   await logout(page)
 
   await loginAs(page, ROLE_USERS.attendee)
+  await expect(page).toHaveURL(/\/profile$/)
   await page.goto('/requests')
   await expect(page.getByText(/^Location: Seed Hall.*Level 1, Main Campus/)).toBeVisible()
   await page.goto(`/requests/${eventId}?tab=venue-details`)
@@ -54,6 +56,7 @@ test('Coordinator selects a primary venue; Attendee sees only that location and 
   await logout(page)
 
   await loginAs(page, ROLE_USERS.organiser)
+  await expect(page).toHaveURL(/\/profile$/)
   await page.goto(`/requests/${eventId}?tab=venue-details`)
   await expect(page.getByRole('region', { name: /^Booking for Seed Hall/ })).toBeVisible()
   await expect(page.getByRole('region', { name: /^Booking for Seed Breakout/ })).toBeVisible()

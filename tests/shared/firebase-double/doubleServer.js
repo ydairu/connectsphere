@@ -9,7 +9,7 @@
 
 import cors from 'cors'
 import express from 'express'
-import { SEED_ACCOUNTS, SEED_FIELD_HISTORY, SEED_REQUESTS, SEED_VENUES, SEED_VENUE_AVAILABILITY } from '../../../backend/scripts/seedData.js'
+import { SEED_ACCOUNTS, SEED_FIELD_HISTORY, SEED_REQUESTS, SEED_VENUES, SEED_VENUE_AVAILABILITY, seedSafetyApproval } from '../../../backend/scripts/seedData.js'
 import { createApp } from '../../../backend/src/app.js'
 import { createAuthenticate } from '../../../backend/src/middleware/authenticate.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
@@ -24,11 +24,10 @@ export function createDouble() {
   // users/{uid} profiles live in the database too, so SPM-8's coordinator selection on submit sees them.
   // reset() replaces the whole database: seeded requests and their seeded field history (SPM-28), no other
   // activity entries, no assignment lock.
-  const state = { accounts: new Map(), db: null, profiles: null, approvedSafetyEvents: new Set(), nextUid: 1 }
+  const state = { accounts: new Map(), db: null, profiles: null, nextUid: 1 }
 
   function reset() {
     state.accounts.clear()
-    state.approvedSafetyEvents.clear()
     state.db = createFakeFirestore({
       eventRequests: Object.fromEntries(SEED_REQUESTS.map(({ id, ...request }) => [id, request])),
       venues: Object.fromEntries(SEED_VENUES.map(({ id, ...venue }) => [id, venue])),
@@ -94,10 +93,13 @@ export function createDouble() {
     reset()
     res.status(204).end()
   })
-  // Test-only SPM-91/92 stand-in. No production request can set this; the real verifier remains fail-closed.
+  // Test-only shortcut past SPM-91/92: records an approved safety review on the event, as the Safety Officer's
+  // review would, for specs about a later stage. Specs about the review itself go through the real routes.
   router.post('/safety-approvals/:id', (req, res) => {
-    if (!state.db.collectionData('eventRequests').has(req.params.id)) return res.status(404).json({ message: 'Event not found' })
-    state.approvedSafetyEvents.add(req.params.id)
+    const events = state.db.collectionData('eventRequests')
+    const event = events.get(req.params.id)
+    if (!event) return res.status(404).json({ message: 'Event not found' })
+    events.set(req.params.id, { ...event, ...seedSafetyApproval(SEED_ACCOUNTS.coordinator, new Date().toISOString()) })
     return res.status(204).end()
   })
   // Signs in one more seeded account (SEED_ACCOUNTS key) until the next reset, for a spec that needs an
@@ -216,7 +218,6 @@ export function createDouble() {
     getVenueDb: () => state.db,
     // SPM-37: equipment types and units start empty after every reset.
     getEquipmentDb: () => state.db,
-    verifySafetyApproval: async (request) => state.approvedSafetyEvents.has(request.id),
   })
 
   reset()

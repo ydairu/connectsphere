@@ -111,6 +111,7 @@ a { color: inherit; }
 .role-coordinator { color: #5a3a8c; background: #f1ebfb; }
 .role-venue_staff { color: #1f6b4f; background: #e6f5ee; }
 .role-technical_staff { color: #8c2f39; background: #fbeaec; }
+.role-safety_officer { color: #155d75; background: #e5f4f8; }
 .role-value { flex-wrap: wrap; }
 
 .request-page { padding-top: 72px; padding-bottom: 72px; }
@@ -240,7 +241,7 @@ a { color: inherit; }
 }
 
 /* SPM-24 status pills — class carries the stored status value, see StatusPill.jsx */
-.status-pill { display: inline-flex; align-items: center; min-height: 26px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; color: var(--muted); background: #eef1ef; }
+.status-pill, .safety-pill { display: inline-flex; align-items: center; min-height: 26px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; color: var(--muted); background: #eef1ef; }
 .status-submitted { color: #25578c; background: #e9f2fb; }
 .status-under_review { color: #7b4d12; background: #fbf1df; }
 .status-planning { color: #5a3a8c; background: #f1ebfb; }
@@ -249,6 +250,16 @@ a { color: inherit; }
 .status-returned_for_clarification { color: #8a4a12; background: #fdefe2; }
 .status-completed { color: #35414a; background: #eaeef1; }
 .status-cancelled, .status-rejected { color: #8c2f39; background: #fbeaec; }
+
+/* SPM-91/92 safety review statuses, shown beside the lifecycle status. A separate base class, so a page
+   still has exactly one .status-pill for the lifecycle status. */
+.safety-status-pending { color: #7b4d12; background: #fbf1df; }
+.safety-status-approved { color: #1f6b4f; background: #e6f5ee; }
+.safety-status-changes_requested, .safety-status-invalidated { color: #8a4a12; background: #fdefe2; }
+.safety-status-rejected { color: #8c2f39; background: #fbeaec; }
+.safety-checklist { display: grid; gap: 16px; margin: 0 0 16px; padding: 0; border: 0; }
+.safety-checklist-item { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.safety-checklist-item legend { font-weight: 700; padding: 0 4px; }
 
 /* SPM-37 equipment unit statuses */
 .equipment-status-available { color: #1f6b4f; background: #e6f5ee; }

@@ -15,6 +15,7 @@ import { requestOwnerFields } from '../../../shared/requestOwner.js'
 import { preparationEditing } from '../../../shared/preparationAccess.js'
 import { canCheckVenueSuitability } from '../../../shared/venueSuitability.js'
 import { CONFIRMED, PLANNING } from '../../../shared/status.js'
+import { canDecideSafetyReview, safetyReviewListStatus, safetyReviewSummary } from '../../../shared/safetyReview.js'
 import {
   allAvailableActions,
   arrangementsSummary,
@@ -64,13 +65,16 @@ function outOfScope(user, res) {
  * read-only now (or null), so the page can explain it: the projected record carries no sign-off for staff.
  * `reservedEquipment` (SPM-62) lists the reserved equipment types and quantities, never unit ids, to anyone
  * who may view the equipment section; null when nothing is reserved.
+ * `safetyReview` (SPM-91/92) is the safety review as shared/safetyReview.js lets this user see it: in full for
+ * the assigned Coordinator and an in-scope Safety Officer, the outcome and comments for the owning Organiser,
+ * null for everyone else. `canDecideSafetyReview` says whether this user may record the review now.
  */
-export function presentRequest(user, request, { coordinatorName = null, ownerNames, venueBookingReadiness = null, primaryVenueReadiness = null, safetyApproved = false } = {}) {
+export function presentRequest(user, request, { coordinatorName = null, ownerNames, venueBookingReadiness = null, primaryVenueReadiness = null } = {}) {
   const current = { ...request, venueBookingReadiness, primaryVenueReadiness }
   return {
     request: projectRequest(user, request),
     editableSections: SECTIONS.filter((section) => canEdit(user, request, section)),
-    availableActions: allAvailableActions(user, current, new Date(), { safetyApproved }),
+    availableActions: allAvailableActions(user, current, new Date()),
     arrangements: arrangementsSummary(user, current),
     venueBookingReadiness: venueBookingReadiness && viewableSectionsFor(user, request).includes('venue') ? venueBookingReadiness : null,
     primaryVenueRequired: primaryVenueReadiness?.ready === false && venueBookingReadiness?.ready === true &&
@@ -88,6 +92,8 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
     preparation: preparationEditing(user, request),
     canCheckVenueSuitability: canCheckVenueSuitability(user, request),
     reservedEquipment: reservedEquipmentSummary(user, request),
+    safetyReview: safetyReviewSummary(user, request),
+    canDecideSafetyReview: canDecideSafetyReview(user, request).allowed,
     ...requestOwnerFields(user, request, ownerNames),
   }
 }
@@ -98,9 +104,14 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
  */
 export function authoriseList(req, res, next) {
   // SPM-64 follow-up: an Organiser's items also say who submitted them (shared/requestOwner.js).
+  // SPM-91: and the safety review status, to the users who may see it on the event page.
   res.locals.requests = req.eventRequests
     .filter((request) => inScope(req.user, request))
-    .map((request) => ({ ...projectRequest(req.user, request), ...requestOwnerFields(req.user, request, req.ownerNames) }))
+    .map((request) => ({
+      ...projectRequest(req.user, request),
+      ...requestOwnerFields(req.user, request, req.ownerNames),
+      safetyReviewStatus: safetyReviewListStatus(req.user, request),
+    }))
   return next()
 }
 
@@ -115,9 +126,10 @@ export function authoriseRead(req, res, next) {
 }
 
 /**
- * SPM-28 change history: the assigned Coordinator and the owning Organiser only. Out of scope gets
- * SPM-42/SPM-65's refusal (404 for anyone holding the Coordinator role, 403 otherwise); a user who may see
- * the event but not its history — a same-organisation colleague, assigned staff — gets 403.
+ * SPM-28 change history: the assigned Coordinator, the owning Organiser and (SPM-66) an in-scope Safety
+ * Officer. Out of scope gets SPM-42/SPM-65's refusal (404 for anyone holding the Coordinator role, 403
+ * otherwise); a user who may see the event but not its history — a same-organisation colleague, assigned
+ * staff — gets 403.
  */
 export function authoriseHistory(req, res, next) {
   if (!inScope(req.user, req.eventRequest)) return outOfScope(req.user, res)

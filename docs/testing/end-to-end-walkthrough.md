@@ -62,13 +62,16 @@ This is a manual checklist. It has not been run in a browser as written; record 
    - [ ] **Status actions** → **Approve venue arrangement** → **Your decision has been recorded.**; **Venue arrangement: Approved**.
    - [ ] **Venue preparation** and **Equipment preparation** remain read-only in Planning and Confirmed. They unlock only when the event enters Preparation.
 
-7. **Confirm; significant change; re-confirm; confirm again**
-   - [ ] As the Coordinator, **Confirm event** → **Status changed to Confirmed.**
-   - [ ] ⚠️ **Start Preparation** is unavailable in the live app until SPM-91/92 supplies the safety approval and server verifier. The current Confirm action also awaits SPM-91/92's safety-before-Confirmed gate. The SPM-88 browser double can exercise Start Preparation with a test-only approval.
-   - [ ] **Event details** → **Expected attendees** `35` → **Save changes** → **Confirm significant change**: "You changed Expected attendees. Saving resets the venue and technical sign-offs to Awaiting approval and moves the event back to Planning. It cannot be confirmed again until both sign-offs are approved. Assigned venue and technical staff will be notified."
-   - [ ] **Save and reset sign-offs** → **Changes saved.**; status **Planning**; both arrangements **Awaiting approval**; both preparation sections read-only.
+7. **Safety check; confirm; significant change; re-confirm; confirm again**
+   - [ ] As the Coordinator, **Confirm event** is not offered yet: "The arrangements are approved. The event can be confirmed once it passes its safety check." **Submit for safety review** → "Send this event to the Safety Officer for its operational safety check? …" → **Submit for safety review**. The heading shows **Pending safety check** beside **Planning** (SPM-91).
+   - [ ] As `safety-officer@…`, **Requests** shows **Safety-review queue** with the event → **View**. The event details are read-only; the **Safety check** card lists **Booked venues** with capacity, layouts, accessibility features and **Operating hours (venue restriction)** (SPM-66). Choose a **Result** for each of the six checklist items, choose **Approve** → **Record safety review** → back on the queue with "Safety review recorded: Approve." The event is no longer listed, and its link now says "You do not have access to this request."
+   - [ ] As the Coordinator, the heading shows **Safety approved** and the Notifications page has "“…” passed its safety check." **Confirm event** → **Status changed to Confirmed.**
+   - [ ] **Start Preparation** is now offered on the Confirmed event. Leave it for the separate Preparation review (`docs/testing/spm-88-manual-testing.md`).
+   - [ ] **Event details** → **Expected attendees** `35` → **Save changes** → **Confirm significant change**: "You changed Expected attendees. Saving resets the venue and technical sign-offs to Awaiting approval and moves the event back to Planning. It cannot be confirmed again until both sign-offs are approved. The safety check is withdrawn, and the event must pass a new one before it can be confirmed. Assigned venue and technical staff will be notified."
+   - [ ] **Save and reset sign-offs** → **Changes saved.**; status **Planning**; both arrangements **Awaiting approval**; the heading shows **Safety check required again** (SPM-91); both preparation sections read-only.
    - [ ] As the Technical Support member: the request is still **Approved**, with "A significant change to the event cleared the technical sign-off. Re-confirm to approve it again (until SPM-87 removes the automatic reset)." → **Re-confirm approval** → "Approval re-confirmed. The technical arrangement is approved again." and a **Re-confirmed by** row.
    - [ ] As Venue Staff, **Approve venue arrangement** again → **Your decision has been recorded.**
+   - [ ] As the Coordinator, **Submit for safety review** again; as `safety-officer@…`, approve it from the queue as above. The **Safety check** card now lists the earlier review too.
    - [ ] As the Coordinator, **Confirm event** → **Status changed to Confirmed.**
 
 8. **Complete and cancel**

@@ -5,6 +5,7 @@ import { createAuthenticate } from '../../backend/src/middleware/authenticate.js
 import { createFakeFirestoreEventRequestStore } from '../shared/firebase-double/fakeFirestoreEventRequestStore.js'
 import { CONFIRMED, PLANNING, PREPARATION } from '../../shared/status.js'
 import { coordinator, fixture, input, organiser } from '../spm-14/fixtures.js'
+import { SAFETY_APPROVED } from '../../shared/safetyReview.js'
 
 let db, app
 beforeEach(() => {
@@ -24,6 +25,7 @@ const choose = (bookingId, expectedPrimaryVenueBookingId = null, uid = coordinat
   .put('/api/requests/event/primary-venue').set(auth(uid)).send({ bookingId, expectedPrimaryVenueBookingId })
 const confirm = () => request(app).post('/api/event-requests/event/transitions').set(auth(coordinator.uid)).send({ action: 'confirm' })
 const activity = () => [...db.collectionData('eventRequests/event/activity').values()]
+const approveSafety = () => { db.store.get('event').safetyReview = { status: SAFETY_APPROVED } }
 async function approve(booking) {
   const assignee = db.collectionData('venueBookingRequests').get(booking.id).assignedVenueStaffUid
   return request(app).post(`/api/requests/event/venue-bookings/${booking.id}/actions`).set(auth(assignee)).send({ action: 'approve' })
@@ -38,6 +40,7 @@ describe('SPM-90 primary venue API', () => {
     expect((await confirm()).body.reason).toBe('primary_venue_required')
     expect(db.store.get('event').status).toBe(PLANNING)
     expect((await choose(hall.id)).status).toBe(200)
+    approveSafety()
     expect((await confirm()).status).toBe(200)
     expect(db.store.get('event').status).toBe(CONFIRMED)
     const attendee = (await request(app).get('/api/requests/event').set(auth('attendee'))).body
@@ -76,6 +79,7 @@ describe('SPM-90 primary venue API', () => {
     expect((await confirm()).body.reason).toBe('primary_venue_required')
     hallHold.lifecycleStatus = 'active'
     expect((await choose(room.id)).status).toBe(409)
+    approveSafety()
     expect((await confirm()).status).toBe(200)
     expect((await choose(room.id, hall.id)).status).toBe(200)
     expect(db.store.get('event').status).toBe(CONFIRMED)
@@ -99,6 +103,7 @@ describe('SPM-90 primary venue API', () => {
   it('automatically selects a sole approved booking at Confirm and records the system change', async () => {
     const hall = (await create()).body.booking
     await approve(hall)
+    approveSafety()
     expect((await confirm()).status).toBe(200)
     expect(db.store.get('event').primaryVenue).toMatchObject({ bookingId: hall.id, location: 'Level 1, Main Campus' })
     expect(activity()).toContainEqual(expect.objectContaining({ field: 'primaryVenue', actor: expect.objectContaining({ name: 'System' }) }))
@@ -110,6 +115,7 @@ describe('SPM-90 primary venue API', () => {
     await approve(hall)
     await approve(room)
     await choose(hall.id)
+    approveSafety()
     await confirm()
     expect((await request(app).post(`/api/requests/event/venue-bookings/${hall.id}/actions`)
       .set(auth(coordinator.uid)).send({ action: 'cancel' })).status).toBe(200)
@@ -121,12 +127,14 @@ describe('SPM-90 primary venue API', () => {
     expect(blocked.status).toBe(409)
     expect(blocked.body.reason).toBe('primary_venue_required')
     expect((await choose(room.id)).status).toBe(200)
+    approveSafety()
     expect((await confirm()).status).toBe(200)
   })
 
   it('clears the primary venue when the whole event is cancelled', async () => {
     const hall = (await create()).body.booking
     await approve(hall)
+    approveSafety()
     await confirm()
     const cancelled = await request(app).post('/api/event-requests/event/transitions').set(auth(coordinator.uid))
       .send({ action: 'cancel', reason: 'Event withdrawn' })

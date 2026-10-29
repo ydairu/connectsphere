@@ -33,11 +33,14 @@ import {
   REJECT,
   RESUBMIT,
   RETURN_FOR_CLARIFICATION,
+  SAFETY_APPROVAL_REQUIRED,
+  START_PREPARATION,
   START_REVIEW,
   SUBMIT,
   TERMINAL_STATUS,
   UNKNOWN_ACTION,
 } from '../../../shared/statusTransitions.js'
+import { CHECK_SATISFACTORY, SAFETY_CHECKLIST_IDS, SUBMIT_SAFETY_REVIEW } from '../../../shared/safetyReview.js'
 import {
   APPROVE_TECHNICAL,
   APPROVE_VENUE,
@@ -48,7 +51,7 @@ import {
 import { createFakeFirestoreEventRequestStore } from '../../shared/firebase-double/fakeFirestoreEventRequestStore.js'
 
 const TOKEN_PREFIX = 'test-token:'
-const { organiserA1, organiserA2, organiserB1, coordinator, coordinator2, coordinator3, venueStaff, technicalStaff, attendee } =
+const { organiserA1, organiserA2, organiserB1, coordinator, coordinator2, coordinator3, venueStaff, technicalStaff, attendee, safetyOfficer } =
   SEED_ACCOUNTS
 
 const seeded = (slug) => SEED_REQUESTS.find((request) => request.id === `seed-req-${slug}`)
@@ -289,6 +292,13 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
     expect(Object.keys(organiserView.json.arrangements)).toEqual(['venue', 'technical'])
     expect(organiserView.json.request.arrangementApprovals).toBeUndefined()
 
+    // SPM-91/92: the arrangements are approved, so the Coordinator sends the event for its safety check.
+    expect((await view(coordinator, 'a1-planning')).json.availableActions).toEqual([REJECT, SUBMIT_SAFETY_REVIEW])
+    expect((await act(coordinator, 'a1-planning', CONFIRM)).json.reason).toBe(SAFETY_APPROVAL_REQUIRED)
+    expect((await act(coordinator, 'a1-planning', SUBMIT_SAFETY_REVIEW)).status).toBe(200)
+    const checklist = Object.fromEntries(SAFETY_CHECKLIST_IDS.map((id) => [id, { result: CHECK_SATISFACTORY }]))
+    expect((await call('POST', '/api/requests/seed-req-a1-planning/safety-review', safetyOfficer, { outcome: 'approve', checklist })).status).toBe(200)
+
     expect((await view(coordinator, 'a1-planning')).json.availableActions).toEqual([CONFIRM, REJECT])
     const confirmed = await act(coordinator, 'a1-planning', CONFIRM)
     expect(confirmed.status).toBe(200)
@@ -321,8 +331,9 @@ describe('SPM-9 — Event lifecycle status (API, in-memory only)', () => {
 
     const coordinatorView = await view(coordinator3, 'a1-confirmed')
     expect(coordinatorView.json.cancellationRequest.status).toBe('pending')
-    // SPM-47 added Return cancellation request.
-    expect(coordinatorView.json.availableActions).toEqual([APPROVE_CANCELLATION, REFUSE_CANCELLATION, RETURN_CANCELLATION])
+    // SPM-47 added Return cancellation request. The seeded event holds a safety approval (SPM-91/92), so
+    // SPM-88's Start Preparation is offered too.
+    expect(coordinatorView.json.availableActions).toEqual([START_PREPARATION, APPROVE_CANCELLATION, REFUSE_CANCELLATION, RETURN_CANCELLATION])
     // While the request is pending the Coordinator decides it rather than cancelling directly.
     expect((await act(coordinator3, 'a1-confirmed', CANCEL, 'Venue closed')).json.reason).toBe('cancellation_request_pending')
 

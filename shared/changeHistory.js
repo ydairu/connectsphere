@@ -17,7 +17,7 @@
 // `significant: true` is present only on a field shared/significantChanges.js lists as significant (SPM-10).
 // `at` is added by the store when it writes the entry.
 
-import { ORGANISER, ROLES, SECTIONS, canEdit, rolesOf, viewableSections } from './permissions.js'
+import { CORE, EQUIPMENT, ORGANISER, ROLES, SAFETY_OFFICER, SECTIONS, VENUE, canEdit, inScopeAs, rolesOf, viewableSections } from './permissions.js'
 import { PREPARATION_SECTIONS, preparationSection } from './preparation.js'
 import { isAssignedCoordinator, isOwningOrganiser } from './requestActors.js'
 import { isSignificantField } from './significantChanges.js'
@@ -138,11 +138,12 @@ export function historyEntriesForEdit(user, before, after) {
 
 /**
  * May this user view the request's change history? [Team decision, 4 Oct 2026, pending PO confirmation]
- * The assigned Event Coordinator and the owning Event Organiser only — not a same-organisation colleague,
- * an unassigned Coordinator, staff or Attendees.
+ * The assigned Event Coordinator and the owning Event Organiser — not a same-organisation colleague, an
+ * unassigned Coordinator, staff or Attendees. SPM-66: also a Safety Officer, for an event in the
+ * safety-review queue, limited to safetyOfficerMaySee().
  */
 export function canViewChangeHistory(user, request) {
-  return isAssignedCoordinator(user, request) || isOwningOrganiser(user, request)
+  return isAssignedCoordinator(user, request) || isOwningOrganiser(user, request) || inScopeAs(SAFETY_OFFICER, user, request)
 }
 
 // The sections whose history an Organiser sees: exactly those the Organiser role may view (SPM-42), so
@@ -151,6 +152,13 @@ const ORGANISER_VISIBLE_SECTIONS = viewableSections([ORGANISER])
 
 function organiserMaySee(entry) {
   return entry.field === PRIMARY_VENUE_FIELD || ORGANISER_VISIBLE_SECTIONS.includes(entry.field.split('.')[0])
+}
+
+// SPM-66: "they can see its change history for attendance, venue/layout, access and equipment" (CL3 G8!C49).
+// Venue/layout and access are fields of the venue section; equipment is the equipment section.
+function safetyOfficerMaySee(entry) {
+  const section = entry.field.split('.')[0]
+  return entry.field === `${CORE}.expectedAttendees` || section === VENUE || section === EQUIPMENT
 }
 
 function newestFirst(a, b) {
@@ -166,15 +174,18 @@ function newestFirst(a, b) {
  *
  * The Organiser sees every entry except changes to sections the Organiser role may not view: internal
  * planning (SPM-28 AC6) and venue and equipment preparation (SPM-48 AC8). Those sections are never sent to
- * them (SPM-42), so their history is not either.
+ * them (SPM-42), so their history is not either. A Safety Officer sees attendance, venue and equipment
+ * changes only (SPM-66). A user holding several of these roles sees the union.
  */
 export function visibleChangeHistory(user, request, entries) {
   if (!canViewChangeHistory(user, request)) return null
   // The assigned Coordinator sees everything, including when they also own the event.
   const all = isAssignedCoordinator(user, request)
+  const asOrganiser = isOwningOrganiser(user, request)
+  const asSafetyOfficer = inScopeAs(SAFETY_OFFICER, user, request)
   return entries
     .filter((entry) => entry.type === FIELD_CHANGED && typeof entry.field === 'string')
-    .filter((entry) => all || organiserMaySee(entry))
+    .filter((entry) => all || (asOrganiser && organiserMaySee(entry)) || (asSafetyOfficer && safetyOfficerMaySee(entry)))
     .sort(newestFirst)
     .map(({ id, field, oldValue, newValue, actor, at, significant }) => ({
       id: id ?? null,

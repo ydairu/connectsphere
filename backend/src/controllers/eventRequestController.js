@@ -55,7 +55,7 @@ export function sendEventRequestError(error, res, next) {
 // request arrives; tests and the E2E double pass an in-memory database.
 // loadCoordinatorName (SPM-46): see services/assignedCoordinatorService.js. loadOwnerNames (SPM-64
 // follow-up): see services/requestOwnerService.js.
-export function createEventRequestController(getDb, loadCoordinatorName = async () => null, loadOwnerNames = async () => new Map(), verifySafetyApproval = async () => false) {
+export function createEventRequestController(getDb, loadCoordinatorName = async () => null, loadOwnerNames = async () => new Map()) {
   return {
     async createEventRequest(req, res, next) {
       try {
@@ -103,13 +103,11 @@ export function createEventRequestController(getDb, loadCoordinatorName = async 
       try {
         const eventRequest = await transitionEventRequest(req.params.id, action, req.user, getDb(), new Date(), {
           reason: req.body.reason,
-          verifySafetyApproval,
         })
         const coordinatorName = await loadCoordinatorName(req.user, eventRequest)
         const ownerNames = await loadOwnerNames(req.user, [eventRequest])
         const bookingState = await loadVenueBookingState(req.params.id, eventRequest, getDb())
-        const safetyApproved = await verifySafetyApproval(eventRequest, getDb()) === true
-        return res.json(presentRequest(req.user, eventRequest, { coordinatorName, ownerNames, ...bookingState, safetyApproved }))
+        return res.json(presentRequest(req.user, eventRequest, { coordinatorName, ownerNames, ...bookingState }))
       } catch (error) {
         return sendEventRequestError(error, res, next)
       }

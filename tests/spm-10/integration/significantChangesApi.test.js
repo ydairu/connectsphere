@@ -13,14 +13,15 @@ import { STATUS_CHANGED } from '../../../backend/src/services/statusHistory.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
 import { FIELD_CHANGED } from '../../../shared/changeHistory.js'
 import { NOTIFICATIONS_COLLECTION, SIGNIFICANT_CHANGE_NOTICE } from '../../../shared/notifications.js'
-import { ARRANGEMENTS_NOT_APPROVED } from '../../../shared/statusTransitions.js'
+import { ARRANGEMENTS_NOT_APPROVED, SAFETY_APPROVAL_REQUIRED } from '../../../shared/statusTransitions.js'
+import { CHECK_SATISFACTORY, INVALIDATED_BY_SIGNIFICANT_CHANGE, SAFETY_APPROVED, SAFETY_CHECKLIST_IDS, SAFETY_INVALIDATED, SUBMIT_SAFETY_REVIEW } from '../../../shared/safetyReview.js'
 import { CANCELLATION_REQUEST_OPEN, SIGNIFICANT_CHANGE } from '../../../shared/significantChanges.js'
 import { COMPLETED, CONFIRMED, PLANNING, SUBMITTED, UNDER_REVIEW } from '../../../shared/status.js'
 import { createFakeFirestoreEventRequestStore } from '../../shared/firebase-double/fakeFirestoreEventRequestStore.js'
 import { addApprovedVenue } from '../../spm-90/approvedVenueFixture.js'
 
 const TOKEN_PREFIX = 'test-token:'
-const { attendee, coordinator, coordinator3, organiserA1, technicalStaff, venueStaff, venueTechnicalStaff } = SEED_ACCOUNTS
+const { attendee, coordinator, coordinator3, organiserA1, safetyOfficer, technicalStaff, venueStaff, venueTechnicalStaff } = SEED_ACCOUNTS
 
 const SUBMITTED_ID = 'seed-req-a1-submitted'
 const UNDER_REVIEW_ID = 'seed-req-a1-under-review'
@@ -191,12 +192,20 @@ describe('SPM-10 AC4/AC5 — Confirmed: back to Planning, sign-offs cleared, Con
     expect(response.json.availableActions).not.toContain(SIGNIFICANT_CHANGE)
   })
 
-  it('Confirm is refused until both sign-offs are approved again', async () => {
+  // SPM-91 AC6: "When an accepted significant change returns a safety-approved event to Planning, its safety
+  // approval is invalidated and another safety check is required."
+  it('Confirm is refused until both sign-offs and a new safety check are approved again', async () => {
+    expect(record(CONFIRMED_ID).safetyReview.status).toBe(SAFETY_APPROVED)
     await patch(coordinator3, CONFIRMED_ID, { core: { preferredDateTime: '2026-11-27T09:00:00+08:00' } })
+    expect(record(CONFIRMED_ID).safetyReview).toMatchObject({ status: SAFETY_INVALIDATED, invalidatedReason: INVALIDATED_BY_SIGNIFICANT_CHANGE })
     expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(ARRANGEMENTS_NOT_APPROVED)
     addApprovedVenue(db, CONFIRMED_ID, `approved-${CONFIRMED_ID}`)
     expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(ARRANGEMENTS_NOT_APPROVED)
     expect((await act(technicalStaff, CONFIRMED_ID, 'approve_technical')).status).toBe(200)
+    expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(SAFETY_APPROVAL_REQUIRED)
+    expect((await act(coordinator3, CONFIRMED_ID, SUBMIT_SAFETY_REVIEW)).status).toBe(200)
+    const checklist = Object.fromEntries(SAFETY_CHECKLIST_IDS.map((id) => [id, { result: CHECK_SATISFACTORY }]))
+    expect((await call('POST', `/api/requests/${CONFIRMED_ID}/safety-review`, safetyOfficer, { outcome: 'approve', checklist })).status).toBe(200)
     const confirmed = await act(coordinator3, CONFIRMED_ID, 'confirm')
     expect(confirmed.status).toBe(200)
     expect(confirmed.json.request.status).toBe(CONFIRMED)

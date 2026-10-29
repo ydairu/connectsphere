@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { createVenueBookingController } from '../controllers/venueBookingController.js'
 import { createEquipmentRequestController } from '../controllers/equipmentRequestController.js'
 import { createRequestController } from '../controllers/requestController.js'
+import { createSafetyReviewController } from '../controllers/safetyReviewController.js'
 import { authoriseHistory, authoriseList, authoriseRead, authoriseWrite, sendHistory } from '../middleware/authorise.js'
 import { createCoordinatorNameLoader } from '../services/assignedCoordinatorService.js'
 import { createOwnerNameLoader } from '../services/requestOwnerService.js'
@@ -18,7 +19,7 @@ import { presentRequest } from '../middleware/authorise.js'
 // Route split by status (AGENTS.md §6, team decision of 20 Sep 2026): drafts are
 // created and edited through /api/event-requests, which validates field values; everything after
 // submission goes through these routes, which evaluate role, record scope and the status gate.
-export function createRequestRoutes({ authenticate, store, getUserDb, getEventRequestDb, verifySafetyApproval = async () => false }) {
+export function createRequestRoutes({ authenticate, store, getUserDb, getEventRequestDb }) {
   const controller = createRequestController(
     store,
     createCoordinatorNameLoader(getUserDb),
@@ -47,14 +48,18 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   router.get('/:id/equipment-requests/:requestId/availability', authenticate, equipmentRequests.checkAvailability)
   // SPM-56: the client sends an action ('approve', 'reconfirm_approval'; SPM-36 adds 'reject'), never a status.
   router.post('/:id/equipment-requests/:requestId/actions', authenticate, equipmentRequests.decide)
+  // SPM-92: the Safety Officer records the review. SPM-66: the booked venues' safety details. Who may do either
+  // is decided in shared/safetyReview.js. Submitting for review is an event action (POST /transitions).
+  const safetyReviews = createSafetyReviewController(getEventRequestDb)
+  router.get('/:id/safety-review/venues', authenticate, safetyReviews.listVenues)
+  router.post('/:id/safety-review', authenticate, safetyReviews.decide)
 
   router.get('/', authenticate, controller.loadAll, controller.loadOwnerNames, authoriseList, controller.sendList)
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead,
     async (req, res, next) => {
       try {
         const bookingState = await loadVenueBookingState(req.params.id, req.eventRequest, getEventRequestDb())
-        const safetyApproved = await verifySafetyApproval(req.eventRequest, getEventRequestDb()) === true
-        res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName, ownerNames: req.ownerNames, ...bookingState, safetyApproved })
+        res.locals.body = presentRequest(req.user, req.eventRequest, { coordinatorName: req.assignedCoordinatorName, ownerNames: req.ownerNames, ...bookingState })
         next()
       } catch (error) { next(error) }
     }, controller.sendOne)

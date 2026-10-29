@@ -1,4 +1,4 @@
-import { DOUBLE_ORIGIN, expect, test, ROLE_USERS, EXTRA_USERS, loginAs } from '../../shared/e2e/fixtures.js'
+import { DOUBLE_ORIGIN, expect, test, ROLE_USERS, EXTRA_USERS, loginAs, recordSafetyApproval } from '../../shared/e2e/fixtures.js'
 
 const eventId = 'seed-req-a1-planning'
 const path = `/requests/${eventId}/venue-bookings`
@@ -64,6 +64,8 @@ test('Coordinator resolves two venue needs independently before Confirm', async 
     headers: auth(ROLE_USERS.coordinator.uid), data: { bookingId: hall.id, expectedPrimaryVenueBookingId: null },
   })
   expect(primary.status(), await primary.text()).toBe(200)
+  // SPM-91/92: Confirm also needs a safety approval, recorded through the double here.
+  await recordSafetyApproval(request, eventId)
   const readyView = await request.get(`${DOUBLE_ORIGIN}/api/requests/${eventId}`, { headers: auth(ROLE_USERS.coordinator.uid) })
   const ready = await readyView.json()
   expect(ready.venueBookingReadiness).toMatchObject({ ready: true })
