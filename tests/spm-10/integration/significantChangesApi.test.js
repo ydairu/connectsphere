@@ -134,44 +134,51 @@ describe('SPM-10 AC2 — Submitted or Under Review: marked significant, no other
   })
 })
 
-describe('SPM-10 AC3 — Planning: significant edit clears the recorded sign-offs', () => {
-  it('both decisions are cleared back to Awaiting approval; the status stays Planning', async () => {
+// SPM-87 supersedes SPM-10's automatic reset (CL3 G8!C51): the sign-offs are kept and marked "Changed since
+// approval", and the Coordinator decides which go back (tests/spm-87).
+describe('SPM-10 AC3 / SPM-87 AC1 — Planning: significant edit marks the recorded sign-offs', () => {
+  it('both sign-offs are kept and marked Changed since approval; the status stays Planning', async () => {
     await approveBoth(PLANNING_ID)
     const response = await patch(coordinator, PLANNING_ID, { venue: { layoutPreference: 'banquet' } })
     expect(response.status).toBe(200)
     expect(record(PLANNING_ID).status).toBe(PLANNING)
-    expect(record(PLANNING_ID).arrangementApprovals).toEqual({})
+    expect(record(PLANNING_ID).arrangementApprovals.technical).toMatchObject({ decision: 'approved' })
+    expect(record(PLANNING_ID).signOffReview).toMatchObject({ status: 'pending', changedFields: ['venue.layoutPreference'] })
+    expect(record(PLANNING_ID).signOffReview.items.map((item) => item.key).sort()).toEqual(['technical', `venue:approved-${PLANNING_ID}`])
     expect(response.json.arrangements).toEqual({
       venue: { required: true, decision: 'approved', at: null },
-      technical: { required: true, decision: null, at: null },
+      technical: { required: true, decision: 'approved', at: expect.any(String) },
     })
+    expect(response.json.signOffReview.items).toHaveLength(2)
     expect(fieldEntries(PLANNING_ID)).toEqual([expect.objectContaining({ field: 'venue.layoutPreference', significant: true })])
     expect(statusEntries(PLANNING_ID).filter((entry) => entry.action === SIGNIFICANT_CHANGE)).toEqual([])
   })
 
-  it('a rejected decision is cleared too', async () => {
-    record(PLANNING_ID).arrangementApprovals = { venue: { decision: 'rejected', byUid: venueStaff.uid, at: 'legacy' } }
+  it('a rejected decision is not a sign-off to mark, and stays as recorded', async () => {
+    record(PLANNING_ID).arrangementApprovals = { technical: { decision: 'rejected', byUid: venueStaff.uid, at: 'legacy' } }
     await patch(coordinator, PLANNING_ID, { core: { durationHours: 6 } })
-    expect(record(PLANNING_ID).arrangementApprovals).toEqual({})
+    expect(record(PLANNING_ID).arrangementApprovals).toEqual({ technical: { decision: 'rejected', byUid: venueStaff.uid, at: 'legacy' } })
+    expect(record(PLANNING_ID).signOffReview).toBeUndefined()
   })
 
-  it('"Not required" is derived, so it survives the reset: removing all equipment makes technical sign-off not required', async () => {
+  it('"Not required" is derived: removing all equipment makes technical sign-off not required', async () => {
     await approveBoth(PLANNING_ID)
     const response = await patch(coordinator, PLANNING_ID, { equipment: { requirements: [], technicalSupportNeeded: false } })
     expect(response.status).toBe(200)
-    expect(response.json.arrangements.technical).toEqual({ required: false, decision: null, at: null })
+    expect(response.json.arrangements.technical).toMatchObject({ required: false })
     expect(response.json.arrangements.venue).toEqual({ required: true, decision: 'approved', at: null })
   })
 })
 
-describe('SPM-10 AC4/AC5 — Confirmed: back to Planning, sign-offs cleared, Confirm refused until re-approved', () => {
+describe('SPM-10 AC4/AC5, SPM-87 AC3 — Confirmed: back to Planning, sign-offs marked, Confirm refused until decided and re-approved', () => {
   it('the status moves to Planning with a status_changed entry carrying the Coordinator, time and reason', async () => {
     const start = Date.now()
     const response = await patch(coordinator3, CONFIRMED_ID, { core: { expectedAttendees: 120 } })
     expect(response.status).toBe(200)
     expect(response.json.request.status).toBe(PLANNING)
     expect(record(CONFIRMED_ID).status).toBe(PLANNING)
-    expect(record(CONFIRMED_ID).arrangementApprovals).toEqual({})
+    expect(record(CONFIRMED_ID).arrangementApprovals.technical).toMatchObject({ decision: 'approved' })
+    expect(record(CONFIRMED_ID).signOffReview).toMatchObject({ status: 'pending', items: [expect.objectContaining({ key: 'technical' })] })
     expect(record(CONFIRMED_ID).core.expectedAttendees).toBe(120)
     expect(fieldEntries(CONFIRMED_ID)).toEqual([expect.objectContaining({ field: 'core.expectedAttendees', oldValue: 80, newValue: 120, significant: true })])
 
@@ -194,12 +201,16 @@ describe('SPM-10 AC4/AC5 — Confirmed: back to Planning, sign-offs cleared, Con
 
   // SPM-91 AC6: "When an accepted significant change returns a safety-approved event to Planning, its safety
   // approval is invalidated and another safety check is required."
-  it('Confirm is refused until both sign-offs and a new safety check are approved again', async () => {
+  it('Confirm is refused until the Coordinator decides, the sent-back sign-off and a new safety check are approved', async () => {
     expect(record(CONFIRMED_ID).safetyReview.status).toBe(SAFETY_APPROVED)
     await patch(coordinator3, CONFIRMED_ID, { core: { preferredDateTime: '2026-11-27T09:00:00+08:00' } })
     expect(record(CONFIRMED_ID).safetyReview).toMatchObject({ status: SAFETY_INVALIDATED, invalidatedReason: INVALIDATED_BY_SIGNIFICANT_CHANGE })
     expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(ARRANGEMENTS_NOT_APPROVED)
     addApprovedVenue(db, CONFIRMED_ID, `approved-${CONFIRMED_ID}`)
+    expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe('sign_off_review_pending')
+    expect((await act(coordinator3, CONFIRMED_ID, SUBMIT_SAFETY_REVIEW)).json.reason).toBe('sign_off_review_pending')
+    // SPM-87: the Coordinator sends the technical sign-off back; it is approved again.
+    expect((await call('POST', `/api/requests/${CONFIRMED_ID}/sign-off-review`, coordinator3, { reapprove: ['technical'] })).status).toBe(200)
     expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(ARRANGEMENTS_NOT_APPROVED)
     expect((await act(technicalStaff, CONFIRMED_ID, 'approve_technical')).status).toBe(200)
     expect((await act(coordinator3, CONFIRMED_ID, 'confirm')).json.reason).toBe(SAFETY_APPROVAL_REQUIRED)
@@ -387,7 +398,7 @@ describe('SPM-10 AC8 — notifications to assigned Venue and Technical Support S
   it('no staff assigned: the change is saved and nothing is sent', async () => {
     const response = await patch(coordinator, NO_STAFF_ID, { core: { durationHours: 6 } })
     expect(response.status).toBe(200)
-    expect(record(NO_STAFF_ID).arrangementApprovals).toEqual({})
+    expect(record(NO_STAFF_ID).arrangementApprovals).toEqual(approvals)
     expect(notifications()).toEqual([])
   })
 

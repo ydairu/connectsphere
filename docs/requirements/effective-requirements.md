@@ -543,6 +543,16 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 > **Week 7 / CL3 effect (Change #6).** When a significant change on a Confirmed event is accepted, the event re-enters the standard lifecycle and returns to planning/reviewing, **which includes the safety checkpoint** (G8!C16, C48). The Coordinator's discretion (G8!C51) is limited to **venue/technical sign-offs: there is no automatic reset of any venue/equipment arrangement** — the Coordinator reviews and decides which arrangements to re-review. The safety checkpoint itself is not optional Coordinator judgment: once a confirmed event re-enters the lifecycle, it must pass through the safety review again before reaching Confirmed/Preparation, consistent with the customer's loop (*"the event returns to the relevant earlier planning stage and affected venue or technical arrangements may need to be reviewed again"*).
 
+**[Implemented — SPM-87, 29 Oct 2026 — team decisions pending PO confirmation]** The Coordinator decides which sign-offs need re-approval after a significant change, replacing SPM-10's automatic reset (CL3 G8!C51). Rules in `shared/signOffReview.js`; route `POST /api/requests/:id/sign-off-review`. Choices the acceptance criteria left open:
+
+- **What is marked.** Each current approved venue booking and an approved technical sign-off. Rejected or not-yet-approved arrangements are not marked. A second significant change before the Coordinator decides adds to the same review.
+- **Who sees the marking.** The assigned Coordinator only. Assigned staff are told through the significant-change notice; the Organiser's arrangement summary is unchanged.
+- **Undecided blocks progress.** Until the Coordinator decides, Confirm and submission for the safety check are refused (`sign_off_review_pending`), even though the marked sign-offs are still approved. Recording that none need re-approval (an empty choice) lifts this, as AC6 describes.
+- **A venue booking sent back** keeps its confirmed reservation and stays Approved in its record, with `reapprovalRequestedAt` set. It counts as Awaiting approval and returns to its Venue Staff member's queue, where they approve it again (its period, attendance and suitability are checked again) or reject it (the reservation is released and, if it was the primary venue, the primary venue is cleared, as a cancellation does).
+- **A technical sign-off sent back** is removed from `arrangementApprovals`. It is approved again with SPM-56's Re-confirm, which now also applies to a Reserved request (its reservation stays), or with the manual sign-off for an event without an equipment request.
+- **Preparation.** A significant change in Preparation is no longer refused: like Confirmed, the event moves back to Planning in the same transaction, with the safety approval withdrawn. A significant change to a Preparation event with an open cancellation request is refused, as for Confirmed.
+- **History and notices.** The choice is a `field_changed` entry on `signOffReapproval` (the marked sign-offs, and those sent back or "None (existing approvals kept)"), shown to the Coordinator. The staff whose sign-offs are sent back are notified in-app.
+
 ### 4.8 Venue Catalogue
 
 **[Customer-confirmed]** Maintain location, capacity, facilities, accessibility, supported layouts, operating information, and availability-related characteristics. Venue Staff can use catalogue information to identify suitable spaces.
@@ -729,6 +739,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Temporary — until SPM-87] Re-confirm approval.** SPM-10 still clears `arrangementApprovals` on a significant change while the equipment request stays Approved, which would block Confirm. The assignee may "Re-confirm approval" on an Approved request whose technical sign-off is not approved: availability is checked again and the sign-off is set again, with an `equipment_request_approval_reconfirmed` entry and a notice to the Coordinator. SPM-87 removes the automatic reset, and with it the need for this action.
 
+**[Superseded — SPM-87, 29 Oct 2026]** A significant change no longer clears the technical sign-off. Re-confirm remains the way to approve it again after the Coordinator sends it back, and now also applies to a Reserved request.
+
 **[Implemented — SPM-56, 17 Oct 2026 — historical record]** Rules in `shared/equipmentRequest.js` (`equipmentDecision`, `equipmentRequestActions`, `hasCurrentEquipmentRequest`) and `shared/arrangements.js`; notice in `shared/notifications.js`; service `decideEquipmentRequest` and `listAssignedEquipmentRequests` in `backend/src/services/equipmentRequestService.js`; the Review panel on the Equipment requests card and the `/equipment/requests` queue page. Notes:
 
 - **Pattern for SPM-54.** SPM-56 sets the approve pattern (an action route, the decision and the sign-off in one transaction, a fresh check inside it, a Coordinator notice) that SPM-54's venue booking approval may follow.
@@ -822,6 +834,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - Reservations of one equipment type are serialised by `systemLocks/equipmentReservation-{typeId}`, as SPM-16's venue lock. The in-memory double does not model transaction retries, so this is not verified under real concurrency.
 
 **[Held — SPM-62, team decision 18 Oct 2026]** "Technical Support Staff must re-confirm the equipment arrangement before the event can be confirmed again" after a significant change is not built. It conflicts with CL3 row 51 (no automatic reset of sign-offs; the Coordinator decides), and is held until SPM-87 settles the reset. **Consequence until then:** SPM-10 still clears the technical sign-off on a significant change. SPM-56's Re-confirm works only on Approved requests, and the manual sign-off is refused while a current request exists, so a Reserved event whose sign-off has been cleared cannot be confirmed again.
+
+**[Resolved — SPM-87, 29 Oct 2026]** The reset is no longer automatic: the Coordinator decides whether the technical sign-off goes back, and a Reserved request can then be re-confirmed, so such an event can be confirmed again.
 
 **[Known gaps — SPM-62]**
 

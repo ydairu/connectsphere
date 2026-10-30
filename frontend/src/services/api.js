@@ -253,6 +253,12 @@ export function getSafetyVenueDetails(user, id) {
   return authenticatedRequest(user, `/api/requests/${id}/safety-review/venues`)
 }
 
+// SPM-87: the Coordinator's choice of which sign-offs changed since approval go back for re-approval; an empty
+// list records that none need it. The response is shaped like getRequest's.
+export function decideSignOffReview(user, id, reapprove) {
+  return authenticatedRequest(user, `/api/requests/${id}/sign-off-review`, { method: 'POST', body: JSON.stringify({ reapprove }) })
+}
+
 // SPM-92: the Safety Officer's review, { outcome, checklist, comments, internalNotes }. An invalid review comes
 // back as 400 with `errors` by field; a review of an event no longer in the queue as 403 or 409.
 export function recordSafetyReview(user, id, review) {

@@ -202,7 +202,7 @@ function ReviewPanel({ user, eventId, request, busy, onDecided }) {
           {approveActions.length > 0 && result?.fulfillable === false && <p className="form-note">A request with a shortfall cannot be approved.</p>}
           {approveActions.length > 0 && result === null && <p className="form-note">Approval is available once availability has been checked.</p>}
           {actions.includes(RECONFIRM_EQUIPMENT_APPROVAL) && (
-            <p className="form-note">A significant change to the event cleared the technical sign-off. Re-confirm to approve it again (until SPM-87 removes the automatic reset).</p>
+            <p className="form-note">After a significant change, the event coordinator sent the technical sign-off back for re-approval. Re-confirm to approve it again.</p>
           )}
           {rejecting && (
             <RejectForm

@@ -333,7 +333,9 @@ export async function decideEquipmentRequest(eventId, equipmentRequestId, action
     tx.update(requestRef, requestUpdate)
     tx.update(eventRef, {
       arrangementApprovals: { ...event.arrangementApprovals, [TECHNICAL_ARRANGEMENT]: { decision: ARRANGEMENT_APPROVED, byUid: user.uid, at } },
-      currentEquipmentRequest: equipmentRequestSummary(equipmentRequestId, EQUIPMENT_REQUEST_STATUS.APPROVED),
+      // A re-confirmed Reserved request stays Reserved (SPM-87).
+      currentEquipmentRequest: equipmentRequestSummary(equipmentRequestId,
+        request.status === EQUIPMENT_REQUEST_STATUS.RESERVED ? EQUIPMENT_REQUEST_STATUS.RESERVED : EQUIPMENT_REQUEST_STATUS.APPROVED),
       updatedAt: at,
     })
     const activity = eventRef.collection(ACTIVITY_SUBCOLLECTION)

@@ -1,6 +1,6 @@
 # SPM-88 manual review
 
-SPM-88 is incomplete until SPM-87 provides significant-change re-review and SPM-19 provides attendee registration. SPM-91/92 now records the safety approval that Start Preparation reads (27 October 2026, local; not yet accepted). Record the date, test event ID, account, and actual result for each check. Use separate events for completion and cancellation because those actions close an event.
+SPM-88 is incomplete until SPM-19 provides attendee registration. SPM-87 now provides the significant-change re-review (29 October 2026, local; not yet accepted). SPM-91/92 now records the safety approval that Start Preparation reads (27 October 2026, local; not yet accepted). Record the date, test event ID, account, and actual result for each check. Use separate events for completion and cancellation because those actions close an event.
 
 ## Test setup
 
@@ -22,7 +22,7 @@ SPM-88 is incomplete until SPM-87 provides significant-change re-review and SPM-
 - [ ] On a future Preparation event, direct cancellation requires a reason. A pending Organiser cancellation request blocks direct cancellation, but remains actionable after Preparation starts. Approval of that request cancels the event. After the start time, both cancellation paths are refused.
 - [ ] For each cancellation path, check Cancelled status, status history, affected-user notices, and release of event venue/equipment reservations. Other events' reservations stay active.
 - [ ] Cancelling an approved venue booking while the event is in Preparation returns the event to Planning and saves a status history entry.
-- [ ] A significant edit in Preparation currently returns 409 `preparation_rereview_unavailable` with no write. Repeat this check after SPM-87 integrates the re-review and safety checkpoint.
+- [ ] A significant edit in Preparation moves the event back to Planning (SPM-87), with a status history entry, the safety approval withdrawn and the recorded sign-offs marked Changed since approval for the Coordinator. Preparation sections become read-only again.
 - [ ] Check attendee visibility in Confirmed and Preparation. Check registration in both statuses when SPM-19 exists.
 
 ## Acceptance record

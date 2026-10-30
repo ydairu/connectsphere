@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 29 October 2026 (SPM-68 Lead assignment, SPM-85 Lead new-request notice, SPM-69 Lead reassignment, SPM-90 and SPM-19 integration; older implementation sections retain their historical dates)
+Last reviewed: 29 October 2026 (SPM-87 sign-off re-approval; SPM-68 Lead assignment, SPM-85 Lead new-request notice, SPM-69 Lead reassignment, SPM-90 and SPM-19 integration; older implementation sections retain their historical dates)
 
 ## Current implementation map (27 October 2026)
 
@@ -29,11 +29,17 @@ The backfill script is dry-run-first and was not run against a live project. Alr
 
 **SPM-19 integration (29 October 2026):** Once an approved primary venue is selected, new registrations use only that venue's capacity and name in availability, validation, confirmation and notices. Existing registration snapshots are retained. Events without a selected primary venue retain SPM-19's largest-approved-venue capacity rule.
 
+## Current SPM-87 state (29 October 2026)
+
+A significant change at Planning, Confirmed or Preparation no longer clears the venue and technical sign-offs. It keeps them and marks them "Changed since approval", and the assigned Coordinator chooses which go back to Awaiting approval, or records that none need it (`shared/signOffReview.js`, `POST /api/requests/:id/sign-off-review`). Confirmed and Preparation events move back to Planning with the safety approval withdrawn. An undecided review, or any sign-off Awaiting approval, blocks submission for the safety check and Confirm. A venue booking sent back keeps its reservation and returns to its Venue Staff member's queue to approve or reject again; a technical sign-off sent back is re-confirmed with SPM-56's Re-confirm, now also for Reserved requests. The Coordinator's choice is recorded in the change history. This closes SPM-88's Preparation re-review dependency and SPM-62's held re-confirmation gap.
+
+SPM-87 is **In Progress / not Done**. Every acceptance criterion has code and automated tests (`docs/evidence/spm-87-traceability.md`); the team decisions in effective-requirements.md §4.7 need PO confirmation, and no live Firebase check, peer review or human acceptance has been done. Manual checks: `docs/testing/spm-87-manual-testing.md`. Local run on 29 Oct 2026: lint and build passed; 136 Node, 101 frontend and 2,240 Vitest tests passed; Playwright 120 of 120 passed.
+
 ## Current SPM-88 state (26 October 2026)
 
 The local code now has a separate `Preparation` status and an assigned-Coordinator `start_preparation` action. The action records the status change and sends one in-app notice to each assigned Venue or Technical Support Staff member in the same transaction. **Update, 27 October 2026:** it now requires the safety approval recorded by SPM-92 (see the SPM-66/91/92 section below), which replaced the fail-closed verifier. Confirmed events from before SPM-91 have no approval, so they cannot start preparation until reviewed.
 
-Staff preparation sections are editable only in Preparation. Completion requires Preparation and an ended event. Direct cancellation and approved Organiser cancellation requests work before a Preparation event starts, with the existing reservation release. Cancelling an approved venue booking returns Preparation to Planning. Attendees can read eligible Confirmed and Preparation events, but registration itself is still SPM-19 scope. Significant section edits in Preparation return 409 without writing until SPM-87 supplies the required re-review and safety invalidation path. **Update, 27 October 2026:** Confirm now requires the SPM-91/92 safety approval, so the safety-before-Confirmed sequence exists locally.
+Staff preparation sections are editable only in Preparation. Completion requires Preparation and an ended event. Direct cancellation and approved Organiser cancellation requests work before a Preparation event starts, with the existing reservation release. Cancelling an approved venue booking returns Preparation to Planning. Attendees can read eligible Confirmed and Preparation events, but registration itself is still SPM-19 scope. Significant section edits in Preparation return 409 without writing until SPM-87 supplies the required re-review and safety invalidation path. **Update, 29 October 2026:** SPM-87 now returns such an edit to Planning for re-review instead (see above). **Update, 27 October 2026:** Confirm now requires the SPM-91/92 safety approval, so the safety-before-Confirmed sequence exists locally.
 
 SPM-88 is **In Progress / not Done** in the Product Backlog. Local tests cover the implemented parts; no live Firebase verification or human acceptance has been performed. See `docs/testing/spm-88-manual-testing.md`. The earlier dated sections below describe their historical increments and may mention SPM-48's old temporary preparation gate.
 

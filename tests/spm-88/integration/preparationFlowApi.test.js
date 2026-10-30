@@ -7,7 +7,7 @@ import { SEED_ACCOUNTS } from '../../../backend/scripts/seedData.js'
 import { STATUS_CHANGED } from '../../../backend/src/services/statusHistory.js'
 import { PREPARATION_STARTED_NOTICE } from '../../../shared/notifications.js'
 import { RESERVATION_STATUS } from '../../../shared/equipmentReservation.js'
-import { CANCELLED, COMPLETED, CONFIRMED, PREPARATION } from '../../../shared/status.js'
+import { CANCELLED, COMPLETED, CONFIRMED, PLANNING, PREPARATION } from '../../../shared/status.js'
 import { APPROVE_CANCELLATION, CANCEL, COMPLETE, START_PREPARATION } from '../../../shared/statusTransitions.js'
 import { REQUEST_CANCELLATION } from '../../../shared/requestActions.js'
 import { CONFIRMED_ID, createCancellationApi } from '../../shared/helpers/cancellationApi.js'
@@ -77,16 +77,20 @@ describe('SPM-88 — start Preparation', () => {
     }
   })
 
-  it('blocks significant edits in Preparation until SPM-87 can run the review in one transaction', async () => {
+  // SPM-87 supplies the re-review: a significant edit in Preparation now returns the event to Planning, in the
+  // same transaction, with its safety approval withdrawn and its sign-offs marked for the Coordinator.
+  it('a significant edit in Preparation moves the event back to Planning for re-review (SPM-87)', async () => {
     await startPreparation()
     const original = api.stored().core.expectedAttendees
     const response = await api.call('PATCH', `/api/requests/${CONFIRMED_ID}`, coordinator3, {
       core: { expectedAttendees: original + 1 },
     })
-    expect(response).toMatchObject({ status: 409, json: { reason: 'preparation_rereview_unavailable' } })
-    expect(api.stored().status).toBe(PREPARATION)
-    expect(api.stored().core.expectedAttendees).toBe(original)
-    expect(api.activity()).toHaveLength(1)
+    expect(response.status).toBe(200)
+    expect(api.stored()).toMatchObject({ status: PLANNING, core: { expectedAttendees: original + 1 } })
+    expect(api.stored().safetyReview.status).toBe('invalidated')
+    expect(api.stored().signOffReview).toMatchObject({ status: 'pending' })
+    expect(api.activity().filter((entry) => entry.type === STATUS_CHANGED).map(({ fromStatus, toStatus }) => [fromStatus, toStatus]))
+      .toEqual([[CONFIRMED, PREPARATION], [PREPARATION, PLANNING]])
   })
 
   it('requires Preparation and the event end before completion', async () => {
