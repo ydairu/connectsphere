@@ -1019,6 +1019,8 @@ Before implementing affected functionality, resolve and record:
 9. Whether to retain the six-character password minimum as a team security choice. *(open)*
 10. SPM-42 split for five role surfaces in Sprint 1. This is a **historical Sprint 1 scope question**, not a cap on the now-seven total roles (§2.1); it does not limit the two new internal roles' permission surfaces.
 11. **Known gap: how staff are assigned to an event. Pending PO decision.** Nothing in the application sets `assignedStaffUids`; only the seed does. Likely belongs to booking/equipment stories (SPM-14/SPM-17/SPM-56).
+
+    **Later team direction, 29 Oct 2026 — SPM-71:** one Venue Staff member and one Technical Support Staff member become the event's designated assignees on entry to Planning. New booking and equipment requests go to those members; historical request assignees keep their existing decision rights. For existing events, the newest current booking's eligible reviewer is preferred for the venue role, then the newest equipment request's eligible reviewer for the technical role. The team removed SPM-71's no-available-staff acceptance criterion and assumes both roles have eligible accounts. The Product Backlog workbook records the revised criterion; do not treat the older note above as the current implementation state.
 12. **SPM-48, pending PO confirmation (not ratified):** whether staff edit only their preparation/reservation sections, or also the Organiser's requested venue/equipment sections.
 
 ### 8.1 Week 7 / Session 3 open decisions

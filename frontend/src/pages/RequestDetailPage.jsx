@@ -165,6 +165,7 @@ function RequestDetailPage() {
   const [clarificationRequests, setClarificationRequests] = useState(null)
   const [canReassign, setCanReassign] = useState(false)
   const [assignedCoordinator, setAssignedCoordinator] = useState(null)
+  const [assignedEventStaff, setAssignedEventStaff] = useState(null)
   const [cancellation, setCancellation] = useState(null)
   const [rejection, setRejection] = useState(null)
   const [completion, setCompletion] = useState(null)
@@ -198,6 +199,7 @@ function RequestDetailPage() {
     setClarificationRequests(response.clarificationRequests ?? null)
     setCanReassign(response.canReassignCoordinator === true)
     setAssignedCoordinator(response.assignedCoordinator ?? null)
+    setAssignedEventStaff(response.assignedEventStaff ?? null)
     setCancellation(response.cancellation ?? null)
     setRejection(response.rejection ?? null)
     setCompletion(response.completion ?? null)
@@ -485,6 +487,11 @@ function RequestDetailPage() {
             {renderSection('internal')}
             <StatusNotices cancellation={cancellation} rejection={rejection} completion={completion} />
             <AssignedCoordinator coordinator={assignedCoordinator} />
+            {assignedEventStaff && <Card className="request-form-section">
+              <h2>Assigned event staff</h2>
+              <p>Venue Staff: {assignedEventStaff.venue ?? 'Not yet assigned'}</p>
+              <p>Technical Support Staff: {assignedEventStaff.technical ?? 'Not yet assigned'}</p>
+            </Card>}
             {roles?.includes(ORGANISER) && <ArrangementsSummary request={request} arrangements={arrangements} reservedEquipment={reservedEquipment} />}
             <ClarificationRequests status={request.status} entries={clarificationRequests} />
             <EventRegistrations user={user} requestId={id} canView={canViewRegistrations} />

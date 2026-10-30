@@ -51,6 +51,7 @@ export const CANCELLATION_RETURNED_NOTICE = 'cancellation_returned'
 export const CANCELLATION_REFUSED_NOTICE = 'cancellation_refused'
 export const EVENT_CANCELLED_NOTICE = 'event_cancelled'
 export const PREPARATION_STARTED_NOTICE = 'preparation_started'
+export const EVENT_STAFF_ASSIGNED_NOTICE = 'event_staff_assigned'
 // SPM-10: a significant change reset the sign-off (and, from Confirmed, moved the event back to Planning).
 export const SIGNIFICANT_CHANGE_NOTICE = 'significant_change'
 // SPM-56: the assigned Technical Support Staff member approved the event's equipment request (or re-confirmed it).
@@ -192,6 +193,22 @@ export function preparationStartedNotifications(request, actor, { recipientUids 
     message: `Preparation has started for “${title}”. You can update your assigned preparation section.`,
     reason: null,
   })), request, actor, title, at)
+}
+
+/** SPM-71: a saved event-level assignment appears in the selected member's inbox. */
+export function eventStaffAssignedNotifications(request, assignments, at) {
+  const title = titleOf(request)
+  const rolesByUid = new Map()
+  for (const { role, staff } of assignments) {
+    if (!rolesByUid.has(staff.uid)) rolesByUid.set(staff.uid, [])
+    rolesByUid.get(staff.uid).push(role === 'venue_staff' ? 'Venue Staff' : 'Technical Support Staff')
+  }
+  return addressed([...rolesByUid].map(([recipientUid, labels]) => ({
+    recipientUid,
+    type: EVENT_STAFF_ASSIGNED_NOTICE,
+    message: `You have been assigned to “${title}” as ${labels.join(' and ')}.`,
+    reason: null,
+  })), request, { uid: null }, title, at)
 }
 
 // The stage a request was rejected at, as SPM-45 shows it on the event page.

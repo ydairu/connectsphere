@@ -72,7 +72,7 @@ A story is Done only when its acceptance criteria and the team's Definition of D
 
 ## 6. Authentication and Authorisation Guardrails
 
-**Implementation boundary (29 October 2026):** The role constants and routes below implement the original five roles plus the two Week 7 internal roles: Safety Officer (SPM-66) and Event Coordinator Lead (SPM-68 the unassigned queue and first assignment; SPM-69 Lead-only reassignment of the active events the Lead supervises). The Lead is notified of each new request that enters the queue (SPM-85). The Lead's overview with filters (SPM-70), the Coordinator's transfer request (SPM-86) and assignment notifications are not implemented; do not infer them from this guidance. The SPM-88 local Preparation status and edit condition exist; the production safety verifier fails closed pending SPM-91/92. See `project_context.md` and `docs/requirements/effective-requirements.md` before extending these workflows.
+**Implementation boundary (30 October 2026):** The role constants and routes implement the original five roles plus Safety Officer (SPM-66) and Event Coordinator Lead (SPM-68/69). A first submission enters the Lead's unassigned queue and notifies Leads (SPM-85); the Lead assigns a Coordinator. When that Coordinator moves the event from Under Review to Planning, SPM-71 assigns its Venue and Technical Support Staff. The Lead's overview with filters (SPM-70), the Coordinator's transfer request (SPM-86) and Coordinator assignment notifications are not implemented. See `project_context.md` and `docs/requirements/effective-requirements.md` before extending these workflows.
 
 The seven roles currently implemented in the repository are:
 

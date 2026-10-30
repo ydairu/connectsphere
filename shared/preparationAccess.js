@@ -6,11 +6,13 @@
 import { canEdit, editableSections, inScopeAs, rolesOf } from './permissions.js'
 import { PREPARATION_SECTIONS, preparationReadOnlyReason, preparationShown } from './preparation.js'
 
+export const PREPARATION_NOT_EVENT_ASSIGNEE = 'not_event_assignee'
+
 /**
  * For each preparation section shown to this user through a staff role that edits it:
- * { editable, readOnlyReason }, where readOnlyReason comes from preparationReadOnlyReason() — the same
- * condition the server enforces. Null when there is none, e.g. for a Coordinator, who views preparation
- * read-only as part of the event, or an Organiser, who never receives it.
+ * { editable, readOnlyReason }. The reason is the shared status condition or the SPM-71
+ * event-assignee restriction. Null when there is none, e.g. for a Coordinator, who views
+ * preparation read-only as part of the event, or an Organiser, who never receives it.
  */
 export function preparationEditing(user, request) {
   if (!preparationShown(request)) return null
@@ -19,7 +21,9 @@ export function preparationEditing(user, request) {
     const editsAs = rolesOf(user).some((role) => editableSections([role]).includes(section) && inScopeAs(role, user, request))
     if (!editsAs) continue
     const editable = canEdit(user, request, section)
-    result[section] = { editable, readOnlyReason: editable ? null : preparationReadOnlyReason(section, request) }
+    const canonicalUid = section === 'venuePreparation' ? request.assignedVenueStaffUid : request.assignedTechnicalStaffUid
+    result[section] = { editable, readOnlyReason: editable ? null :
+      canonicalUid && canonicalUid !== user.uid ? PREPARATION_NOT_EVENT_ASSIGNEE : preparationReadOnlyReason(section, request) }
   }
   return Object.keys(result).length > 0 ? result : null
 }

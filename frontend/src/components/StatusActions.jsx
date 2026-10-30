@@ -245,7 +245,7 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, pri
           {confirmBlocked && !signOffReviewPending && !primaryVenueRequired && !awaitingSafety && (
             <p className="form-note">The event can be confirmed once all mandatory venue and technical arrangements are approved.</p>
           )}
-          {confirmBlocked && !primaryVenueRequired && awaitingSafety && (
+          {confirmBlocked && !signOffReviewPending && !primaryVenueRequired && awaitingSafety && (
             <p className="form-note">The arrangements are approved. The event can be confirmed once it passes its safety check.</p>
           )}
           {approveCancellationBlocked && (
