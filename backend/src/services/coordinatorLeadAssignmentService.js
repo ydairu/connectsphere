@@ -22,9 +22,11 @@ import {
   mayAssignFromQueue,
   unassignedQueue,
 } from '../../../shared/coordinatorLeadAssignment.js'
+import { coordinatorAssignmentNotifications } from '../../../shared/notifications.js'
 import { SUBMITTED } from '../../../shared/status.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { ACTIVITY_SUBCOLLECTION, ASSIGNMENT_LOCK_PATH, COORDINATOR_ASSIGNED, loadActiveCounts, loadCoordinators } from './coordinatorAssignmentService.js'
+import { addNotifications } from './notificationService.js'
 import { userActor } from './statusHistory.js'
 
 const REFUSALS = Object.freeze({
@@ -80,7 +82,8 @@ export async function listAssignmentCandidates(id, user, db = getAdminDb()) {
 /**
  * SPM-68 AC4: the Lead assigns request `id` to `input.coordinatorUid`. One transaction reads the request,
  * Coordinator list and lock, then writes assignedCoordinatorUid, assignedByUid, assignedAt and a
- * coordinator_assigned activity entry naming the Lead. Returns { id, assigned: true, coordinator: { name } } —
+ * coordinator_assigned activity entry naming the Lead, and (SPM-84) the notices for the Coordinator and the owning
+ * Organiser, which therefore exist only if the assignment is saved. Returns { id, assigned: true, coordinator: { name } } —
  * not the request, which has now left the Lead's scope. Nothing is written when it throws.
  */
 export async function assignCoordinator(id, user, input, db = getAdminDb(), now = new Date()) {
@@ -115,6 +118,7 @@ export async function assignCoordinator(id, user, input, db = getAdminDb(), now 
       at,
     })
     tx.set(lockRef, { lastAssignedRequestId: id, lastAssignedAt: at })
+    addNotifications(tx, db, coordinatorAssignmentNotifications(request, user, { change: 'assigned', coordinator: target, at }))
     return { id, assigned: true, coordinator: { name: target.name ?? null } }
   })
 }

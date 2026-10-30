@@ -68,7 +68,9 @@ describe('SPM-69 AC1 — the Lead reassigns an active event and the history reco
     expect(writes).toHaveLength(1)
     const lock = ASSIGNMENT_LOCK_PATH.join('/')
     expect(writes[0].reads).toEqual([`eventRequests/${PLANNING_ID}`, 'users', 'users', lock])
-    expect(writes[0].writes).toHaveLength(3)
+    // The request, the activity entry, the lock and (SPM-84) three notices: new and previous Coordinator, Organiser.
+    expect(writes[0].writes).toHaveLength(6)
+    expect(writes[0].writes.filter((path) => path.startsWith('notifications/'))).toHaveLength(3)
     expect(writes[0].writes).toContain(lock)
     expect(writes[0].writes.some((path) => path.startsWith(`eventRequests/${PLANNING_ID}/activity/`))).toBe(true)
   })

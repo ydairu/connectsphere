@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 29 October 2026 (SPM-68 Lead assignment, SPM-85 Lead new-request notice, SPM-69 Lead reassignment, SPM-90 and SPM-19 integration; older implementation sections retain their historical dates)
+Last reviewed: 29 October 2026 (SPM-68 Lead assignment, SPM-85 Lead new-request notice, SPM-69 Lead reassignment, SPM-84 assignment notices, SPM-90 and SPM-19 integration; older implementation sections retain their historical dates)
 
 ## Current implementation map (27 October 2026)
 
@@ -18,7 +18,7 @@ SPM-68 is **implemented locally and not Done**: automated checks pass, but no ma
 - **Display:** the Organiser's Event Coordinator row reads "Unassigned" (was "Not yet assigned"). It is the only place an Organiser sees the Coordinator.
 - **Seed:** `coordinator-lead@seed.connectsphere.test` and `seed-req-a2-unassigned`. Existing seeded assignments are kept. Only a dry run was performed.
 - **Team decisions pending PO:** effective-requirements.md §4.5, SPM-68.
-- **Known gaps:** no assignment or reassignment notifications (G8!C43; the Lead's new-request notice is SPM-85, below); reassignment became Lead-only and the Lead now keeps the events they assigned in view (SPM-69, below); assignment entries are recorded but not shown in any page; concurrent assignment by two Leads is covered only by the in-transaction re-check and an in-memory test, not an emulator test.
+- **Known gaps:** assignment and reassignment notifications are SPM-84 (below), and the Lead's new-request notice SPM-85; reassignment became Lead-only and the Lead now keeps the events they assigned in view (SPM-69, below); assignment entries are recorded but not shown in any page; concurrent assignment by two Leads is covered only by the in-transaction re-check and an in-memory test, not an emulator test.
 - **Evidence:** `tests/spm-68/` (unit, API integration, page, navigation, Playwright `tests/spm-68/e2e/spm68.assignFromQueue.spec.js`).
 
 ## Current SPM-90 state (29 October 2026)
@@ -885,7 +885,7 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Built:** a first submission that enters the unassigned queue notifies every Event Coordinator Lead in-app: "New request “{title}” from {organisation} is waiting for assignment.", with the event's start, linking to `/requests/unassigned`. A resubmitted Returned request, a failed submission and a submitter who is also a Lead get no notice. With no Lead accounts the submission still succeeds.
 - **Code:** `newUnassignedRequestNotifications` (`shared/notifications.js`); `submitDraftEventRequest` (`backend/src/services/eventRequestService.js`) reads the Leads with `loadUsersWithRole` (`backend/src/services/coordinatorAssignmentService.js`, which `loadCoordinators` now wraps) before any write and adds the notices in the same transaction; the `linkFor` branch in `frontend/src/pages/NotificationsPage.jsx`. Summarised in AGENTS.md §6.
 - **Team decisions (29 Oct 2026, pending PO confirmation):** effective-requirements.md §4.5, SPM-85, with the evidence note that no distilled customer statement asks for this notice.
-- **Gaps:** a notice still says the request is waiting after it has been assigned. Assignment and reassignment notifications (G8!C43) are not built.
+- **Gaps:** a notice still says the request is waiting after it has been assigned. (Assignment and reassignment notifications were added later by SPM-84.)
 - **Status:** implemented locally, not Done. Human acceptance and peer review are pending; the backlog workbook was not updated.
 - **Local verification (29 Oct 2026, macOS):** see `docs/evidence/spm-85-traceability.md`.
 - **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No emulator or live-project check; Firestore rules were neither edited nor deployed.
@@ -895,7 +895,17 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Built:** only an Event Coordinator Lead reassigns an active event (Submitted with a Coordinator, Under Review, Returned, Planning, Confirmed, Preparation) through SPM-26's routes. The assigned Coordinator is refused and not offered Reassign. Finished events are refused (409), and so is a reassignment whose Coordinator changed since the page loaded (409, `expectedCoordinatorUid`). The Lead's scope is now the unassigned queue plus the active events they assigned, plus those assigned before SPM-68; the Lead finds them in their Requests list ("Requests you oversee") and sees the event's basic information and Coordinator, with no edits or status actions. Reassigning writes the new Coordinator, the Lead as `assignedByUid`/`assignedAt` and a `coordinator_reassigned` entry in one transaction. SPM-26's handover-agreement checkbox is removed.
 - **Code:** `attributedToLead`/`supervisedByLead` (`shared/coordinatorAssignment.js`), the Lead case of `roleInScope` (`shared/permissions.js`), `mayReassignCoordinator` (`shared/coordinatorReassignment.js`), the Lead in `mayViewAssignedCoordinator` (`shared/assignedCoordinator.js`), `backend/src/services/coordinatorReassignmentService.js`, `frontend/src/components/CoordinatorReassignment.jsx`, `RequestDetailPage.jsx` and the Lead's list wording. Summarised in AGENTS.md §6.
 - **Team decisions (29 Oct 2026, pending PO confirmation):** effective-requirements.md §4.5, SPM-69 (events assigned before SPM-68 are any Lead's; reassigning moves supervision; no agreement confirmation).
-- **Gaps:** no reassignment notifications (G8!C43, C14); no transfer request (SPM-86); no overview with filters or per-Coordinator counts (SPM-70). Two truly simultaneous reassignments are covered only by the shared lock and Firestore's transaction retry; no emulator test.
+- **Gaps:** reassignment notifications were added later by SPM-84; no transfer request (SPM-86); no overview with filters or per-Coordinator counts (SPM-70). Two truly simultaneous reassignments are covered only by the shared lock and Firestore's transaction retry; no emulator test.
 - **Status:** implemented locally, not Done. Human acceptance and peer review are pending; the backlog workbook was not updated.
 - **Local verification (29 Oct 2026, macOS):** see `docs/evidence/spm-69-traceability.md`.
+- **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No emulator or live-project check; Firestore rules were neither edited nor deployed.
+
+## SPM-84 notify on assignment and reassignment — 30 October 2026
+
+- **Built:** when the Event Coordinator Lead assigns a Coordinator (SPM-68), the Coordinator and the owning Organiser are notified in-app; the Organiser's notice names the Coordinator. When the Lead reassigns (SPM-69), the new Coordinator, the previous Coordinator and the owning Organiser are notified. The new Coordinator's and Organiser's notices open the event and show its start; the previous Coordinator's has no link. The acting Lead and other Leads are not notified, and a refused assignment or reassignment sends nothing.
+- **Code:** `coordinatorAssignmentNotifications` and three notice types (`shared/notifications.js`), added in `assignCoordinator` (`backend/src/services/coordinatorLeadAssignmentService.js`) and `reassignEventRequest` (`backend/src/services/coordinatorReassignmentService.js`) in their transactions, after every read and with no extra reads; `linkFor` in `frontend/src/pages/NotificationsPage.jsx` returns no link for the previous Coordinator's notice. Summarised in AGENTS.md §6.
+- **Team decisions (30 Oct 2026, pending PO confirmation):** effective-requirements.md §4.5, SPM-84 (owning Organiser only; wording for a Coordinator without a name; three types).
+- **Gaps:** a Coordinator's transfer request (SPM-86) and the Lead's overview (SPM-70) do not exist yet.
+- **Status:** implemented locally, not Done. Human acceptance and peer review are pending; the backlog workbook was not updated.
+- **Local verification (30 Oct 2026, macOS):** see `docs/evidence/spm-84-traceability.md`.
 - **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No emulator or live-project check; Firestore rules were neither edited nor deployed.

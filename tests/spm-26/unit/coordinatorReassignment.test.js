@@ -171,7 +171,9 @@ describe('SPM-26 — reassignEventRequest', () => {
     expect(tx.committed).toBe(true)
     const lockPath = ASSIGNMENT_LOCK_PATH.join('/')
     expect(tx.reads).toEqual(['eventRequests/req-1', 'users', 'users', lockPath])
-    expect(tx.writes).toHaveLength(3)
+    // The request, the activity entry, the lock and (SPM-84) three notices: new and previous Coordinator, Organiser.
+    expect(tx.writes).toHaveLength(6)
+    expect(tx.writes.filter((path) => path.startsWith('notifications/'))).toHaveLength(3)
     expect(tx.writes).toContain('eventRequests/req-1')
     expect(tx.writes).toContain(lockPath)
     expect(tx.writes.some((path) => path.startsWith(`eventRequests/req-1/${ACTIVITY_SUBCOLLECTION}/`))).toBe(true)

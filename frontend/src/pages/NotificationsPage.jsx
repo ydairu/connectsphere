@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth.js'
 import { listNotifications, markNotificationRead } from '../services/api.js'
 import {
   ATTENDEE_EVENT_CANCELLED_NOTICE,
+  EVENT_REASSIGNED_AWAY_NOTICE,
   EVENT_RESCHEDULED_NOTICE,
   NEW_UNASSIGNED_REQUEST_NOTICE,
   REQUEST_CONFIRMED_NOTICE,
@@ -15,7 +16,8 @@ import {
 } from '../../../shared/notifications.js'
 
 // The signed-in user's in-app notifications. Venue booking rejections link to the booking; other notices
-// link to the event. The API returns only the user's own.
+// link to the event, except where linkFor() says otherwise, and a notice with no link shows none (SPM-84). The API
+// returns only the user's own.
 
 function formatDateTime(value) {
   const date = new Date(value ?? '')
@@ -30,6 +32,8 @@ function periodText(start, end) {
 // SPM-61: a returned request is edited on its event page, and a confirmed event's arrangements are shown
 // there, so both link to it under a label that says what the Organiser will find.
 function linkFor(notification) {
+  // SPM-84: the previous Coordinator no longer has the event, so their reassignment notice has no link.
+  if (notification.type === EVENT_REASSIGNED_AWAY_NOTICE) return null
   if (notification.bookingRequestId) {
     return {
       to: `/requests/${notification.eventRequestId}/venue-bookings?bookingId=${encodeURIComponent(notification.bookingRequestId)}`,
@@ -135,7 +139,7 @@ function NotificationsPage() {
                           Mark as read
                         </Button>
                       )}
-                      <Link className="button button-secondary button-small" to={link.to}>{link.label}</Link>
+                      {link && <Link className="button button-secondary button-small" to={link.to}>{link.label}</Link>}
                     </div>
                   </Card>
                 </li>

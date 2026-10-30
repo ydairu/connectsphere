@@ -348,6 +348,22 @@ See §10, Superseded Legacy Register.
 
 **[Not in SPM-69]** reassignment notifications (G8!C43, C14), the Lead's overview with filters and per-Coordinator counts (SPM-70), the Coordinator's transfer request (SPM-86), and per-Lead supervisory scope beyond `assignedByUid` (G8!C33).
 
+#### SPM-84 — Notify when the Lead assigns or reassigns a Coordinator
+
+**[Customer-confirmed — CL3]** New assignment → notify the newly assigned Coordinator and the Organiser; reassignment → notify the new Coordinator, the previous Coordinator and the Organiser; notifying other Leads is optional (G8!C43, C14).
+
+**[Implemented locally — SPM-84, 30 Oct 2026; not Done]**
+
+- **Triggers:** the Lead's assignment from the queue (SPM-68) and reassignment (SPM-69). The notices are written in the same transaction as the change, after every read, so they exist only for a saved change; a refused one (400, 403, 409) writes none.
+- **Recipients and messages:** the new Coordinator — "“{title}” has been assigned to you." (or "reassigned to you."); the previous Coordinator, on a reassignment — "“{title}” has been reassigned to {new Coordinator}. You no longer manage it."; the owning Organiser — "{Coordinator} is now the Event Coordinator for “{title}”." The acting Lead and other Leads are not notified.
+- **Links:** the new Coordinator's and the Organiser's notices open the event and show its start; the previous Coordinator's has no link, as they no longer have access to the event, and can still be marked as read.
+
+**[Team decisions, 30 Oct 2026 — pending PO confirmation]**
+
+- **Owning Organiser only:** "the Organiser" is the request's owner. Same-organisation colleagues, who can see the Coordinator's name on the event (SPM-46), are not notified, as for SPM-61's status notices.
+- **A Coordinator without a name:** the Organiser is told "An Event Coordinator has been assigned to “{title}”.", and a previous Coordinator that it was reassigned "to another Event Coordinator", rather than an empty name (as SPM-46 shows "Assigned (name unavailable)").
+- **Three notice types, one per recipient** (`event_assigned_to_you`, `event_reassigned_away`, `event_coordinator_assigned`, each with `change` 'assigned' or 'reassigned'), following SPM-41's one type per Attendee change; the type decides the link.
+
 #### SPM-26 — Reassign an Event to a Different Event Coordinator
 
 **[Customer-confirmed — live]** Exactly one Coordinator is assigned to an event — except the new Week 7 state in which a newly submitted request sits in the **Unassigned queue** before the Lead assigns a Coordinator (G8!C2, C12).
@@ -885,6 +901,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 **[Team decision pending]** Select channels, delivery preferences, acknowledgement, and optional mentions. Offline communication may be manually recorded as event comments.
 
 **[Implemented, pending ratification — SPM-63/SPM-47, 3 Oct 2026 — historical record]** A minimal in-app channel for cancellation only: each notification is a document in the top-level `notifications` collection, one per recipient, written in the same transaction; each user reads their own via `GET /api/notifications` and marks read with `POST /api/notifications/:id/read`. No email, SMS, delivery preference or unread badge.
+
+**[Implemented — SPM-84, 30 Oct 2026]** Assignment and reassignment notices to the Coordinators and the owning Organiser: see §4.5, SPM-84.
 
 **[Implemented — SPM-41, 29 Oct 2026]** Registered Attendees (active registrations only) are notified in-app when their event is cancelled — by the Coordinator or by approving the Organiser's request, from Confirmed or Preparation — and when it is rescheduled through the Coordinator's edit (SPM-10). A cancellation notice names the event and says it was cancelled, without the reason. A reschedule notice names the event and gives the new and previous start and end. An event with no registrations sends no Attendee notices; Organiser and staff notices are unchanged. Cancellation notices are written in the status-change transaction; reschedule notices in the section edit's transaction, through `store.update(..., { consequences })`. Date changes at Preparation are still refused (SPM-87), so a reschedule comes from Planning or Confirmed.
 
