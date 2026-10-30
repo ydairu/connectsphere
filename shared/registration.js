@@ -20,8 +20,11 @@ import { registrationEligibleStatus } from './status.js'
 
 export const REGISTRATIONS_COLLECTION = 'eventRegistrations'
 
-// SPM-39 and SPM-59 add waitlisted, invited and withdrawn.
+// SPM-59 adds invited and withdrawn.
 export const REGISTERED = 'registered'
+// SPM-39 (W1, team decision of 29 Oct 2026): a waiting-list entry is the Attendee's registration record for the
+// event with this status. It holds no place, so it is not active.
+export const WAITLISTED = 'waitlisted'
 export const ACTIVE_REGISTRATION_STATUSES = Object.freeze([REGISTERED])
 
 // Why registration is unavailable, in the order they are checked.
@@ -33,6 +36,9 @@ export const NOT_OPEN_YET = 'not_open_yet'
 export const CLOSED = 'closed'
 export const ALREADY_REGISTERED = 'already_registered'
 export const FULL = 'full'
+// SPM-39: why an Attendee cannot join the waiting list, beyond the reasons registration is unavailable.
+export const NOT_FULL = 'not_full'
+export const ALREADY_WAITLISTED = 'already_waitlisted'
 
 export const UNAVAILABLE_MESSAGES = Object.freeze({
   [NOT_ATTENDEE]: 'Only Attendees can register for events.',
@@ -43,6 +49,8 @@ export const UNAVAILABLE_MESSAGES = Object.freeze({
   [CLOSED]: 'Registration has closed.',
   [ALREADY_REGISTERED]: 'You are already registered for this event.',
   [FULL]: 'This event is full.',
+  [NOT_FULL]: 'Places are still available. Register instead.',
+  [ALREADY_WAITLISTED]: 'You are already on the waiting list for this event.',
 })
 
 /** The document id of `uid`'s registration for event `eventId`: one per Attendee per event. */
@@ -136,6 +144,43 @@ export function canRegister(user, event, { existing = null, ...options } = {}) {
   return { ...availability, allowed: true, reason: null }
 }
 
+// --- Waiting list (SPM-39) -------------------------------------------------------------------------
+
+/**
+ * May `user` join the waiting list for `event` now? { allowed, reason } plus the availability fields. Only when the
+ * event is full and registration is otherwise open (AC1); not when registration is closed, not yet open, disabled,
+ * unset or the event is not Confirmed/Preparation (AC2); not while a place is free (W4: register instead); once per
+ * Attendee, and not while registered.
+ */
+export function canJoinWaitingList(user, event, { existing = null, ...options } = {}) {
+  const availability = registrationAvailability(event, options)
+  const refuse = (reason) => ({ ...availability, allowed: false, reason })
+  if (!rolesOf(user).includes(ATTENDEE)) return refuse(NOT_ATTENDEE)
+  if (isActiveRegistration(existing)) return refuse(ALREADY_REGISTERED)
+  if (existing?.status === WAITLISTED) return refuse(ALREADY_WAITLISTED)
+  if (availability.open) return refuse(NOT_FULL)
+  if (availability.reason !== FULL) return refuse(availability.reason)
+  return { ...availability, allowed: true, reason: null }
+}
+
+/**
+ * AC3, first come, first served: `uid`'s place in the event's waiting list (1 is next), or null when they are not
+ * on it. `entries` are the event's registration records. Order is `waitlistSequence`, the counter taken under the
+ * registration lock when they joined (W3), never the Attendee id or a clock.
+ */
+export function waitingListPosition(entries, uid) {
+  const queue = entries
+    .filter((entry) => entry.status === WAITLISTED)
+    .sort((a, b) => (a.waitlistSequence ?? 0) - (b.waitlistSequence ?? 0))
+  const index = queue.findIndex((entry) => entry.attendeeUid === uid)
+  return index === -1 ? null : index + 1
+}
+
+/** How many Attendees are on the event's waiting list. */
+export function waitingListCount(entries) {
+  return entries.filter((entry) => entry.status === WAITLISTED).length
+}
+
 // --- Who sees what --------------------------------------------------------------------------------
 
 /** D3: the owning Organiser and the assigned Coordinator may see an event's registrations. */
@@ -149,17 +194,21 @@ export function canViewRegistrations(user, event) {
  * What the event page tells an Attendee about registering (`attendeeRegistration` in the response), or null for
  * a user without the Attendee role in scope. Never the `registration` section itself: its notes are the Organiser's.
  */
-export function attendeeRegistrationSummary(user, event, { existing = null, venueNames = [], ...options } = {}) {
+export function attendeeRegistrationSummary(user, event, { existing = null, venueNames = [], waitingListPosition: position = null, ...options } = {}) {
   if (!inScopeAs(ATTENDEE, user, event)) return null
   const decision = canRegister(user, event, { existing, ...options })
+  const own = isActiveRegistration(existing) || existing?.status === WAITLISTED
   return {
     canRegister: decision.allowed,
     reason: decision.reason,
+    // SPM-39: offered instead of Register when the event is full and registration is open.
+    canJoinWaitingList: canJoinWaitingList(user, event, { existing, ...options }).allowed,
+    waitingListPosition: existing?.status === WAITLISTED ? position : null,
     opensAt: event.registration?.opensAt ?? null,
     closesAt: event.registration?.closesAt ?? null,
     placesLeft: decision.placesLeft,
     venueNames,
-    myRegistration: isActiveRegistration(existing) ? presentOwnRegistration(existing) : null,
+    myRegistration: own ? presentOwnRegistration(existing, null, { waitingListPosition: position }) : null,
   }
 }
 
@@ -191,14 +240,45 @@ export function buildRegistration(event, user, { venueNames = [], at }) {
   }
 }
 
-/** One of the Attendee's own registrations, as "My registrations" and the event page show it. */
-export function presentOwnRegistration(record) {
+/**
+ * SPM-39 — the waiting-list entry for `user` on `event`: the same record as a registration (W1), holding no place.
+ * `waitlistSequence` is its place in the queue, taken from the registration lock in the joining transaction.
+ */
+export function buildWaitlistEntry(event, user, { venueNames = [], waitlistSequence, at }) {
+  return {
+    eventRequestId: event.id,
+    attendeeUid: user.uid,
+    attendeeName: user.name ?? null,
+    attendeeEmail: user.email ?? null,
+    status: WAITLISTED,
+    waitlistSequence,
+    waitlistedAt: at,
+    registeredAt: null,
+    eventTitle: event.core?.title ?? null,
+    eventStartsAt: event.core?.preferredDateTime ?? null,
+    eventDurationHours: event.core?.durationHours ?? null,
+    venueNames,
+    updatedAt: at,
+  }
+}
+
+/**
+ * One of the Attendee's own registrations, as "My registrations" and the event page show it. SPM-41 (E3, team
+ * decision of 29 Oct 2026): when the event is given, its current title, start, duration and status are shown, so a
+ * rescheduled or cancelled event never reads as it was at registration. The copy kept on the registration is the
+ * fallback for an event that no longer exists. The venue stays as registered: SPM-90 keeps registration venue
+ * snapshots, and a venue change is SPM-74's to announce. Only these fields of the event are sent.
+ */
+export function presentOwnRegistration(record, event = null, { waitingListPosition: position = null } = {}) {
   return {
     eventRequestId: record.eventRequestId,
     status: record.status,
-    eventTitle: record.eventTitle,
-    eventStartsAt: record.eventStartsAt,
-    eventDurationHours: record.eventDurationHours,
+    // SPM-39: the Attendee's place in the queue while waitlisted (1 is next), otherwise null.
+    waitingListPosition: record.status === WAITLISTED ? position : null,
+    eventStatus: event?.status ?? null,
+    eventTitle: event?.core?.title ?? record.eventTitle,
+    eventStartsAt: event?.core?.preferredDateTime ?? record.eventStartsAt,
+    eventDurationHours: event?.core?.durationHours ?? record.eventDurationHours,
     venueNames: record.venueNames ?? [],
     registeredAt: record.registeredAt,
   }
@@ -207,4 +287,23 @@ export function presentOwnRegistration(record) {
 /** One row of the registered list for the owning Organiser or assigned Coordinator (D3). No uid is sent. */
 export function presentRegistrant(record) {
   return { name: record.attendeeName, email: record.attendeeEmail, status: record.status, registeredAt: record.registeredAt }
+}
+
+// --- Changes to the event (SPM-41) ------------------------------------------------------------------
+
+/** When the event ends: its start plus its duration, as an ISO string; null when either is unknown. */
+export function eventEndsAt(core = {}) {
+  const start = time(core.preferredDateTime)
+  const hours = Number(core.durationHours)
+  return start !== null && Number.isFinite(hours) && hours > 0 ? new Date(start + hours * 60 * 60 * 1000).toISOString() : null
+}
+
+/**
+ * SPM-41: has the event been rescheduled between `before` and `after`? A new start date/time, or (E1, team
+ * decision of 29 Oct 2026) a new duration, because the end time moves. The same instant written differently is
+ * not a change.
+ */
+export function eventRescheduled(before, after) {
+  return time(before?.core?.preferredDateTime) !== time(after?.core?.preferredDateTime) ||
+    Number(before?.core?.durationHours) !== Number(after?.core?.durationHours)
 }

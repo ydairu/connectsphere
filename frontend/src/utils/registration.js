@@ -1,4 +1,5 @@
-import { CLOSED, NOT_OPEN_YET, REGISTERED, UNAVAILABLE_MESSAGES } from '../../../shared/registration.js'
+import { CLOSED, NOT_OPEN_YET, REGISTERED, UNAVAILABLE_MESSAGES, WAITLISTED } from '../../../shared/registration.js'
+import { CANCELLED, COMPLETED, PLANNING, REJECTED } from '../../../shared/status.js'
 
 // SPM-19 — how registration times, reasons and statuses read on the pages. The rules are in
 // shared/registration.js; the API sends the reason, this file only words it.
@@ -15,13 +16,27 @@ export function unavailableText(summary) {
   return UNAVAILABLE_MESSAGES[summary?.reason] ?? 'Registration is not available.'
 }
 
-const STATUS_LABELS = Object.freeze({ [REGISTERED]: 'Registered' })
+const STATUS_LABELS = Object.freeze({ [REGISTERED]: 'Registered', [WAITLISTED]: 'Waitlisted' })
 
-export function registrationStatusLabel(status) {
-  return STATUS_LABELS[status] ?? status
+/** "Registered", or (SPM-39) "Waitlisted, position N" when the position is known. */
+export function registrationStatusLabel(status, waitingListPosition = null) {
+  const label = STATUS_LABELS[status] ?? status
+  return status === WAITLISTED && waitingListPosition ? `${label}, position ${waitingListPosition}` : label
 }
 
 /** "Venue A, Venue B", or null when no venue is known yet. */
 export function venueText(venueNames) {
   return Array.isArray(venueNames) && venueNames.length > 0 ? venueNames.join(', ') : null
+}
+
+// SPM-41: what "My registrations" says about an event that is no longer simply going ahead.
+const EVENT_STATUS_NOTES = Object.freeze({
+  [CANCELLED]: 'Event cancelled',
+  [REJECTED]: 'Event cancelled',
+  [PLANNING]: 'Event being rearranged',
+  [COMPLETED]: 'Event held',
+})
+
+export function eventStatusNote(status) {
+  return EVENT_STATUS_NOTES[status] ?? null
 }

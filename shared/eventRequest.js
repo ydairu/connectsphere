@@ -130,7 +130,7 @@ export function buildDraftEventRequest(input, organiser, now = new Date()) {
       organisationId: organiser?.organisationId ?? null,
       organisationName: organiser?.organisationName ?? null,
       assignedStaffUids: [],
-      // SPM-8: a coordinator is assigned on submission, never while the request is a draft.
+      // SPM-68: the Event Coordinator Lead assigns a coordinator after submission, never while it is a draft.
       assignedCoordinatorUid: null,
       ...eventRequest,
       internal: { planningNotes: '' },

@@ -1,3 +1,6 @@
+import { awaitingCoordinatorAssignment } from '../../../shared/coordinatorAssignment.js'
+import { newUnassignedRequestNotifications } from '../../../shared/notifications.js'
+import { COORDINATOR_LEAD } from '../../../shared/permissions.js'
 import { DRAFT, RETURNED, SUBMITTED } from '../../../shared/status.js'
 import { RESUBMIT, SUBMIT, canTransition } from '../../../shared/statusTransitions.js'
 import {
@@ -7,7 +10,8 @@ import {
   validateEventRequestSubmission,
 } from '../../../shared/eventRequest.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
-import { assignCoordinatorInTransaction } from './coordinatorAssignmentService.js'
+import { loadUsersWithRole } from './coordinatorAssignmentService.js'
+import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
 
 export class EventRequestValidationError extends Error {
@@ -70,11 +74,15 @@ export async function updateDraftEventRequest(id, input, organiser, db = getAdmi
   return { id, ...existing, ...update }
 }
 
-// SPM-3 submit and SPM-8 coordinator assignment commit together or not at all: a request is never left
-// Submitted without its coordinator, and a failed assignment leaves the draft unchanged.
-// SPM-9: a Returned request is resubmitted the same way (Returned → Submitted), keeping its coordinator,
-// and either change is recorded in the activity history in the same transaction.
-export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), now = new Date(), { random } = {}) {
+// SPM-3 submit. SPM-68 (W7-CUST Change #5) replaces SPM-8's automatic assignment: a first submission is left
+// with no Coordinator and enters the Event Coordinator Lead's unassigned queue. `submittedAt` records when it
+// entered the queue, and is not changed by a resubmission.
+// SPM-9: a Returned request is resubmitted the same way (Returned → Submitted). It keeps its Coordinator, since
+// nothing here writes assignedCoordinatorUid, so it never re-enters the queue (CL3 G8!C15). Either change is
+// recorded in the activity history in the same transaction.
+// SPM-85: a first submission that enters the queue notifies every Event Coordinator Lead in the same
+// transaction, so a notice exists only for a saved submission. The Leads are read before any write.
+export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), now = new Date()) {
   return db.runTransaction(async (tx) => {
     const docRef = db.collection('eventRequests').doc(id)
     const snapshot = await tx.get(docRef)
@@ -91,18 +99,15 @@ export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), 
     const { errors } = validateEventRequestSubmission(existing)
     if (hasValidationErrors(errors)) throw new EventRequestValidationError(errors)
 
-    const assignedCoordinatorUid = await assignCoordinatorInTransaction(tx, db, {
-      requestRef: docRef,
-      request: existing,
-      now,
-      random,
-    })
-
     const update = {
       status: SUBMITTED,
-      assignedCoordinatorUid,
+      ...(action === SUBMIT ? { submittedAt: now.toISOString() } : {}),
       updatedAt: now.toISOString(),
     }
+    const submitted = { id, ...existing, ...update }
+    const leads = action === SUBMIT && awaitingCoordinatorAssignment(submitted)
+      ? await loadUsersWithRole(db, COORDINATOR_LEAD, (query) => tx.get(query))
+      : []
 
     tx.update(docRef, update)
     recordStatusChange(tx, docRef, {
@@ -112,6 +117,10 @@ export async function submitDraftEventRequest(id, organiser, db = getAdminDb(), 
       actor: userActor(organiser),
       at: now.toISOString(),
     })
-    return { id, ...existing, ...update }
+    addNotifications(tx, db, newUnassignedRequestNotifications(submitted, organiser, {
+      recipientUids: leads.map((lead) => lead.uid),
+      at: now.toISOString(),
+    }))
+    return submitted
   })
 }

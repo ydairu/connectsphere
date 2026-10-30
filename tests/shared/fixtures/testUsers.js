@@ -26,14 +26,16 @@ export const EXTRA_USERS = Object.freeze({
   // SPM-24's empty-state criterion: an Organiser who owns nothing.
   organiserWithoutRequests: SEED_ACCOUNTS.organiserA3,
   // SPM-26: a second Coordinator to hand an event to. Its seeded events (A1 cancelled, A2 submitted, B1
-  // planning) belong to it already, so SPM-65's coordinator views are unchanged. No E2E spec submits through
-  // the UI, so SPM-8's selection in the double is not exercised by its presence.
+  // planning) belong to it already, so SPM-65's coordinator views are unchanged. Since SPM-68 a submission is
+  // not assigned automatically, so its presence changes no submission.
   secondCoordinator: SEED_ACCOUNTS.coordinator2,
   // SPM-19: more Attendees, to fill the seeded two-place event and be turned away from it.
   secondAttendee: SEED_ACCOUNTS.attendee2,
   thirdAttendee: SEED_ACCOUNTS.attendee3,
   // SPM-66: the Safety Officer. No seeded event is in the safety-review queue, so its list starts empty.
   safetyOfficer: SEED_ACCOUNTS.safetyOfficer,
+  // SPM-68: the Event Coordinator Lead. Its queue holds the seeded A2 unassigned request.
+  coordinatorLead: SEED_ACCOUNTS.coordinatorLead,
 })
 
 export const ALL_TEST_USERS = Object.freeze([...ALL_ROLE_USERS, ...Object.values(EXTRA_USERS)])

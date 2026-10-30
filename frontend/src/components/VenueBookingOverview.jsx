@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BOOKING_APPROVED, currentVenueBookingGroups, venueBookingNextStep, venueBookingStatusLabel } from '../../../shared/venueBooking.js'
+import { BOOKING_APPROVED, currentVenueBookingGroups, venueBookingLabel, venueBookingNextStep, venueBookingStatusLabel } from '../../../shared/venueBooking.js'
 import { getVenueBookings, setPrimaryVenue } from '../services/api.js'
 import Card from './Card.jsx'
 
@@ -57,7 +57,7 @@ export default function VenueBookingOverview({ user, eventId, eventStatus, canMa
     {bookings?.length === 0 && <p>No venue bookings yet.</p>}
     {groups.map(({ venueNeedId, current, history }) => <section className="venue-booking-overview-item" key={venueNeedId} role="region" aria-label={`Booking for ${current.venueName}, ${displayTime(current.startsAt)}`}>
       <h3>{current.venueName} {primaryVenue?.bookingId === current.id && <span className="significant-badge">Primary venue</span>}</h3>
-      <p><strong>{venueBookingStatusLabel(current.status)}</strong> · {displayTime(current.startsAt)}–{displayTime(current.endsAt)}</p>
+      <p><strong>{venueBookingLabel(current)}</strong> · {displayTime(current.startsAt)}–{displayTime(current.endsAt)}</p>
       <p>Next step: {venueBookingNextStep(current, eventStatus)}</p>
       {canManage && <Link to={`/requests/${eventId}/venue-bookings?bookingId=${encodeURIComponent(current.id)}`}>Manage this booking</Link>}
       {canSetPrimary && current.status === BOOKING_APPROVED && primaryVenue?.bookingId !== current.id &&

@@ -5,7 +5,7 @@ The [CI workflow](../../.github/workflows/ci.yml) runs on every push and on pull
 | Job | Checks, in order within that job | Additional setup | Uploaded artifacts |
 |---|---|---|---|
 | `code_checks` | `npm run lint`, `npm run test:existing`, `npm run test:coverage`, `npm run build` | None | `coverage` from the root Vitest suite |
-| `firestore_emulator` | SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81, SPM-90, SPM-19 and SPM-71 transaction suites | Java 21; pinned `firebase-tools@15.34.0`; local Firestore emulator | `booking-emulator-results` (SPM-14 JSON), `equipment-reservation-emulator-results` (SPM-58 JSON) |
+| `firestore_emulator` | SPM-14, SPM-54, SPM-58, SPM-78, SPM-79, SPM-81, SPM-90, SPM-19, SPM-71 and SPM-39 transaction suites | Java 21; pinned `firebase-tools@15.34.0`; local Firestore emulator | `booking-emulator-results` (SPM-14 JSON), `equipment-reservation-emulator-results` (SPM-58 JSON) |
 | `e2e` | `npm run test:e2e` | Cached Playwright Chromium and browser dependencies | `playwright-report`, including the HTML report and `test-results` |
 
 The emulator suites run one after another in their job. Each command starts and stops its own local emulator on port 8085 with a `demo-connectsphere-*` project ID. SPM-54 uses `tests/spm-54/firebase.emulator.json`; the others use `firebase.spm14.json`. The [package scripts](../../package.json) name each suite as `test:spm<story>:emulator`. Only SPM-14 and SPM-58 currently produce JSON result files; the other suites report in the job log.

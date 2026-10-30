@@ -35,6 +35,8 @@ function EventRegistrations({ user, requestId, canView }) {
               <strong>{data.registeredCount}</strong> registered
               {data.capacity != null && <> of <strong>{data.capacity}</strong> places</>}
             </p>
+            {/* SPM-39: how many Attendees are waiting for a place. */}
+            {data.waitingListCount > 0 && <p className="form-note">{data.waitingListCount} on the waiting list</p>}
             {data.registrations.length === 0 ? (
               <p className="form-note">No one has registered yet.</p>
             ) : (

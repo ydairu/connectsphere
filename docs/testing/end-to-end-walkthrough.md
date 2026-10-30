@@ -9,8 +9,8 @@ This is a manual checklist. It has not been run in a browser as written; record 
 - [ ] Reset the seed so earlier demos are cleared: `SEED_ACCOUNT_PASSWORD=… node backend/scripts/seed.js --write --project=<FIREBASE_PROJECT_ID>` (run it without `--write` first for a dry run).
 - [ ] Every seeded account is `<slug>@seed.connectsphere.test` with the password in `SEED_ACCOUNT_PASSWORD`. Set the browser to Singapore time (SGT): date/time fields use the browser's timezone.
 - [ ] **Log in:** `/login` → **Email address**, **Password** → **Log in**; you land on `/profile`. **Switch user:** `/profile` → **Log out**.
-- [ ] **Assignments the app makes.** Each is shown on screen; use the account the page names. With freshly seeded data:
-  - Coordinator: **Seed Coordinator 3** (`coordinator-3@…`), who has the lightest workload.
+- [ ] **Assignments.** Each is shown on screen; use the account the page names. With freshly seeded data:
+  - Coordinator: chosen by the Event Coordinator Lead (`coordinator-lead@…`) in step 1b. Choose **Seed Coordinator 3** (`coordinator-3@…`), who has the lightest workload; the later steps assume it.
   - Venue Staff: usually **Seed Venue Staff** (`venue-staff@…`), named in the booking confirmation.
   - Technical Support Staff: almost certainly **Seed Venue + Technical Staff** (`venue-technical-staff@…`), not Seed Technical Staff, who already has the two seeded Pending Review requests. Named in the equipment request confirmation.
 
@@ -22,7 +22,14 @@ This is a manual checklist. It has not been run in a browser as written; record 
    - [ ] **Save unsubmitted request** → toast **Draft saved**, "Your event request has been saved as a draft. You can continue editing it on this page."; the URL becomes `/event-requests/<id>/edit` and the heading **Edit Draft Event Request**.
    - [ ] Optional: **My drafts** (`/requests/drafts`, heading **Saved drafts**) lists it.
    - [ ] **Submit request** → toast **Request submitted**, "Your event request is now available for the next staff workflow."; card **Submitted for review** with **Back to requests**.
-   - [ ] **Back to requests** (`/requests`, heading **Event requests**) → **View**. Note the `<id>`. Status **Submitted**; the **Event Coordinator** row names the Coordinator.
+   - [ ] **Back to requests** (`/requests`, heading **Event requests**) → **View**. Note the `<id>`. Status **Submitted**; the **Event Coordinator** row reads **Unassigned** (SPM-68: nothing is assigned on submission).
+
+1b. **The Event Coordinator Lead assigns a Coordinator (SPM-68)**
+   - [ ] As `coordinator-lead@…`, click **Unassigned requests** in the navbar (`/requests/unassigned`, heading **Unassigned requests**). "Walkthrough Seminar" is listed with **Date and time**, **Duration** "2 hours", **Expected attendees** `30`, **Organisation** and **Submitted**, after the seeded "A2 unassigned (waiting for a Coordinator)" (oldest first).
+   - [ ] On "Walkthrough Seminar", **Assign** → **Event Coordinator** lists "Seed Coordinator · 6 active events", "Seed Coordinator 2 · 2 active events", "Seed Coordinator 3 · 1 active event", with **Choose a Coordinator** selected and **Confirm assignment** disabled. The Lead is not listed.
+   - [ ] Choose **Seed Coordinator 3** → **Confirm assignment** → "“Walkthrough Seminar” was assigned to Seed Coordinator 3."; the card disappears.
+   - [ ] Optional: as `coordinator-3@…`, `/requests/unassigned` shows **You do not have access to this page**, and there is no **Unassigned requests** link.
+   - [ ] As `organiser-a1@…`, reopen the event: the **Event Coordinator** row now reads **Seed Coordinator 3**.
 
 2. **Review, return for clarification, resubmit, approve to Planning**
    - [ ] As the assigned Coordinator (`coordinator-3@…`): **Requests** shows **Events assigned to you** → **View** (`/requests/<id>`).
@@ -30,7 +37,7 @@ This is a manual checklist. It has not been run in a browser as written; record 
    - [ ] **Return for clarification** → prompt "Return this request to the organiser for clarification or amendments?" → fill **Message to the organiser (required)** (the button stays disabled with "Enter a message to the organiser to continue." until it has text) → **Return for clarification** → **Status changed to Returned for clarification.**
    - [ ] As `organiser-a1@…`, open the event: a **Clarification requested** card shows the message. ⚠️ The Organiser gets no notification for this; they only see it on the request page.
    - [ ] Edit **Purpose** under **Event details** → **Save changes** → **Changes saved.**
-   - [ ] **Status actions** → **Resubmit request** → **Status changed to Submitted.**
+   - [ ] **Status actions** → **Resubmit request** → **Status changed to Submitted.** The **Event Coordinator** row still names Seed Coordinator 3: a resubmitted request keeps its Coordinator and does not return to the Lead's queue.
    - [ ] As the Coordinator: **Start review**, then **Approve for planning** → **Status changed to Planning.** **Arrangements and cancellation** shows **Venue arrangement** and **Technical arrangement** as **Awaiting approval**; under **Status actions**: "The event can be confirmed once all mandatory venue and technical arrangements are approved."
 
 3. **Coordinator requests a venue; a conflicting choice is blocked**
@@ -67,10 +74,11 @@ This is a manual checklist. It has not been run in a browser as written; record 
    - [ ] As `safety-officer@…`, **Requests** shows **Safety-review queue** with the event → **View**. The event details are read-only; the **Safety check** card lists **Booked venues** with capacity, layouts, accessibility features and **Operating hours (venue restriction)** (SPM-66). Choose a **Result** for each of the six checklist items, choose **Approve** → **Record safety review** → back on the queue with "Safety review recorded: Approve." The event is no longer listed, and its link now says "You do not have access to this request."
    - [ ] As the Coordinator, the heading shows **Safety approved** and the Notifications page has "“…” passed its safety check." **Confirm event** → **Status changed to Confirmed.**
    - [ ] **Start Preparation** is now offered on the Confirmed event. Leave it for the separate Preparation review (`docs/testing/spm-88-manual-testing.md`).
-   - [ ] **Event details** → **Expected attendees** `35` → **Save changes** → **Confirm significant change**: "You changed Expected attendees. Saving resets the venue and technical sign-offs to Awaiting approval and moves the event back to Planning. It cannot be confirmed again until both sign-offs are approved. The safety check is withdrawn, and the event must pass a new one before it can be confirmed. Assigned venue and technical staff will be notified."
-   - [ ] **Save and reset sign-offs** → **Changes saved.**; status **Planning**; both arrangements **Awaiting approval**; the heading shows **Safety check required again** (SPM-91); both preparation sections read-only.
-   - [ ] As the Technical Support member: the request is still **Approved**, with "A significant change to the event cleared the technical sign-off. Re-confirm to approve it again (until SPM-87 removes the automatic reset)." → **Re-confirm approval** → "Approval re-confirmed. The technical arrangement is approved again." and a **Re-confirmed by** row.
-   - [ ] As Venue Staff, **Approve venue arrangement** again → **Your decision has been recorded.**
+   - [ ] **Event details** → **Expected attendees** `35` → **Save changes** → **Confirm significant change**: "You changed Expected attendees. Saving keeps the recorded venue and technical sign-offs but marks them Changed since approval; you then choose which need re-approval. The event moves back from Confirmed to Planning … The safety check is withdrawn …"
+   - [ ] **Save significant change** → **Changes saved.**; status **Planning**; both arrangements still **Approved**; the heading shows **Safety check required again** (SPM-91); a **Sign-offs changed since approval** card lists the venue booking and **Technical arrangement — Changed since approval** (SPM-87). **Submit for safety review** and **Confirm event** are not offered.
+   - [ ] Tick both and **Send selected back for re-approval** → "The selected sign-offs were sent back for re-approval."; both arrangements **Awaiting approval**; the **Change Log** has a **Sign-offs sent back for re-approval** entry. (Alternatively, **None need re-approval** keeps both approvals and goes straight to the safety check.)
+   - [ ] As the Technical Support member: the request is still **Approved**, with "After a significant change, the event coordinator sent the technical sign-off back for re-approval. Re-confirm to approve it again." → **Re-confirm approval** → "Approval re-confirmed. The technical arrangement is approved again." and a **Re-confirmed by** row.
+   - [ ] As the Venue Staff member: **Venue bookings** shows the booking **Awaiting re-approval** → **View details** → **Approve booking** → **Confirm approval**.
    - [ ] As the Coordinator, **Submit for safety review** again; as `safety-officer@…`, approve it from the queue as above. The **Safety check** card now lists the earlier review too.
    - [ ] As the Coordinator, **Confirm event** → **Status changed to Confirmed.**
 

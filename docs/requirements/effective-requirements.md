@@ -292,6 +292,62 @@ The 20-area order below follows §1. Week 7 deltas are integrated into the area 
 
 See §10, Superseded Legacy Register.
 
+#### SPM-68 — Event Coordinator Lead assigns submitted requests from an unassigned queue
+
+**[Team decisions, 29 Oct 2026 — pending PO confirmation]** made where the customer left the implementation open:
+
+- **Unassigned is derived, not a status.** A first submission stays **Submitted** with no Coordinator (`assignedCoordinatorUid` null or absent); the Organiser's status pill still reads "Submitted". Assigning a Coordinator is not a status change and does not go through the SPM-9 transitions route. This matches the customer's lifecycle "Submitted (Unassigned queue) → Assigned / Under Review" (G8!C2).
+- **Queue route and page.** `GET /api/requests/unassigned`, Event Coordinator Lead only (403 for every other role), oldest submission first. Each item carries the title, preferred date and time, duration, expected attendance, organisation name and submission time. The Lead's page is `/requests/unassigned` ("Unassigned requests"), linked from the navbar for Leads only.
+- **Workload shown, no auto-pick.** The Lead's picker lists every eligible Coordinator with their count of active events (SPM-8's count), with nothing pre-selected or ranked. This answers the §8.1 sub-question for now: the Lead chooses; the SPM-8 algorithm is not run. Whether the system may also *suggest* a Coordinator remains the customer gap above (G8!B12).
+- **Who may be chosen.** A user holding the Event Coordinator role who is neither the Lead making the assignment (G8!C13) nor the request's submitter (SPM-8's rule, kept by SPM-26).
+- **What is recorded.** `assignedByUid` and `assignedAt` on the request, and a `coordinator_assigned` activity entry naming the Lead and the time. `assignedByUid` is recorded so a later story can give a Lead the events they assigned (G8!C41); SPM-68 does not show them.
+- **Refusals.** A request that is no longer submitted-and-unassigned (for example, assigned meanwhile by another Lead) is refused with 409 and nothing is written. A draft id is refused as not found (404), so drafts stay private.
+- **What the Lead sees.** Only unassigned submitted requests, with `core` and the organisation name; no other section, no edits and no SPM-9 actions. A user who is both Lead and Coordinator acts as a Coordinator only on events assigned to them.
+- **Display.** The Organiser's "Event Coordinator" row reads **"Unassigned"** (G8!C42), replacing SPM-46's "Not yet assigned".
+
+**[Not in SPM-68]** assignment notifications (G8!C43; SPM-84/85), Lead-only reassignment (G8!C12, C35, C39; SPM-26 still lets the assigned Coordinator reassign) and the Lead's view of active events they assigned (G8!C41).
+
+#### SPM-85 — Notify the Event Coordinator Lead when a new request is submitted
+
+**[Evidence]** The notice comes from the SPM-85 backlog story (from SPM-21, Change #5). No customer statement distilled in this file asks for the Lead to be notified of a new submission: W7-CUST Change #5 asks for notices "when assignments or reassignments occur", and G8!C43 makes notifying *other* Leads optional and only "when they own that queue/scope". The rules below are therefore team decisions, not customer requirements.
+
+**[Team decisions, 29 Oct 2026 — pending PO confirmation]**
+
+- **Recipients: every Event Coordinator Lead.** There is one shared unassigned queue (SPM-68) and no per-Lead scope is recorded, so every Lead is notified. A Lead who submitted the request is not. If per-Lead supervisory scopes are recorded later (G8!C33), the recipients would narrow to the Leads covering the queue.
+- **Trigger: a first submission that enters the unassigned queue.** A resubmitted Returned request goes back to its current Coordinator (G8!C15) and notifies no Lead.
+- **Content:** "New request “{title}” from {organisation} is waiting for assignment." ("from …" is left out when the organisation is unknown), with the event's start, shown in the reader's time zone as the SPM-19 and SPM-41 notices are. Each notice names its own event.
+- **Link:** the notice opens the unassigned queue (`/requests/unassigned`), not the event, which a Lead cannot open once it is assigned.
+- **No Lead accounts:** the submission still succeeds; no notice is written.
+- **Same transaction:** the notices are written in the submit transaction, so a notice exists only for a saved submission.
+
+**[Known limitation — SPM-85]** A notice is not updated when the request is assigned: it still says the request "is waiting for assignment". The queue it links to shows the current state.
+
+**[Correction to the SPM-68 note above]** SPM-85 is this new-request notice, not an assignment notification. Assignment and reassignment notifications (G8!C43) remain unimplemented.
+
+#### SPM-69 — Event Coordinator Lead reassigns events between Coordinators
+
+**[Customer-confirmed — CL3]** Only the Lead performs a reassignment; the assigned Coordinator may request a transfer but not hand the event over (G8!C12, C35, C39). The Lead does not act as a Coordinator (G8!C13). The Lead sees the unassigned queue plus the active events that Lead previously assigned (G8!C41). The Lead may reassign existing assignments (G8!C38). Event-linked records follow the event (G8!C14).
+
+**[Implemented locally — SPM-69, 29 Oct 2026; not Done]**
+
+- **Who:** an Event Coordinator Lead, on a submitted event attributed to them. The assigned Coordinator is refused (403) and no longer offered Reassign; an unassigned Coordinator still gets 404. The transfer request is SPM-86 and is not built.
+- **When:** Submitted (with a Coordinator), Under Review, Returned, Planning, Confirmed and Preparation. Completed, Cancelled and Rejected are refused (409). A request still in the unassigned queue is assigned (SPM-68), not reassigned.
+- **To whom:** SPM-26's and SPM-68's checks: a Coordinator who is not the current one, not the submitter and not the Lead. The picker shows each Coordinator's active events, with nothing pre-selected.
+- **What is written:** in one transaction under the assignment lock, `assignedCoordinatorUid`, `assignedByUid` and `assignedAt` (the reassigning Lead) and a `coordinator_reassigned` activity entry (previous and new Coordinator, the Lead as actor, the time). Nothing else on the event changes; venue and equipment requests, holds, history and comments are keyed by the event and checked against its current Coordinator, so they follow it.
+- **Stale page:** the client sends the Coordinator its page showed (`expectedCoordinatorUid`, from the candidates' `currentCoordinator`); if it has changed, the reassignment is refused (409) and nothing is written.
+- **Finding events:** the Lead's Requests list holds the queue and the events in the Lead's scope, as a plain list. Filters and per-Coordinator counts are SPM-70's.
+- **What the Lead sees:** the basic event information of SPM-68 plus the assigned Coordinator's name; no edits and no status actions.
+
+**[Team decisions, 29 Oct 2026 — pending PO confirmation]**
+
+- **Events assigned before SPM-68:** an active event with no `assignedByUid` (assigned automatically before the Lead role existed) is in every Lead's scope and may be reassigned by any Lead. G8!C41 bounds a Lead's view to the events that Lead assigned, and G8!C38 says the Lead may reassign existing assignments, but no Lead assigned these, so neither row names whose they are.
+- **Reassigning moves supervision:** the reassigning Lead becomes `assignedByUid`, so the event joins their scope and leaves that of any other Lead. The earlier assigner remains in the activity history.
+- **No handover-agreement confirmation:** SPM-26's required "handover agreed outside the system" confirmation (from Clarification 2's Coordinator-initiated handover) is removed. CL3 rows 12, 35 and 39 replace that handover with the Lead's own decision.
+
+**[Superseded — SPM-26]** The assigned Coordinator no longer reassigns, and the agreement flag and its 400 refusal are gone. The SPM-26 record below is kept as history.
+
+**[Not in SPM-69]** reassignment notifications (G8!C43, C14), the Lead's overview with filters and per-Coordinator counts (SPM-70), the Coordinator's transfer request (SPM-86), and per-Lead supervisory scope beyond `assignedByUid` (G8!C33).
+
 #### SPM-26 — Reassign an Event to a Different Event Coordinator
 
 **[Customer-confirmed — live]** Exactly one Coordinator is assigned to an event — except the new Week 7 state in which a newly submitted request sits in the **Unassigned queue** before the Lead assigns a Coordinator (G8!C2, C12).
@@ -487,6 +543,16 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 > **Week 7 / CL3 effect (Change #6).** When a significant change on a Confirmed event is accepted, the event re-enters the standard lifecycle and returns to planning/reviewing, **which includes the safety checkpoint** (G8!C16, C48). The Coordinator's discretion (G8!C51) is limited to **venue/technical sign-offs: there is no automatic reset of any venue/equipment arrangement** — the Coordinator reviews and decides which arrangements to re-review. The safety checkpoint itself is not optional Coordinator judgment: once a confirmed event re-enters the lifecycle, it must pass through the safety review again before reaching Confirmed/Preparation, consistent with the customer's loop (*"the event returns to the relevant earlier planning stage and affected venue or technical arrangements may need to be reviewed again"*).
 
+**[Implemented — SPM-87, 29 Oct 2026 — team decisions pending PO confirmation]** The Coordinator decides which sign-offs need re-approval after a significant change, replacing SPM-10's automatic reset (CL3 G8!C51). Rules in `shared/signOffReview.js`; route `POST /api/requests/:id/sign-off-review`. Choices the acceptance criteria left open:
+
+- **What is marked.** Each current approved venue booking and an approved technical sign-off. Rejected or not-yet-approved arrangements are not marked. A second significant change before the Coordinator decides adds to the same review.
+- **Who sees the marking.** The assigned Coordinator only. Assigned staff are told through the significant-change notice; the Organiser's arrangement summary is unchanged.
+- **Undecided blocks progress.** Until the Coordinator decides, Confirm and submission for the safety check are refused (`sign_off_review_pending`), even though the marked sign-offs are still approved. Recording that none need re-approval (an empty choice) lifts this, as AC6 describes.
+- **A venue booking sent back** keeps its confirmed reservation and stays Approved in its record, with `reapprovalRequestedAt` set. It counts as Awaiting approval and returns to its Venue Staff member's queue, where they approve it again (its period, attendance and suitability are checked again) or reject it (the reservation is released and, if it was the primary venue, the primary venue is cleared, as a cancellation does).
+- **A technical sign-off sent back** is removed from `arrangementApprovals`. It is approved again with SPM-56's Re-confirm, which now also applies to a Reserved request (its reservation stays), or with the manual sign-off for an event without an equipment request.
+- **Preparation.** A significant change in Preparation is no longer refused: like Confirmed, the event moves back to Planning in the same transaction, with the safety approval withdrawn. A significant change to a Preparation event with an open cancellation request is refused, as for Confirmed.
+- **History and notices.** The choice is a `field_changed` entry on `signOffReapproval` (the marked sign-offs, and those sent back or "None (existing approvals kept)"), shown to the Coordinator. The staff whose sign-offs are sent back are notified in-app.
+
 ### 4.8 Venue Catalogue
 
 **[Customer-confirmed]** Maintain location, capacity, facilities, accessibility, supported layouts, operating information, and availability-related characteristics. Venue Staff can use catalogue information to identify suitable spaces.
@@ -673,6 +739,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Temporary — until SPM-87] Re-confirm approval.** SPM-10 still clears `arrangementApprovals` on a significant change while the equipment request stays Approved, which would block Confirm. The assignee may "Re-confirm approval" on an Approved request whose technical sign-off is not approved: availability is checked again and the sign-off is set again, with an `equipment_request_approval_reconfirmed` entry and a notice to the Coordinator. SPM-87 removes the automatic reset, and with it the need for this action.
 
+**[Superseded — SPM-87, 29 Oct 2026]** A significant change no longer clears the technical sign-off. Re-confirm remains the way to approve it again after the Coordinator sends it back, and now also applies to a Reserved request.
+
 **[Implemented — SPM-56, 17 Oct 2026 — historical record]** Rules in `shared/equipmentRequest.js` (`equipmentDecision`, `equipmentRequestActions`, `hasCurrentEquipmentRequest`) and `shared/arrangements.js`; notice in `shared/notifications.js`; service `decideEquipmentRequest` and `listAssignedEquipmentRequests` in `backend/src/services/equipmentRequestService.js`; the Review panel on the Equipment requests card and the `/equipment/requests` queue page. Notes:
 
 - **Pattern for SPM-54.** SPM-56 sets the approve pattern (an action route, the decision and the sign-off in one transaction, a fresh check inside it, a Coordinator notice) that SPM-54's venue booking approval may follow.
@@ -767,6 +835,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Held — SPM-62, team decision 18 Oct 2026]** "Technical Support Staff must re-confirm the equipment arrangement before the event can be confirmed again" after a significant change is not built. It conflicts with CL3 row 51 (no automatic reset of sign-offs; the Coordinator decides), and is held until SPM-87 settles the reset. **Consequence until then:** SPM-10 still clears the technical sign-off on a significant change. SPM-56's Re-confirm works only on Approved requests, and the manual sign-off is refused while a current request exists, so a Reserved event whose sign-off has been cleared cannot be confirmed again.
 
+**[Resolved — SPM-87, 29 Oct 2026]** The reset is no longer automatic: the Coordinator decides whether the technical sign-off goes back, and a Reserved request can then be re-confirmed, so such an event can be confirmed again.
+
 **[Known gaps — SPM-62]**
 
 - SPM-17 still accepts a new request while one is Reserved (its tests cover that path). The earlier request's reservation is not released or replaced. This needs a PO decision.
@@ -807,13 +877,28 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 **[Team decisions, 28 Oct 2026 — SPM-19, pending PO confirmation]**
 
 - **D1, settings after confirmation:** see §3, SPM-42 (the Organiser edits `registration` only, at Confirmed or Preparation).
-- **D2, capacity:** the limit is the smaller of the Organiser's capacity and the largest approved venue's `maximumCapacity`, worked out when someone registers. A capacity above the venue's is refused when saved. SPM-90's primary venue is to replace "largest" when it exists. With no approved venue, the Organiser's capacity is the limit.
+- **D2, capacity:** the limit is the smaller of the Organiser's capacity and the venue's `maximumCapacity`, worked out when someone registers. A capacity above the venue's is refused when saved. With no approved venue, the Organiser's capacity is the limit.
+  - **Follow-up (SPM-90, 29 Oct 2026):** once the Coordinator selects a primary venue, that venue alone is used. Before one is selected, the largest approved venue is used.
 - **D3, who sees registrants:** the owning Organiser and the assigned Coordinator see the count and each Attendee's name, email, status and registration time. Everyone else is refused at the API.
 - **D4, event information:** a confirmation on the event page and an in-app notification, both with the event name, date/time and venue.
 - **D5, event moved back to Planning (SPM-10):** existing registrations are kept, and no new ones are taken until the event is Confirmed again.
 - **Period required:** registration is unavailable until the opening time, closing time and capacity are all set. Registration must open before it closes and close by the event start.
 
 **[Known gaps — SPM-19]** Lowering the capacity below the current count is allowed and keeps every registration. Registrations made before a later capacity cut are not revisited. Withdrawal (SPM-59), the waiting list (SPM-39) and Attendee notices of cancellation or rescheduling (SPM-41) are separate stories.
+
+**[Implemented — SPM-39, 29 Oct 2026]** When an event is full and registration is otherwise open, an Attendee is offered the waiting list, confirms joining, and is told their position; "My registrations" shows it. Joining is refused when registration is closed, not yet open, disabled or unset, when the event is not Confirmed or Preparation, while a place is free, and when the Attendee is already registered or waiting. Order is first come, first served. Rules: `shared/registration.js` (`canJoinWaitingList`, `waitingListPosition`); service: `joinWaitingList` in `backend/src/services/registrationService.js`, under the same `systemLocks/registration-{eventId}` lock as registering.
+
+**[Backlog change, 29 Oct 2026]** SPM-39's fourth criterion (a withdrawal invites the next person on the waiting list) was moved to SPM-59, whose AC3 and AC5 already state it. SPM-39 has three criteria.
+
+**[Team decisions, 29 Oct 2026 — SPM-39, pending PO confirmation]**
+
+- **W1, storage:** a waiting-list entry is the Attendee's `eventRegistrations` record for the event with status `waitlisted`. It holds no place: it does not count toward capacity, the registered count or list, and it is not sent SPM-41's notices.
+- **W2, size:** no limit, as the customer set none.
+- **W3, order:** each join takes the next `waitlistSequence` from the event's registration lock in the joining transaction; position is the rank by that number. Never the Attendee id or a clock.
+- **W4, free place:** joining is refused while a place is free; the Attendee registers instead.
+- **W5, left to SPM-59:** leaving the waiting list, and inviting the next person when a place frees (by withdrawal, or by the Organiser raising the capacity).
+
+**[Known gaps — SPM-39]** Until SPM-59, a place freed by raising the capacity can be taken by anyone who registers, including people not on the waiting list. The Organiser and Coordinator see how many are waiting, not who.
 
 ### 4.19 Event Change Requests
 
@@ -828,6 +913,19 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 **[Team decision pending]** Select channels, delivery preferences, acknowledgement, and optional mentions. Offline communication may be manually recorded as event comments.
 
 **[Implemented, pending ratification — SPM-63/SPM-47, 3 Oct 2026 — historical record]** A minimal in-app channel for cancellation only: each notification is a document in the top-level `notifications` collection, one per recipient, written in the same transaction; each user reads their own via `GET /api/notifications` and marks read with `POST /api/notifications/:id/read`. No email, SMS, delivery preference or unread badge.
+
+**[Implemented — SPM-41, 29 Oct 2026]** Registered Attendees (active registrations only) are notified in-app when their event is cancelled — by the Coordinator or by approving the Organiser's request, from Confirmed or Preparation — and when it is rescheduled through the Coordinator's edit (SPM-10). A cancellation notice names the event and says it was cancelled, without the reason. A reschedule notice names the event and gives the new and previous start and end. An event with no registrations sends no Attendee notices; Organiser and staff notices are unchanged. Cancellation notices are written in the status-change transaction; reschedule notices in the section edit's transaction, through `store.update(..., { consequences })`. Date changes at Preparation are still refused (SPM-87), so a reschedule comes from Planning or Confirmed.
+
+**[Team decisions, 29 Oct 2026 — SPM-41, pending PO confirmation]**
+
+- **E1:** a new duration is a reschedule, because the end time moves.
+- **E2:** any non-finished event with active registrations notifies, so a further change while back in Planning (D5) reaches its Attendees again.
+- **E3:** "My registrations" shows each event's current title, date/time and status ("Event cancelled", "Event being rearranged"), and links to the event only while an Attendee may open it. The venue stays as registered, as SPM-90 keeps.
+- **E4:** Attendee notices link to "My registrations", because an Attendee cannot open a cancelled event or one back in Planning.
+- **E5:** rejecting an event that still has registrations (possible only after a reschedule moved it back to Planning) sends its Attendees the cancellation notice.
+- **No reason to Attendees:** a cancellation or rejection reason may be internal or the Organiser's own, so Attendee notices carry none.
+
+**[Known gaps — SPM-41]** SPM-20 (Organiser change requests) does not exist yet. When it applies an accepted date change, it must go through the same section-edit save (`store.update` with `consequences`) for Attendees to be notified. A venue change (SPM-74, SPM-90 primary switch) is not announced to Attendees by SPM-41.
 
 **[Implemented — SPM-61, 25 Oct 2026]** The same channel now tells the owning Organiser, and nobody else, when the assigned Coordinator approves, rejects (with the reason), confirms or returns (with the clarification message) their request, in the status-change transaction. This closes the SPM-25 return-notice and SPM-45 rejection-notice gaps recorded in §4.4 and §4.6.
 
@@ -914,7 +1012,7 @@ Before implementing affected functionality, resolve and record:
 2. Official Sprint 1 start date: 13 or 14 September 2026. *(open team choice)*
 3. ~~Same-organisation Organiser visibility.~~ Resolved — team decision, 3 Oct 2026 (§2.2).
 4. Exact multi-role storage and permission evaluation model. *(open team choice)*
-5. ~~Coordinator assignment algorithm.~~ The SPM-8 algorithm itself was PO-confirmed 20 Sep 2026; **its on-submit auto-trigger (and the empty-pool = server error rule) is superseded by Change #5** (§4.5, §10). Open sub-question: whether the Lead reuses the algorithm on manual assignment.
+5. ~~Coordinator assignment algorithm.~~ The SPM-8 algorithm itself was PO-confirmed 20 Sep 2026; **its on-submit auto-trigger (and the empty-pool = server error rule) is superseded by Change #5** (§4.5, §10). Open sub-question: whether the Lead reuses the algorithm on manual assignment — **SPM-68 team decision, 29 Oct 2026, pending PO confirmation: no; the Lead chooses and is shown each Coordinator's active workload** (§4.5, SPM-68).
 6. ~~Missing venue-facility block/warning policy.~~ **Resolved by SPM-13 AC2: a missing required facility makes a venue unsuitable** (§4.11).
 7. ~~Venue partial-match behaviour.~~ **Resolved by SPM-12 AC4: no results, with a clear no-matching-venues message** (§4.10).
 8. Notification channels and preferences. *(open)*

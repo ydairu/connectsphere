@@ -25,9 +25,15 @@
 //   approve / reject / confirm /     the owning Organiser only, with the rejection reason or the
 //   return for clarification         clarification message                        (SPM-61)
 //   start preparation                assigned Venue and Technical Support Staff   (SPM-88)
+//   sign-offs sent back for          the Venue Staff member of each booking sent   (SPM-87)
+//   re-approval                      back, and the technical reviewers
 //   safety review recorded           the assigned Coordinator, with the Safety     (SPM-92)
 //                                    Officer's comments
 //   attendee registers                the Attendee, with the event's start and venue (SPM-19)
+//   event cancelled or rescheduled    every registered Attendee, with no reason; a reschedule carries the
+//                                     new and previous start and end (SPM-41)
+//   request submitted into the        every Event Coordinator Lead, with the event's start; a Returned
+//   unassigned queue                  request resubmitted to its Coordinator notifies no one  (SPM-85)
 // The user who acted is never notified of their own action, except the SPM-19 registration confirmation,
 // which is the Attendee's own record of what they registered for.
 
@@ -35,6 +41,7 @@ import { REFUSE_CANCELLATION, REQUEST_CANCELLATION, RESUBMIT_CANCELLATION, RETUR
 import { APPROVE_SAFETY, REJECT_SAFETY_ARRANGEMENT, REQUEST_SAFETY_CHANGES } from './safetyReview.js'
 import { PLANNING, PREPARATION, UNDER_REVIEW } from './status.js'
 import { APPROVE, APPROVE_CANCELLATION, CANCEL, CONFIRM, REJECT, RETURN_FOR_CLARIFICATION } from './statusTransitions.js'
+import { eventEndsAt } from './registration.js'
 
 export const NOTIFICATIONS_COLLECTION = 'notifications'
 
@@ -60,10 +67,17 @@ export const REQUEST_APPROVED_NOTICE = 'request_approved'
 export const REQUEST_REJECTED_NOTICE = 'request_rejected'
 export const REQUEST_CONFIRMED_NOTICE = 'request_confirmed'
 export const REQUEST_RETURNED_NOTICE = 'request_returned'
+// SPM-87: the Coordinator sent sign-offs back for re-approval after a significant change.
+export const SIGN_OFF_REAPPROVAL_REQUESTED_NOTICE = 'sign_off_reapproval_requested'
 // SPM-92: the Safety Officer recorded the event's safety review.
 export const SAFETY_APPROVED_NOTICE = 'safety_approved'
 export const SAFETY_CHANGES_REQUESTED_NOTICE = 'safety_changes_requested'
 export const SAFETY_REJECTED_NOTICE = 'safety_arrangement_rejected'
+// SPM-41: an event a registered Attendee registered for was cancelled or rescheduled.
+export const ATTENDEE_EVENT_CANCELLED_NOTICE = 'attendee_event_cancelled'
+export const EVENT_RESCHEDULED_NOTICE = 'event_rescheduled'
+// SPM-85: a newly submitted request is waiting in the Event Coordinator Lead's unassigned queue.
+export const NEW_UNASSIGNED_REQUEST_NOTICE = 'new_unassigned_request'
 // SPM-19: the Attendee's registration was confirmed.
 export const REGISTRATION_CONFIRMED_NOTICE = 'registration_confirmed'
 
@@ -102,10 +116,41 @@ export function cancellationNotifications(action, request, actor, { reason = nul
         : `“${title}” has been cancelled by the event coordinator.`
     notify([request.ownerUid], EVENT_CANCELLED_NOTICE, message)
     notify(request.assignedStaffUids ?? [], EVENT_CANCELLED_NOTICE, `“${title}”, which you are assigned to, has been cancelled.`)
-    notify(attendeeUids, EVENT_CANCELLED_NOTICE, `“${title}”, which you registered for, has been cancelled.`)
   }
 
-  return addressed(notices, request, actor, title, at)
+  // SPM-41: registered Attendees get their own notice, without the reason, which may be internal or the Organiser's.
+  // E5 (team decision, 29 Oct 2026): an event can still have registrations when it is rejected — after a reschedule
+  // moved it back to Planning (SPM-10, D5). For its Attendees that is a cancellation.
+  const attendees = action === CANCEL || action === APPROVE_CANCELLATION || action === REJECT
+    ? attendeeChangeNotifications('cancelled', request, request, actor, { attendeeUids, at })
+    : []
+  return [...addressed(notices, request, actor, title, at), ...attendees]
+}
+
+/**
+ * SPM-41 — the notices for every registered Attendee (`attendeeUids`) when the event is cancelled or rescheduled.
+ * `before` and `after` are the event before and after the change. A reschedule carries the new and previous start
+ * and end, which the page shows in the reader's time zone. No reason is sent: a cancellation reason may be
+ * internal or the Organiser's own. Each Attendee gets one notice, never the user who acted.
+ */
+export function attendeeChangeNotifications(change, before, after, actor, { attendeeUids = [], at }) {
+  const title = titleOf(after)
+  const cancelled = change === 'cancelled'
+  const times = cancelled ? {} : {
+    eventStartsAt: after.core?.preferredDateTime ?? null,
+    eventEndsAt: eventEndsAt(after.core),
+    previousStartsAt: before.core?.preferredDateTime ?? null,
+    previousEndsAt: eventEndsAt(before.core),
+  }
+  const notices = attendeeUids.map((uid) => ({
+    recipientUid: uid,
+    type: cancelled ? ATTENDEE_EVENT_CANCELLED_NOTICE : EVENT_RESCHEDULED_NOTICE,
+    changeType: change,
+    message: `“${title}”, which you registered for, has been ${cancelled ? 'cancelled' : 'rescheduled'}.`,
+    reason: null,
+    ...times,
+  }))
+  return addressed(notices, after, actor, title, at)
 }
 
 // One notice per recipient, never to the user who acted, never to a missing uid.
@@ -118,6 +163,25 @@ function addressed(notices, request, actor, title, at) {
       return true
     })
     .map((notice) => ({ ...notice, eventRequestId: request.id, eventTitle: title, createdAt: at, readAt: null }))
+}
+
+/**
+ * SPM-85 — the notices for the Event Coordinator Leads (`recipientUids`) when `request` (the record as submitted,
+ * with its id) enters the unassigned queue. The message names the event and, when known, its organisation; the
+ * event's start is carried as `eventStartsAt`, which the page shows in the reader's time zone (as SPM-19's does).
+ * The page links the notice to the queue, not the event. A Lead who submitted the request is not notified.
+ */
+export function newUnassignedRequestNotifications(request, actor, { recipientUids = [], at }) {
+  const title = titleOf(request)
+  const organisation = typeof request.organisationName === 'string' ? request.organisationName.trim() : ''
+  const message = `New request “${title}”${organisation ? ` from ${organisation}` : ''} is waiting for assignment.`
+  return addressed(recipientUids.map((uid) => ({
+    recipientUid: uid,
+    type: NEW_UNASSIGNED_REQUEST_NOTICE,
+    message,
+    reason: null,
+    eventStartsAt: request.core?.preferredDateTime ?? null,
+  })), request, actor, title, at)
 }
 
 /** SPM-88: assigned Venue and Technical Support Staff learn that preparation has started. */
@@ -193,7 +257,21 @@ export function safetyReviewDecidedNotifications(event, actor, { outcome, commen
   return addressed([{ recipientUid: event.assignedCoordinatorUid, type, message, reason: comments || null }], event, actor, title, at)
 }
 
-const STATUS_NAMES = Object.freeze({ planning: 'Planning', confirmed: 'Confirmed' })
+/**
+ * SPM-87 — the notices for the staff whose sign-offs the Coordinator sent back for re-approval. `recipients`
+ * is [{ recipientUid, labels }], one entry per staff member, naming what they are asked to review again.
+ */
+export function signOffReapprovalNotifications(event, actor, { recipients = [], at }) {
+  const title = titleOf(event)
+  return addressed(recipients.map(({ recipientUid, labels }) => ({
+    recipientUid,
+    type: SIGN_OFF_REAPPROVAL_REQUESTED_NOTICE,
+    message: `After a significant change to “${title}”, the event coordinator sent ${labels.join(', ')} back for your re-approval.`,
+    reason: null,
+  })), event, actor, title, at)
+}
+
+const STATUS_NAMES = Object.freeze({ planning: 'Planning', confirmed: 'Confirmed', preparation: 'Preparation' })
 
 /**
  * SPM-10 — the notices for a significant change saved on `request` (the record before the edit), to
@@ -204,7 +282,8 @@ export function significantChangeNotifications(request, actor, { recipientUids =
   const title = titleOf(request)
   const moved = request.status !== status
   const where = moved ? `It has moved back to ${STATUS_NAMES[status] ?? status}` : `It remains in ${STATUS_NAMES[status] ?? status}`
-  const message = `“${title}” has had a significant change (${fieldLabels.join(', ')}). ${where}, and the venue and technical sign-off must be approved again.`
+  // SPM-87: the sign-offs are kept and marked "Changed since approval"; the Coordinator decides which go back.
+  const message = `“${title}” has had a significant change (${fieldLabels.join(', ')}). ${where}. Recorded venue and technical sign-offs are marked "Changed since approval"; the event coordinator will decide which need re-approval.`
   const notices = recipientUids.map((uid) => ({
     recipientUid: uid,
     type: SIGNIFICANT_CHANGE_NOTICE,

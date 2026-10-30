@@ -1,20 +1,22 @@
-// SPM-8 — proves, offline, that the seed demonstrates workload-based Coordinator assignment. The
-// SPM-42 / SPM-24 seed checks are in tests/spm-42/unit/seedData.test.js.
+// SPM-8 / SPM-68 — proves, offline, that the seed demonstrates Coordinator workloads and the Event Coordinator
+// Lead's unassigned queue. Since SPM-68 a submission is not assigned automatically: the Lead chooses, seeing each
+// Coordinator's active workload. The SPM-42 / SPM-24 seed checks are in tests/spm-42/unit/seedData.test.js.
 // Run: node --test "backend/scripts/**/*.test.js"
 
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { COORDINATOR } from '../../shared/permissions.js'
+import { COORDINATOR, COORDINATOR_LEAD } from '../../shared/permissions.js'
 import { DRAFT, SUBMITTED } from '../../shared/status.js'
-import { countActiveAssignments, selectCoordinator } from '../../shared/coordinatorAssignment.js'
+import { awaitingCoordinatorAssignment, countActiveAssignments } from '../../shared/coordinatorAssignment.js'
+import { assignmentCandidates } from '../../shared/coordinatorLeadAssignment.js'
 import { createDraftEventRequest, submitDraftEventRequest } from '../src/services/eventRequestService.js'
 import { createFakeFirestore } from '../src/testing/fakeFirestore.js'
 import { SEED_ACCOUNTS, SEED_REQUESTS } from './seedData.js'
 
 const accounts = Object.values(SEED_ACCOUNTS)
 
-describe('Seed data — SPM-8 coordinator workload demonstration', () => {
+describe('Seed data — Coordinator workloads and the SPM-68 unassigned queue', () => {
   const coordinatorUids = accounts.filter((a) => a.roles.includes(COORDINATOR)).map((a) => a.uid)
 
   test('Seed holds three coordinators', () => {
@@ -30,23 +32,34 @@ describe('Seed data — SPM-8 coordinator workload demonstration', () => {
     assert.equal(counts.get('seed-coordinator-3'), 1)
   })
 
-  test('Every non-draft request has one seeded coordinator; drafts carry no assignment', () => {
+  test('Every non-draft request has one seeded coordinator except the one unassigned request; drafts carry no assignment', () => {
     for (const request of SEED_REQUESTS) {
       if (request.status === DRAFT) assert.equal(Object.hasOwn(request, 'assignedCoordinatorUid'), false, request.id)
+      else if (request.id === 'seed-req-a2-unassigned') assert.equal(request.assignedCoordinatorUid, null)
       else assert.ok(coordinatorUids.includes(request.assignedCoordinatorUid), request.id)
     }
   })
 
-  test('Selection on the seed picks coordinator-3 whatever the tie-break', () => {
-    const activeCounts = countActiveAssignments(SEED_REQUESTS)
-    for (const value of [0, 0.5, 0.999]) {
-      assert.equal(selectCoordinator({ coordinatorUids, activeCounts, random: () => value }), 'seed-coordinator-3')
-    }
+  test('SPM-68: the seed holds one Lead-only account and exactly one request in the unassigned queue', () => {
+    const leads = accounts.filter((a) => a.roles.includes(COORDINATOR_LEAD))
+    assert.deepEqual(leads.map((a) => [a.uid, a.email, a.roles]), [['seed-coordinator-lead', 'coordinator-lead@seed.connectsphere.test', [COORDINATOR_LEAD]]])
+    assert.deepEqual(SEED_REQUESTS.filter(awaitingCoordinatorAssignment).map((r) => r.id), ['seed-req-a2-unassigned'])
+  })
+
+  test('SPM-68: the Lead is offered every Coordinator with the seeded workloads, none pre-selected', () => {
+    const unassigned = SEED_REQUESTS.find((r) => r.id === 'seed-req-a2-unassigned')
+    const coordinators = accounts.filter((a) => a.roles.includes(COORDINATOR)).map(({ uid, name }) => ({ uid, name }))
+    const offered = assignmentCandidates(coordinators, unassigned, SEED_ACCOUNTS.coordinatorLead, countActiveAssignments(SEED_REQUESTS))
+    assert.deepEqual(offered.map((c) => [c.uid, c.activeEvents]), [
+      ['seed-coordinator', 6],
+      ['seed-coordinator-2', 2],
+      ['seed-coordinator-3', 1],
+    ])
   })
 
   // In-memory database loaded with the seed, through the real submit service. Not the emulator, and not
   // the deployed project.
-  test('An organiser submitting a new request on the seeded data gets coordinator-3', async () => {
+  test('SPM-68: an organiser submitting a new request on the seeded data is left unassigned, in the queue', async () => {
     const users = Object.fromEntries(accounts.map(({ uid, ...profile }) => [uid, profile]))
     const eventRequests = Object.fromEntries(SEED_REQUESTS.map(({ id, ...request }) => [id, request]))
     const db = createFakeFirestore({ users, eventRequests })
@@ -62,6 +75,8 @@ describe('Seed data — SPM-8 coordinator workload demonstration', () => {
     const submitted = await submitDraftEventRequest(draft.id, SEED_ACCOUNTS.organiserA3, db)
 
     assert.equal(submitted.status, SUBMITTED)
-    assert.equal(submitted.assignedCoordinatorUid, 'seed-coordinator-3')
+    assert.equal(submitted.assignedCoordinatorUid, null)
+    assert.ok(awaitingCoordinatorAssignment(db.store.get(draft.id)))
+    assert.equal(db.collectionData(`eventRequests/${draft.id}/activity`).size, 1, 'only the status_changed entry')
   })
 })

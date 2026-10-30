@@ -6,7 +6,13 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Navbar from '../components/Navbar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { listNotifications, markNotificationRead } from '../services/api.js'
-import { REQUEST_CONFIRMED_NOTICE, REQUEST_RETURNED_NOTICE } from '../../../shared/notifications.js'
+import {
+  ATTENDEE_EVENT_CANCELLED_NOTICE,
+  EVENT_RESCHEDULED_NOTICE,
+  NEW_UNASSIGNED_REQUEST_NOTICE,
+  REQUEST_CONFIRMED_NOTICE,
+  REQUEST_RETURNED_NOTICE,
+} from '../../../shared/notifications.js'
 
 // The signed-in user's in-app notifications. Venue booking rejections link to the booking; other notices
 // link to the event. The API returns only the user's own.
@@ -14,6 +20,11 @@ import { REQUEST_CONFIRMED_NOTICE, REQUEST_RETURNED_NOTICE } from '../../../shar
 function formatDateTime(value) {
   const date = new Date(value ?? '')
   return Number.isNaN(date.getTime()) ? null : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+// SPM-41: "start to end", or the start alone when the end is unknown.
+function periodText(start, end) {
+  return [formatDateTime(start), formatDateTime(end)].filter(Boolean).join(' to ') || 'Not set'
 }
 
 // SPM-61: a returned request is edited on its event page, and a confirmed event's arrangements are shown
@@ -25,6 +36,13 @@ function linkFor(notification) {
       label: 'View booking',
     }
   }
+  // SPM-41: an Attendee cannot open a cancelled event or one moved back to Planning, so their notices lead to
+  // My registrations, which shows the event as it now is.
+  if ([ATTENDEE_EVENT_CANCELLED_NOTICE, EVENT_RESCHEDULED_NOTICE].includes(notification.type)) {
+    return { to: '/registrations', label: 'View my registrations' }
+  }
+  // SPM-85: the Lead assigns from the queue, and cannot open the event once another Lead has assigned it.
+  if (notification.type === NEW_UNASSIGNED_REQUEST_NOTICE) return { to: '/requests/unassigned', label: 'View unassigned requests' }
   const to = `/requests/${notification.eventRequestId}`
   if (notification.type === REQUEST_RETURNED_NOTICE) return { to, label: 'Edit request' }
   if (notification.type === REQUEST_CONFIRMED_NOTICE) return { to, label: 'View arrangements' }
@@ -102,7 +120,13 @@ function NotificationsPage() {
                       <h2>{notification.message}</h2>
                       {notification.reason && <p>{reasonLabel}: {notification.reason}</p>}
                       {/* SPM-19: a registration confirmation carries the event's start, shown in the reader's time zone. */}
-                      {formatDateTime(notification.eventStartsAt) && <p>Event starts: {formatDateTime(notification.eventStartsAt)}</p>}
+                      {notification.type === EVENT_RESCHEDULED_NOTICE ? (
+                        // SPM-41: the new and previous time, in the reader's time zone.
+                        <>
+                          <p>New date and time: {periodText(notification.eventStartsAt, notification.eventEndsAt)}</p>
+                          <p>Previously: {periodText(notification.previousStartsAt, notification.previousEndsAt)}</p>
+                        </>
+                      ) : formatDateTime(notification.eventStartsAt) && <p>Event starts: {formatDateTime(notification.eventStartsAt)}</p>}
                       <p className="request-meta">{[unread ? 'Unread' : 'Read', when].filter(Boolean).join(' · ')}</p>
                     </div>
                     <div className="request-item-actions">

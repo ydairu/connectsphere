@@ -8,7 +8,7 @@
 // entry in one transaction, so the state that was checked is the state that is changed.
 //
 // Submit and resubmit go through submitDraftEventRequest(), which also validates mandatory fields and
-// assigns the Coordinator (SPM-3, SPM-8); there is one path for them, not two.
+// queues a first submission for Lead assignment (SPM-3, SPM-68); there is one path for them, not two.
 
 import {
   ARRANGEMENT_NOT_REQUIRED,
@@ -53,6 +53,7 @@ import {
   APPROVE,
   ARRANGEMENTS_NOT_APPROVED,
   PRIMARY_VENUE_REQUIRED,
+  SIGN_OFF_REVIEW_UNDECIDED,
   CANCEL,
   CONFIRM,
   COMPLETE,
@@ -70,6 +71,7 @@ import {
   WRONG_STATUS,
   canTransition,
 } from '../../../shared/statusTransitions.js'
+import { NO_SIGN_OFF_REVIEW } from '../../../shared/signOffReview.js'
 import { cancellationNotifications, eventStaffAssignedNotifications, preparationStartedNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
 import {
   ARRANGEMENTS_NOT_READY,
@@ -87,6 +89,7 @@ import {
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { ACTIVITY_SUBCOLLECTION } from './coordinatorAssignmentService.js'
 import { EventRequestForbiddenError, EventRequestNotFoundError, submitDraftEventRequest } from './eventRequestService.js'
+import { loadRegisteredAttendeeUids } from './registeredAttendees.js'
 import { addNotifications } from './notificationService.js'
 import { recordStatusChange, userActor } from './statusHistory.js'
 import { prepareVenueHoldRelease } from './venueBookingService.js'
@@ -115,6 +118,8 @@ const MESSAGES = Object.freeze({
   [NOT_PERMITTED]: 'You are not permitted to perform this action on this request.',
   [ARRANGEMENTS_NOT_APPROVED]: 'All mandatory venue and technical arrangements must be approved before confirmation.',
   [PRIMARY_VENUE_REQUIRED]: 'Choose one current approved primary venue before confirming this event.',
+  [SIGN_OFF_REVIEW_UNDECIDED]: 'Sign-offs have changed since approval. Choose which need re-approval, or record that none do, first.',
+  [NO_SIGN_OFF_REVIEW]: 'There are no sign-offs changed since approval to decide on.',
   [EVENT_NOT_ENDED]: 'An event can be marked complete only after it has taken place.',
   [INSUFFICIENT_INFORMATION]: 'The request is missing required details or has invalid ones. Complete them, or return it for clarification.',
   [SAFETY_APPROVAL_REQUIRED]: 'A valid safety approval from the Safety Officer is required first.',
@@ -187,7 +192,7 @@ export function requireRequestScope(user, request) {
  */
 export async function transitionEventRequest(id, action, user, db = getAdminDb(), now = new Date(), options = {}) {
   if (action === SUBMIT || action === RESUBMIT) {
-    return transitionBySubmission(id, action, user, db, now, options)
+    return transitionBySubmission(id, action, user, db, now)
   }
 
   return db.runTransaction(async (tx) => {
@@ -203,6 +208,11 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     const readiness = action === SUBMIT_SAFETY_REVIEW ? await loadVenueBookingReadiness(id, db, now, tx) : null
     const preparationRecipients = action === START_PREPARATION
       ? await assignedPreparationRecipients(tx, db, existing, user)
+      : []
+    // SPM-41: a cancellation, or (E5) a rejection of an event that still has registrations, notifies the registered
+    // Attendees. Read here, before any write in this transaction.
+    const attendeeUids = action === CANCEL || action === APPROVE_CANCELLATION || action === REJECT
+      ? await loadRegisteredAttendeeUids(db, id, tx)
       : []
 
     // The reason is checked only after the action itself is allowed, so a refusal names the real cause.
@@ -337,10 +347,10 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
     }
 
     // SPM-47, SPM-63 — notify the affected users in the same transaction, so a notice exists only for an
-    // action that was saved. An approval carries the Organiser's request reason. No Attendee uids are passed:
-    // Attendee Registration does not exist yet (shared/notifications.js).
+    // action that was saved. An approval carries the Organiser's request reason. SPM-41: and every registered
+    // Attendee, without the reason.
     const noticeReason = action === APPROVE_CANCELLATION ? existing.cancellationRequest?.reason ?? null : reasonFor()
-    addNotifications(tx, db, cancellationNotifications(action, existing, user, { reason: noticeReason, at }))
+    addNotifications(tx, db, cancellationNotifications(action, existing, user, { reason: noticeReason, at, attendeeUids }))
     if (action === START_PREPARATION) {
       addNotifications(tx, db, preparationStartedNotifications(existing, user, { recipientUids: preparationRecipients, at }))
     }
@@ -364,7 +374,7 @@ async function assignedPreparationRecipients(tx, db, request, actor) {
 
 // The action named must match the request's status: "resubmit" on a draft is refused rather than silently
 // treated as "submit". The read is outside the submit transaction, which re-checks everything itself.
-async function transitionBySubmission(id, action, user, db, now, options) {
+async function transitionBySubmission(id, action, user, db, now) {
   const snapshot = await db.collection('eventRequests').doc(id).get()
   if (!snapshot.exists) throw new EventRequestNotFoundError()
 
@@ -373,5 +383,5 @@ async function transitionBySubmission(id, action, user, db, now, options) {
 
   refuse(canTransition(user, existing, action, now))
 
-  return submitDraftEventRequest(id, user, db, now, options)
+  return submitDraftEventRequest(id, user, db, now)
 }

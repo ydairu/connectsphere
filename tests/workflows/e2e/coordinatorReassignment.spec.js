@@ -1,5 +1,6 @@
-// Cross-story E2E: SPM-46 / SPM-26, in Chromium. The assigned Coordinator reassigns the Organiser's event
-// through the real SPM-26 API; the Organiser then opens the event and sees the new Coordinator's name.
+// Cross-story E2E: SPM-46 / SPM-26, in Chromium. The Event Coordinator Lead reassigns the Organiser's event
+// through the real SPM-26 API (Lead-only since SPM-69); the Organiser then opens the event and sees the new
+// Coordinator's name.
 // Firebase is the in-memory double; the API and app are real. Not an SPM-64 test.
 
 import { SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
@@ -8,6 +9,7 @@ import { DOUBLE_ORIGIN, EXTRA_USERS, ROLE_USERS, expect, loginAs, test } from '.
 
 const FROM = ROLE_USERS.coordinator
 const TO = EXTRA_USERS.secondCoordinator
+const LEAD = EXTRA_USERS.coordinatorLead
 
 const submitted = SEED_REQUESTS.find(
   (request) => request.status === SUBMITTED && request.ownerUid === ROLE_USERS.organiser.uid && request.assignedCoordinatorUid === FROM.uid,
@@ -17,10 +19,10 @@ test.describe('SPM-46 / SPM-26 - the Organiser sees the reassigned Coordinator (
   test('spm46_spm26_organiser_sees_the_new_coordinator_after_reassignment', async ({ page }) => {
     expect(submitted).toBeDefined()
 
-    // Set-up through the real API served by the double, as the assigned Coordinator.
+    // Set-up through the real API served by the double, as the Event Coordinator Lead (SPM-69).
     const response = await page.request.post(`${DOUBLE_ORIGIN}/api/event-requests/${submitted.id}/reassignment`, {
-      headers: { Authorization: `Bearer test-token:${FROM.uid}` },
-      data: { coordinatorUid: TO.uid, handoverAgreed: true },
+      headers: { Authorization: `Bearer test-token:${LEAD.uid}` },
+      data: { coordinatorUid: TO.uid, expectedCoordinatorUid: FROM.uid },
     })
     expect(response.ok()).toBeTruthy()
     expect(await response.json()).toEqual({ reassigned: true, coordinator: { name: TO.name } })

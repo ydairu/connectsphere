@@ -8,17 +8,18 @@
 // allows it, then passes it here. The Organiser receives the display name and nothing else — never the
 // uid, email or roles.
 
-import { ORGANISER, inScopeAs } from './permissions.js'
+import { COORDINATOR_LEAD, ORGANISER, inScopeAs } from './permissions.js'
 import { DRAFT } from './status.js'
 
 /**
- * Does this user see the assigned Coordinator on this request? Only through the Organiser role, on a
- * record that role puts in scope: the owner, or a same-organisation colleague (SPM-42). [Team decision,
- * 3 Oct 2026] Colleagues who may view the event see its Coordinator too. Drafts have no Coordinator.
- * Coordinators, staff and attendees receive nothing new.
+ * Does this user see the assigned Coordinator on this request? Through the Organiser role, on a record that
+ * role puts in scope: the owner, or a same-organisation colleague (SPM-42). [Team decision, 3 Oct 2026]
+ * Colleagues who may view the event see its Coordinator too. SPM-69: and through the Event Coordinator Lead role,
+ * on an event in the Lead's scope, so the Lead sees whom they would reassign it from. Drafts have no
+ * Coordinator. Coordinators, staff and attendees receive nothing new.
  */
 export function mayViewAssignedCoordinator(user, request) {
-  return request.status !== DRAFT && inScopeAs(ORGANISER, user, request)
+  return request.status !== DRAFT && (inScopeAs(ORGANISER, user, request) || inScopeAs(COORDINATOR_LEAD, user, request))
 }
 
 /**
@@ -37,11 +38,11 @@ function displayName(name) {
 /**
  * What the API returns as `assignedCoordinator`:
  *   null                                not visible to this user (every draft, every non-Organiser view)
- *   { assigned: false, name: null }     submitted but no Coordinator yet — shown as "Not yet assigned"
+ *   { assigned: false, name: null }     submitted but no Coordinator yet — shown as "Unassigned"
  *   { assigned: true, name: 'Ada' }     the Coordinator's display name
  *   { assigned: true, name: null }      assigned, but their profile has no usable name — [Team decision,
  *                                       3 Oct 2026] shown as "Assigned (name unavailable)", never as
- *                                       "Not yet assigned"
+ *                                       "Unassigned" (SPM-68 wording)
  *
  * `coordinatorName` is users/{assignedCoordinatorUid}.name, or null if it could not be read.
  */

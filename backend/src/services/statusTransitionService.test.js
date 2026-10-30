@@ -122,7 +122,7 @@ async function assertRefused(promise, reason) {
 }
 
 describe('SPM-9 — each status change records previous status, new status, who and when', () => {
-  test('Draft → Submitted on submit, by the Organiser; recorded with the SPM-8 assignment entry', async () => {
+  test('Draft → Submitted on submit, by the Organiser; no Coordinator is assigned (SPM-68), so no assignment entry', async () => {
     const db = fakeDb(readyRequest(DRAFT))
 
     const updated = await transitionEventRequest('request-1', SUBMIT, owner, db, NOW)
@@ -139,7 +139,8 @@ describe('SPM-9 — each status change records previous status, new status, who 
         at: NOW.toISOString(),
       },
     ])
-    assert.equal(activityOf(db).filter((entry) => entry.type === COORDINATOR_ASSIGNED).length, 1)
+    assert.equal(activityOf(db).filter((entry) => entry.type === COORDINATOR_ASSIGNED).length, 0)
+    assert.equal(db.store.get('request-1').assignedCoordinatorUid ?? null, null)
   })
 
   const coordinatorSteps = [
@@ -302,9 +303,10 @@ describe('SPM-65 — transition scope preserves multi-role permissions', () => {
       const db = fakeDb(readyRequest(status))
       const updated = await transitionEventRequest('request-1', action, user, db, NOW)
       assert.equal(updated.status, SUBMITTED)
-      assert.ok(updated.assignedCoordinatorUid)
       assert.notEqual(updated.assignedCoordinatorUid, user.uid)
+      // SPM-68: a first submission waits unassigned for the Lead; a resubmission keeps its Coordinator.
       if (action === RESUBMIT) assert.equal(updated.assignedCoordinatorUid, assigned.uid)
+      else assert.equal(updated.assignedCoordinatorUid, null)
       assert.equal(statusChangesOf(db).length, 1)
     })
   }

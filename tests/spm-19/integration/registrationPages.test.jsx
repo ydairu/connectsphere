@@ -32,6 +32,8 @@ const registration = {
   eventDurationHours: 3,
   venueNames: ['Seed Hall'],
   registeredAt: '2026-11-01T00:00:00.000Z',
+  // SPM-41: GET /api/registrations also gives the event's current status.
+  eventStatus: 'confirmed',
 }
 const open = { canRegister: true, reason: null, opensAt: '2026-10-25T00:00:00.000Z', closesAt: '2026-11-19T00:00:00.000Z', placesLeft: 2, venueNames: ['Seed Hall'], myRegistration: null }
 

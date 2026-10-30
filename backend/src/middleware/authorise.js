@@ -16,6 +16,7 @@ import { preparationEditing } from '../../../shared/preparationAccess.js'
 import { canCheckVenueSuitability } from '../../../shared/venueSuitability.js'
 import { CONFIRMED, PLANNING } from '../../../shared/status.js'
 import { canDecideSafetyReview, safetyReviewListStatus, safetyReviewSummary } from '../../../shared/safetyReview.js'
+import { signOffReviewSummary } from '../../../shared/signOffReview.js'
 import { canViewRegistrations } from '../../../shared/registration.js'
 import {
   allAvailableActions,
@@ -101,6 +102,8 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
     reservedEquipment: reservedEquipmentSummary(user, request),
     safetyReview: safetyReviewSummary(user, request),
     canDecideSafetyReview: canDecideSafetyReview(user, request).allowed,
+    // SPM-87: sign-offs changed since approval and the Coordinator's choice, for the assigned Coordinator only.
+    signOffReview: signOffReviewSummary(user, request),
     canViewRegistrations: canViewRegistrations(user, request),
     ...requestOwnerFields(user, request, ownerNames),
   }

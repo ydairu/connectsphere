@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { ATTENDEE, COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../shared/permissions.js'
+import { ATTENDEE, COORDINATOR, COORDINATOR_LEAD, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../shared/permissions.js'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import CreateEventRequestPage from './pages/CreateEventRequestPage.jsx'
 import CreateVenuePage from './pages/CreateVenuePage.jsx'
@@ -17,6 +17,7 @@ import ProfilePage from './pages/ProfilePage.jsx'
 import RequestDetailPage from './pages/RequestDetailPage.jsx'
 import RequestsPage from './pages/RequestsPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
+import UnassignedRequestsPage from './pages/UnassignedRequestsPage.jsx'
 import VenueCataloguePage from './pages/VenueCataloguePage.jsx'
 import VenueAvailabilityPage from './pages/VenueAvailabilityPage.jsx'
 import VenueDetailPage from './pages/VenueDetailPage.jsx'
@@ -41,6 +42,11 @@ function App() {
       </Route>
       {/* Drafts and the request form belong to Event Organisers. The API enforces this too:
           requireRole(ORGANISER) on /api/event-requests, and owner-only scope on drafts. */}
+      {/* SPM-68: the Event Coordinator Lead's unassigned queue. The API refuses everyone else with 403. */}
+      <Route element={<ProtectedRoute allowedRoles={[COORDINATOR_LEAD]} />}>
+        <Route path="/requests/unassigned" element={<UnassignedRequestsPage />} />
+      </Route>
+
       <Route element={<ProtectedRoute allowedRoles={[ORGANISER]} />}>
         <Route path="/requests/drafts" element={<DraftRequestsPage />} />
         <Route path="/event-requests/new" element={<CreateEventRequestPage />} />

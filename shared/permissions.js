@@ -18,6 +18,7 @@
 
 import { DRAFT, RETURNED, PREPARATION, COMPLETED, CANCELLED, REJECTED, registrationEligibleStatus } from './status.js'
 import { awaitingSafetyReview } from './safetyReviewState.js'
+import { awaitingCoordinatorAssignment, supervisedByLead } from './coordinatorAssignment.js'
 import {
   EQUIPMENT_PREPARATION,
   PREPARATION_CONDITIONS,
@@ -40,7 +41,10 @@ export const ATTENDEE = 'attendee'
 // SPM-66: "a further new internal role ... Safety Officer, responsible for reviewing the operational safety of
 // planned events" (W7-CUST Change #6). Provisioned through system defaults, never self-registered.
 export const SAFETY_OFFICER = 'safety_officer'
-export const ROLES = Object.freeze([ORGANISER, COORDINATOR, VENUE_STAFF, TECHNICAL_STAFF, ATTENDEE, SAFETY_OFFICER])
+// SPM-68: "the Event Coordinator Lead, who is responsible for overseeing incoming event requests and assigning
+// them to individual Event Coordinators" (W7-CUST Change #5). Internal, provisioned through system defaults.
+export const COORDINATOR_LEAD = 'coordinator_lead'
+export const ROLES = Object.freeze([ORGANISER, COORDINATOR, VENUE_STAFF, TECHNICAL_STAFF, ATTENDEE, SAFETY_OFFICER, COORDINATOR_LEAD])
 
 // --- Sections -------------------------------------------------------------------------------------
 // Grouping of SPM-7's field list — plan, "Sections". Without named sections, "venue staff update only
@@ -78,6 +82,10 @@ const SECTION_ACCESS = Object.freeze({
   // hours come from the booked venues (GET /api/requests/:id/safety-review/venues). Internal planning and
   // preparation are not part of the review.
   [SAFETY_OFFICER]: { view: [CORE, VENUE, EQUIPMENT], edit: [] },
+  // SPM-68: "The Lead can review basic event information" (W7-CUST Change #5) — title, date and time, duration
+  // and attendance are in core; the organisation name is added by projectRequest(). The Lead edits nothing
+  // and does not act as a Coordinator (CL3 G8!C13).
+  [COORDINATOR_LEAD]: { view: [CORE], edit: [] },
 })
 
 // Finished events are read-only for every role. Not a customer ruling: team decision, proposed by
@@ -187,6 +195,12 @@ function roleInScope(role, user, request) {
       // that aren't awaiting or under their review." Any Safety Officer may see a queued event (CL3 G8!C49);
       // once the review is recorded the event leaves the queue and their scope.
       return awaitingSafetyReview(request)
+    case COORDINATOR_LEAD:
+      // SPM-68: the unassigned queue — submitted requests with no Coordinator. Any Lead may see them (CL3
+      // G8!C33: no single hard-coded Lead). Once assigned, the request leaves the queue.
+      // SPM-69: plus the active events this Lead assigned or reassigned, and those assigned before SPM-68
+      // (supervisedByLead, CL3 G8!C41, C38), so the Lead can reassign them. The view stays basic information.
+      return awaitingCoordinatorAssignment(request) || supervisedByLead(user, request)
     default:
       return false
   }
@@ -203,6 +217,7 @@ function roleInScope(role, user, request) {
  *  - Venue/technical staff: assigned events, never drafts. — plan, "Role capability"
  *  - Attendee: Confirmed or Preparation events with registration enabled (SPM-88).
  *  - Safety Officer: events in the safety-review queue (SPM-66).
+ *  - Event Coordinator Lead: submitted requests awaiting a Coordinator (SPM-68).
  */
 export function inScope(user, request) {
   return rolesOf(user).some((role) => roleInScope(role, user, request))
@@ -237,6 +252,7 @@ function roleGateOpen(role, user, request) {
     case TECHNICAL_STAFF:
       return STAFF_EDITABLE_STATUSES.includes(request.status)
     default:
+      // Attendee, Safety Officer and Event Coordinator Lead (SPM-68) edit nothing.
       return false
   }
 }
@@ -348,6 +364,11 @@ export function projectRequest(user, request) {
       ...((isAssignedCoordinator(user, request) || inScopeAs(ORGANISER, user, request)) ? { bookingId } : {}),
       venueName, location: location ?? null, startsAt, endsAt,
     }
+  }
+  // SPM-68: the Lead's "basic event information" includes the organisation, which is record metadata rather
+  // than a section. Only the name — never organisationId or any other metadata.
+  if (inScopeAs(COORDINATOR_LEAD, user, request) && !sections.includes(INTERNAL)) {
+    body.organisationName = request.organisationName ?? null
   }
   if (sections.includes(INTERNAL)) {
     for (const [key, value] of Object.entries(request)) {

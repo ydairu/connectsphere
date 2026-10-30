@@ -7,7 +7,6 @@ import {
   submitDraftEventRequest,
   updateDraftEventRequest,
 } from '../services/eventRequestService.js'
-import { NoEligibleCoordinatorError } from '../services/coordinatorAssignmentService.js'
 import { presentRequest } from '../middleware/authorise.js'
 import { loadVenueBookingState } from '../services/primaryVenueService.js'
 import { NOT_PERMITTED, UNKNOWN_ACTION } from '../../../shared/statusTransitions.js'
@@ -20,16 +19,12 @@ import {
 } from '../services/statusTransitionService.js'
 import { ReassignmentError, listReassignmentCandidates, reassignEventRequest } from '../services/coordinatorReassignmentService.js'
 import { EventStaffAssignmentError } from '../services/eventStaffAssignmentService.js'
+import { AssignmentError, assignCoordinator, listAssignmentCandidates } from '../services/coordinatorLeadAssignmentService.js'
 
 const FORBIDDEN_REASONS = Object.freeze([NOT_PERMITTED, NOT_ASSIGNED_STAFF])
 const BAD_REQUEST_REASONS = Object.freeze([UNKNOWN_ACTION, UNKNOWN_ARRANGEMENT, REASON_REQUIRED, REASON_INVALID])
 
 export function sendEventRequestError(error, res, next) {
-  // SPM-8: there is always meant to be an eligible coordinator, so an empty pool is a server fault. The
-  // submit transaction has already been aborted and the draft is unchanged.
-  if (error instanceof NoEligibleCoordinatorError) {
-    return res.status(500).json({ message: error.message })
-  }
   // SPM-9: not permitted → 403; a malformed action or reason → 400; otherwise the request's current state
   // (status, a guard, a pending cancellation request) does not allow the action right now → 409.
   if (error instanceof StatusTransitionError) {
@@ -42,6 +37,10 @@ export function sendEventRequestError(error, res, next) {
   }
   if (error instanceof EventStaffAssignmentError) {
     return res.status(error.status).json({ message: error.message })
+  }
+  // SPM-68: likewise for the Lead's assignment (shared/coordinatorLeadAssignment.js).
+  if (error instanceof AssignmentError) {
+    return res.status(error.status).json({ message: error.message, reason: error.reason })
   }
   if (error instanceof EventRequestValidationError) {
     return res.status(400).json({ message: 'Validation failed', errors: error.errors })
@@ -117,25 +116,43 @@ export function createEventRequestController(getDb, loadCoordinatorName = async 
       }
     },
 
-    // SPM-26 — the Coordinators this event may be handed to: { coordinators: [{ uid, name }] }.
+    // SPM-26/SPM-69 — for the Lead: { coordinators: [{ uid, name, activeEvents }], currentCoordinator: { uid, name } }.
     async listReassignmentCandidates(req, res, next) {
       try {
-        const coordinators = await listReassignmentCandidates(req.params.id, req.user, getDb())
-        return res.json({ coordinators })
+        return res.json(await listReassignmentCandidates(req.params.id, req.user, getDb()))
       } catch (error) {
         return sendEventRequestError(error, res, next)
       }
     },
 
-    // SPM-26 — body { coordinatorUid, handoverAgreed: true }. The caller has just lost access to the event
-    // (SPM-65), so the response is not the projected request but only who now has it.
+    // SPM-26/SPM-69 — body { coordinatorUid, expectedCoordinatorUid }. The response says only who now has the
+    // event; the Lead's page reloads the event to show it.
     async reassignEventRequest(req, res, next) {
       try {
         const { coordinator } = await reassignEventRequest(req.params.id, req.user, {
           coordinatorUid: req.body?.coordinatorUid,
-          handoverAgreed: req.body?.handoverAgreed,
+          expectedCoordinatorUid: req.body?.expectedCoordinatorUid,
         }, getDb())
         return res.json({ reassigned: true, coordinator: { name: coordinator.name } })
+      } catch (error) {
+        return sendEventRequestError(error, res, next)
+      }
+    },
+
+    // SPM-68 — the Coordinators the Lead may choose: { candidates: [{ uid, name, activeEvents }] }.
+    async listAssignmentCandidates(req, res, next) {
+      try {
+        return res.json(await listAssignmentCandidates(req.params.id, req.user, getDb()))
+      } catch (error) {
+        return sendEventRequestError(error, res, next)
+      }
+    },
+
+    // SPM-68 — body { coordinatorUid }. The request leaves the Lead's scope once assigned, so the response is
+    // only who now has it.
+    async assignCoordinator(req, res, next) {
+      try {
+        return res.json(await assignCoordinator(req.params.id, req.user, { coordinatorUid: req.body?.coordinatorUid }, getDb()))
       } catch (error) {
         return sendEventRequestError(error, res, next)
       }

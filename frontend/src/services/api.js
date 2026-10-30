@@ -253,6 +253,12 @@ export function getSafetyVenueDetails(user, id) {
   return authenticatedRequest(user, `/api/requests/${id}/safety-review/venues`)
 }
 
+// SPM-87: the Coordinator's choice of which sign-offs changed since approval go back for re-approval; an empty
+// list records that none need it. The response is shaped like getRequest's.
+export function decideSignOffReview(user, id, reapprove) {
+  return authenticatedRequest(user, `/api/requests/${id}/sign-off-review`, { method: 'POST', body: JSON.stringify({ reapprove }) })
+}
+
 // SPM-92: the Safety Officer's review, { outcome, checklist, comments, internalNotes }. An invalid review comes
 // back as 400 with `errors` by field; a review of an event no longer in the queue as 403 or 409.
 export function recordSafetyReview(user, id, review) {
@@ -270,20 +276,42 @@ export function transitionRequest(user, id, action, reason) {
   })
 }
 
-// SPM-26: the Coordinators this event may be handed to, as { coordinators: [{ uid, name }] }. Only the
-// event's assigned Coordinator receives it; anyone else gets the same refusals as reassignCoordinator.
+// SPM-26/SPM-69: for the Event Coordinator Lead, the Coordinators this event may be handed to, as
+// { coordinators: [{ uid, name, activeEvents }], currentCoordinator: { uid, name } }. Anyone else gets the same
+// refusals as reassignCoordinator.
 export function getReassignmentCandidates(user, id) {
   return authenticatedRequest(user, `/api/event-requests/${id}/reassignment/candidates`)
 }
 
-// SPM-26: hand the event to another Coordinator. Returns { reassigned: true, coordinator: { name } }; the
-// caller no longer has access to the event afterwards. Refusals: 404 (missing, or not the caller's event),
-// 403 (not permitted), 400 (no agreement, or an invalid Coordinator) or 409 (completed, cancelled or
-// rejected), each with a message.
-export function reassignCoordinator(user, id, { coordinatorUid, handoverAgreed }) {
+// SPM-69: the Lead hands the event to another Coordinator. `expectedCoordinatorUid` is currentCoordinator.uid from
+// the candidates. Returns { reassigned: true, coordinator: { name } }. Refusals: 404 or 403 (out of scope),
+// 403 (not a Lead who may reassign it), 400 (an invalid Coordinator) or 409 (finished event, or the Coordinator
+// changed since the candidates were loaded).
+export function reassignCoordinator(user, id, { coordinatorUid, expectedCoordinatorUid }) {
   return authenticatedRequest(user, `/api/event-requests/${id}/reassignment`, {
     method: 'POST',
-    body: JSON.stringify({ coordinatorUid, handoverAgreed }),
+    body: JSON.stringify({ coordinatorUid, expectedCoordinatorUid }),
+  })
+}
+
+// SPM-68: the Event Coordinator Lead's unassigned queue, oldest first: { requests: [{ id, title,
+// preferredDateTime, durationHours, expectedAttendees, organisationName, submittedAt }] }. 403 for anyone else.
+export function listUnassignedRequests(user) {
+  return authenticatedRequest(user, '/api/requests/unassigned')
+}
+
+// SPM-68: the Coordinators the Lead may choose for a request: { candidates: [{ uid, name, activeEvents }] }.
+export function getAssignmentCandidates(user, id) {
+  return authenticatedRequest(user, `/api/event-requests/${id}/assignment/candidates`)
+}
+
+// SPM-68: assign the request to a Coordinator. Returns { id, assigned: true, coordinator: { name } }; the request
+// then leaves the queue. Refusals: 403 (not a Lead), 404 (missing), 409 (no longer waiting for a Coordinator)
+// or 400 (an invalid Coordinator), each with a message.
+export function assignCoordinator(user, id, { coordinatorUid }) {
+  return authenticatedRequest(user, `/api/event-requests/${id}/assignment`, {
+    method: 'POST',
+    body: JSON.stringify({ coordinatorUid }),
   })
 }
 
@@ -300,6 +328,11 @@ export function markNotificationRead(user, id) {
 // registered list; an Attendee reads their own registrations.
 export function registerForEvent(user, eventId) {
   return authenticatedRequest(user, `/api/requests/${eventId}/registrations`, { method: 'POST' })
+}
+
+// SPM-39 — an Attendee joins a full event's waiting list.
+export function joinWaitingList(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/waiting-list`, { method: 'POST' })
 }
 
 export function listEventRegistrations(user, eventId) {
