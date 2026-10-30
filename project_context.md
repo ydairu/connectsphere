@@ -899,3 +899,13 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Status:** implemented locally, not Done. Human acceptance and peer review are pending; the backlog workbook was not updated.
 - **Local verification (29 Oct 2026, macOS):** see `docs/evidence/spm-69-traceability.md`.
 - **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No emulator or live-project check; Firestore rules were neither edited nor deployed.
+
+## SPM-39 waiting list — 29 October 2026
+
+- **Built:** on a full event with registration open, an Attendee is offered "Join waiting list", confirms, and is told their position, which "My registrations" also shows. Closed, not-yet-open or disabled registration, a free place, or an existing registration or entry refuses joining. Order is first come, first served by a counter on the registration lock. The Organiser and Coordinator see how many are waiting.
+- **Code:** `canJoinWaitingList`, `waitingListPosition`, `buildWaitlistEntry` (`shared/registration.js`); `joinWaitingList` and `POST /api/requests/:id/waiting-list` (`registrationService.js`, `requestRoutes.js`). Summarised in AGENTS.md §6.
+- **Backlog change:** SPM-39 AC4 (withdrawal invites the next person) moved to SPM-59 on 29 Oct 2026; it duplicated SPM-59 AC3.
+- **Team decisions (29 Oct 2026, pending PO confirmation):** W1–W5 in effective-requirements.md §4.18.
+- **Built tests-first** from the three criteria (`docs/evidence/spm-39-traceability.md`).
+- **Status:** In Progress, Sprint 4; human acceptance and peer review pending. Local verification (29 Oct 2026, macOS): lint and build passed; Node 136, frontend 101, root Vitest 2,176 (56 skipped) and Playwright 119/119 passed. The emulator test runs in CI only (no Java locally).
+- **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No live-project check; Firestore rules were neither edited nor deployed. The E2E spec shares SPM-19's 25 Nov 2026 date risk.

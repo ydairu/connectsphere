@@ -324,6 +324,11 @@ export function registerForEvent(user, eventId) {
   return authenticatedRequest(user, `/api/requests/${eventId}/registrations`, { method: 'POST' })
 }
 
+// SPM-39 — an Attendee joins a full event's waiting list.
+export function joinWaitingList(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/waiting-list`, { method: 'POST' })
+}
+
 export function listEventRegistrations(user, eventId) {
   return authenticatedRequest(user, `/api/requests/${eventId}/registrations`)
 }
