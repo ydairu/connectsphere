@@ -77,6 +77,8 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   const registrations = createRegistrationController(getEventRequestDb)
   router.get('/:id/registrations', authenticate, registrations.listForEvent)
   router.post('/:id/registrations', authenticate, registrations.register)
+  // SPM-39: a full event's waiting list.
+  router.post('/:id/waiting-list', authenticate, registrations.joinWaitingList)
 
   router.get('/', authenticate, controller.loadAll, controller.loadOwnerNames, authoriseList, controller.sendList)
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead,

@@ -886,6 +886,20 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 **[Known gaps — SPM-19]** Lowering the capacity below the current count is allowed and keeps every registration. Registrations made before a later capacity cut are not revisited. Withdrawal (SPM-59), the waiting list (SPM-39) and Attendee notices of cancellation or rescheduling (SPM-41) are separate stories.
 
+**[Implemented — SPM-39, 29 Oct 2026]** When an event is full and registration is otherwise open, an Attendee is offered the waiting list, confirms joining, and is told their position; "My registrations" shows it. Joining is refused when registration is closed, not yet open, disabled or unset, when the event is not Confirmed or Preparation, while a place is free, and when the Attendee is already registered or waiting. Order is first come, first served. Rules: `shared/registration.js` (`canJoinWaitingList`, `waitingListPosition`); service: `joinWaitingList` in `backend/src/services/registrationService.js`, under the same `systemLocks/registration-{eventId}` lock as registering.
+
+**[Backlog change, 29 Oct 2026]** SPM-39's fourth criterion (a withdrawal invites the next person on the waiting list) was moved to SPM-59, whose AC3 and AC5 already state it. SPM-39 has three criteria.
+
+**[Team decisions, 29 Oct 2026 — SPM-39, pending PO confirmation]**
+
+- **W1, storage:** a waiting-list entry is the Attendee's `eventRegistrations` record for the event with status `waitlisted`. It holds no place: it does not count toward capacity, the registered count or list, and it is not sent SPM-41's notices.
+- **W2, size:** no limit, as the customer set none.
+- **W3, order:** each join takes the next `waitlistSequence` from the event's registration lock in the joining transaction; position is the rank by that number. Never the Attendee id or a clock.
+- **W4, free place:** joining is refused while a place is free; the Attendee registers instead.
+- **W5, left to SPM-59:** leaving the waiting list, and inviting the next person when a place frees (by withdrawal, or by the Organiser raising the capacity).
+
+**[Known gaps — SPM-39]** Until SPM-59, a place freed by raising the capacity can be taken by anyone who registers, including people not on the waiting list. The Organiser and Coordinator see how many are waiting, not who.
+
 ### 4.19 Event Change Requests
 
 **[Customer-confirmed]** Significant changes — date/time, duration, attendance, venue/layout, or equipment — trigger re-review. If essential changes cannot be met, return for modification or reject. Post-confirmation changes do not automatically unbook existing arrangements.

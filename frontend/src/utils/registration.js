@@ -1,4 +1,4 @@
-import { CLOSED, NOT_OPEN_YET, REGISTERED, UNAVAILABLE_MESSAGES } from '../../../shared/registration.js'
+import { CLOSED, NOT_OPEN_YET, REGISTERED, UNAVAILABLE_MESSAGES, WAITLISTED } from '../../../shared/registration.js'
 import { CANCELLED, COMPLETED, PLANNING, REJECTED } from '../../../shared/status.js'
 
 // SPM-19 — how registration times, reasons and statuses read on the pages. The rules are in
@@ -16,10 +16,12 @@ export function unavailableText(summary) {
   return UNAVAILABLE_MESSAGES[summary?.reason] ?? 'Registration is not available.'
 }
 
-const STATUS_LABELS = Object.freeze({ [REGISTERED]: 'Registered' })
+const STATUS_LABELS = Object.freeze({ [REGISTERED]: 'Registered', [WAITLISTED]: 'Waitlisted' })
 
-export function registrationStatusLabel(status) {
-  return STATUS_LABELS[status] ?? status
+/** "Registered", or (SPM-39) "Waitlisted, position N" when the position is known. */
+export function registrationStatusLabel(status, waitingListPosition = null) {
+  const label = STATUS_LABELS[status] ?? status
+  return status === WAITLISTED && waitingListPosition ? `${label}, position ${waitingListPosition}` : label
 }
 
 /** "Venue A, Venue B", or null when no venue is known yet. */

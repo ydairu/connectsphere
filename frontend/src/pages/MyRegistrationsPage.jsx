@@ -59,7 +59,7 @@ function MyRegistrationsPage() {
                     <p className="request-meta">
                       {[displayDateTime(registration.eventStartsAt), venueText(registration.venueNames)].filter(Boolean).join(' · ')}
                     </p>
-                    <p>Status: <strong>{registrationStatusLabel(registration.status)}</strong></p>
+                    <p>Status: <strong>{registrationStatusLabel(registration.status, registration.waitingListPosition)}</strong></p>
                     {eventStatusNote(registration.eventStatus) && <p className="form-note"><strong>{eventStatusNote(registration.eventStatus)}</strong></p>}
                   </div>
                   {/* SPM-41: Attendees can open only Confirmed and Preparation events (SPM-42 scope). */}

@@ -1,4 +1,4 @@
-import { RegistrationError, listEventRegistrations, listMyRegistrations, registerForEvent } from '../services/registrationService.js'
+import { RegistrationError, joinWaitingList, listEventRegistrations, listMyRegistrations, registerForEvent } from '../services/registrationService.js'
 import { sendEventRequestError } from './eventRequestController.js'
 
 // SPM-19 — POST and GET /api/requests/:id/registrations, GET /api/registrations. Who may do what is decided in
@@ -9,6 +9,16 @@ export function createRegistrationController(getDb) {
     async register(req, res, next) {
       try {
         return res.status(201).json(await registerForEvent(req.params.id, req.user, getDb()))
+      } catch (error) {
+        if (error instanceof RegistrationError) return res.status(error.status).json({ message: error.message, reason: error.reason })
+        return sendEventRequestError(error, res, next)
+      }
+    },
+
+    // SPM-39: join the waiting list of a full event. Refusals map as for registering.
+    async joinWaitingList(req, res, next) {
+      try {
+        return res.status(201).json(await joinWaitingList(req.params.id, req.user, getDb()))
       } catch (error) {
         if (error instanceof RegistrationError) return res.status(error.status).json({ message: error.message, reason: error.reason })
         return sendEventRequestError(error, res, next)
