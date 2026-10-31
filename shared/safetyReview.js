@@ -24,6 +24,7 @@ import {
   shownSafetyReviewStatus,
 } from './safetyReviewState.js'
 import { SIGN_OFF_REVIEW_UNDECIDED, signOffReviewPending } from './signOffReview.js'
+import { SIGNIFICANT_CHANGE_REQUEST_PENDING, significantChangeRequestPending } from './changeRequestState.js'
 import { CONFIRMED, PLANNING } from './status.js'
 
 export * from './safetyReviewState.js'
@@ -85,6 +86,8 @@ export function canSubmitForSafetyReview(user, request) {
   // SPM-87 AC4, AC6: sign-offs changed since approval block submission until the Coordinator decides; once
   // they record that none need re-approval, the existing approvals count.
   if (signOffReviewPending(request)) return { allowed: false, reason: SIGN_OFF_REVIEW_UNDECIDED }
+  // SPM-40: the review would be of details about to change.
+  if (significantChangeRequestPending(request)) return { allowed: false, reason: SIGNIFICANT_CHANGE_REQUEST_PENDING }
   return { allowed: true }
 }
 

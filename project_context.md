@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 30 October 2026 (SPM-71 and SPM-84 merged with SPM-68/69/85/87/39/41; older implementation sections retain their historical dates)
+Last reviewed: 31 October 2026 (SPM-20/SPM-40 change requests; SPM-71 and SPM-84 merged with SPM-68/69/85/87/39/41; older implementation sections retain their historical dates)
 
 ## Current implementation map (27 October 2026)
 
@@ -34,6 +34,12 @@ The assigned Coordinator can choose a current approved venue booking as primary 
 The backfill script is dry-run-first and was not run against a live project. Already Confirmed multi-venue events without primary metadata need Coordinator selection before rollout. The locally available Product Backlog workbook was consulted for story interactions and left unchanged. The SPM-90 implementation meets the acceptance criteria in local automated checks; manual acceptance remains pending in `docs/testing/spm-90-manual-testing.md`. Acceptance mapping and the 29 October verification results are in `docs/evidence/spm-90-traceability.md`. No Firestore rules were changed or deployed.
 
 **SPM-19 integration (29 October 2026):** Once an approved primary venue is selected, new registrations use only that venue's capacity and name in availability, validation, confirmation and notices. Existing registration snapshots are retained. Events without a selected primary venue retain SPM-19's largest-approved-venue capacity rule.
+
+## Current SPM-20 / SPM-40 state (31 October 2026)
+
+The owning Organiser can request changes to a submitted event, and the assigned Coordinator sees them flagged, with the arrangements they may affect and how the booked venues suit the proposal, then accepts, declines or returns them (`shared/changeRequests.js`, `POST /api/requests/:id/change-requests`, `.../decision`, `GET .../assessment`). Submitting changes no event field and nothing is released or reset. An accepted change goes through the same save as a Coordinator's edit, so significant changes follow SPM-10, SPM-87 and the safety re-review, and reschedules reach registered Attendees (SPM-41).
+
+Both stories are **In Progress / not Done**. Criteria and evidence: `docs/evidence/spm-20-40-traceability.md`. The team decisions in effective-requirements.md §4.19 need PO confirmation, and no live Firebase check, peer review or human acceptance has been done. Local run on 31 Oct 2026 (Windows): lint and build passed (existing large-chunk warning); 147 Node, 101 frontend and 2,331 Vitest tests passed (57 opt-in skips); Playwright 124 of 124 passed before the final assessment layout fix, and the SPM-20, SPM-87 and SPM-92 journeys passed again after it.
 
 ## Current SPM-87 state (29 October 2026)
 

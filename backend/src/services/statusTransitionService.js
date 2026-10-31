@@ -53,6 +53,7 @@ import {
   APPROVE,
   ARRANGEMENTS_NOT_APPROVED,
   PRIMARY_VENUE_REQUIRED,
+  SIGNIFICANT_CHANGE_REQUEST_PENDING,
   SIGN_OFF_REVIEW_UNDECIDED,
   CANCEL,
   CONFIRM,
@@ -67,11 +68,21 @@ import {
   RETURN_FOR_CLARIFICATION,
   SUBMIT,
   TERMINAL_STATUS,
+  TERMINAL_STATUSES,
   UNKNOWN_ACTION,
   WRONG_STATUS,
   canTransition,
 } from '../../../shared/statusTransitions.js'
 import { NO_SIGN_OFF_REVIEW } from '../../../shared/signOffReview.js'
+import {
+  CANCELLATION_REQUEST_OPEN,
+  CHANGE_ALREADY_PENDING,
+  CHANGE_NOT_ELIGIBLE,
+  NO_COORDINATOR_ASSIGNED,
+  NO_OPEN_CHANGE_REQUEST,
+  UNKNOWN_CHANGE_DECISION,
+  closedChangeRequests,
+} from '../../../shared/changeRequests.js'
 import { cancellationNotifications, eventStaffAssignedNotifications, preparationStartedNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
 import {
   ARRANGEMENTS_NOT_READY,
@@ -118,6 +129,13 @@ const MESSAGES = Object.freeze({
   [NOT_PERMITTED]: 'You are not permitted to perform this action on this request.',
   [ARRANGEMENTS_NOT_APPROVED]: 'All mandatory venue and technical arrangements must be approved before confirmation.',
   [PRIMARY_VENUE_REQUIRED]: 'Choose one current approved primary venue before confirming this event.',
+  [CHANGE_NOT_ELIGIBLE]: 'A change can be requested after submission, until the event closes. Edit a returned request directly.',
+  [NO_COORDINATOR_ASSIGNED]: 'A change can be requested once a coordinator is assigned to the event.',
+  [CHANGE_ALREADY_PENDING]: 'A change request is already awaiting the coordinator’s decision.',
+  [NO_OPEN_CHANGE_REQUEST]: 'There is no change request to decide.',
+  [UNKNOWN_CHANGE_DECISION]: 'Choose accept, decline or return.',
+  [CANCELLATION_REQUEST_OPEN]: 'This event has an open cancellation request. Decide it first.',
+  [SIGNIFICANT_CHANGE_REQUEST_PENDING]: 'A significant change request is waiting for your decision. Decide it first.',
   [SIGN_OFF_REVIEW_UNDECIDED]: 'Sign-offs have changed since approval. Choose which need re-approval, or record that none do, first.',
   [NO_SIGN_OFF_REVIEW]: 'There are no sign-offs changed since approval to decide on.',
   [EVENT_NOT_ENDED]: 'An event can be marked complete only after it has taken place.',
@@ -275,6 +293,11 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       refuse(decision)
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }
+      // SPM-20: an open change request closes with its event.
+      if (TERMINAL_STATUSES.includes(decision.to)) {
+        const closed = closedChangeRequests(existing, at)
+        if (closed) update.changeRequests = closed
+      }
       if (action === APPROVE) {
         const assignment = await assignEventStaffInTransaction(tx, db, existing, at)
         Object.assign(update, assignment.update)
