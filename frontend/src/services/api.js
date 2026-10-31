@@ -264,6 +264,19 @@ export function decideSignOffReview(user, id, reapprove) {
   return authenticatedRequest(user, `/api/requests/${id}/sign-off-review`, { method: 'POST', body: JSON.stringify({ reapprove }) })
 }
 
+// SPM-20: the owning Organiser's change request, { changes: { section: { field: value } }, reason? }. SPM-40: the assigned
+// Coordinator's assessment of it and { decision: 'accept' | 'decline' | 'return', reason? }. Responses to the two
+// writes are shaped like getRequest's. An invalid request is 400 with `errors` by field.
+export function submitChangeRequest(user, id, request) {
+  return authenticatedRequest(user, `/api/requests/${id}/change-requests`, { method: 'POST', body: JSON.stringify(request) })
+}
+export function decideChangeRequest(user, id, decision) {
+  return authenticatedRequest(user, `/api/requests/${id}/change-requests/decision`, { method: 'POST', body: JSON.stringify(decision) })
+}
+export function getChangeRequestAssessment(user, id) {
+  return authenticatedRequest(user, `/api/requests/${id}/change-requests/assessment`)
+}
+
 // SPM-92: the Safety Officer's review, { outcome, checklist, comments, internalNotes }. An invalid review comes
 // back as 400 with `errors` by field; a review of an event no longer in the queue as 403 or 409.
 export function recordSafetyReview(user, id, review) {
@@ -338,6 +351,23 @@ export function registerForEvent(user, eventId) {
 // SPM-39 — an Attendee joins a full event's waiting list.
 export function joinWaitingList(user, eventId) {
   return authenticatedRequest(user, `/api/requests/${eventId}/waiting-list`, { method: 'POST' })
+}
+
+// SPM-59 — withdraw a registration, leave the waiting list, and answer an invitation to a freed place.
+export function withdrawRegistration(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/registrations/withdraw`, { method: 'POST' })
+}
+
+export function leaveWaitingList(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/waiting-list/leave`, { method: 'POST' })
+}
+
+export function acceptInvitation(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/invitation/accept`, { method: 'POST' })
+}
+
+export function declineInvitation(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/invitation/decline`, { method: 'POST' })
 }
 
 export function listEventRegistrations(user, eventId) {

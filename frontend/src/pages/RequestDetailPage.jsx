@@ -21,7 +21,9 @@ import StatusPill from '../components/StatusPill.jsx'
 import SafetyReview from '../components/SafetyReview.jsx'
 import SafetyStatusPill from '../components/SafetyStatusPill.jsx'
 import SignOffReview from '../components/SignOffReview.jsx'
+import ChangeRequest from '../components/ChangeRequest.jsx'
 import { SIGN_OFF_REVIEW_PENDING } from '../../../shared/signOffReview.js'
+import { CHANGE_PENDING } from '../../../shared/changeRequestState.js'
 import Tabs from '../components/Tabs.jsx'
 import VenueBookingOverview from '../components/VenueBookingOverview.jsx'
 import { useAuth } from '../hooks/useAuth.js'
@@ -80,6 +82,14 @@ import { SECTION_ORDER, optionLabel, preparationReadOnlyText, sectionFields, sec
 // SPM-19: an Attendee registers from the Event Status tab (attendeeRegistration in the response); the owning
 // Organiser and assigned Coordinator see the registered list there (canViewRegistrations). The Organiser changes
 // the registration period and capacity in the Registration section, which reopens for them once Confirmed.
+
+// SPM-20, SPM-40: an Organiser asks for changes after submission, and the assigned Coordinator decides them.
+const CHANGE_REQUEST_MESSAGES = {
+  submit: 'Your change request was sent to the event coordinator.',
+  accept: 'Change accepted and saved.',
+  decline: 'Change declined. The organiser has been notified.',
+  return: 'Change returned to the organiser for modification.',
+}
 
 function ReadOnlyValue({ field, value }) {
   const { type } = field
@@ -177,6 +187,8 @@ function RequestDetailPage() {
   const [safetyReview, setSafetyReview] = useState(null)
   const [canDecideSafety, setCanDecideSafety] = useState(false)
   const [signOffReview, setSignOffReview] = useState(null)
+  const [changeRequest, setChangeRequest] = useState(null)
+  const [canSubmitChange, setCanSubmitChange] = useState(false)
   const [attendeeRegistration, setAttendeeRegistration] = useState(null)
   const [canViewRegistrations, setCanViewRegistrations] = useState(false)
   const [historyVersion, setHistoryVersion] = useState(0)
@@ -211,6 +223,8 @@ function RequestDetailPage() {
     setSafetyReview(response.safetyReview ?? null)
     setCanDecideSafety(response.canDecideSafetyReview === true)
     setSignOffReview(response.signOffReview ?? null)
+    setChangeRequest(response.changeRequest ?? null)
+    setCanSubmitChange(response.canSubmitChangeRequest === true)
     setAttendeeRegistration(response.attendeeRegistration ?? null)
     setCanViewRegistrations(response.canViewRegistrations === true)
     setOwner(typeof response.isOwnRequest === 'boolean' ? { name: response.ownerName ?? null, isOwn: response.isOwnRequest } : null)
@@ -444,6 +458,18 @@ function RequestDetailPage() {
             {request.primaryVenue && <Card className="request-form-section"><h2>Event location</h2><p><strong>{request.primaryVenue.venueName}</strong></p>{request.primaryVenue.location && <p>{request.primaryVenue.location}</p>}</Card>}
             {primaryVenueRequired && request.status === PLANNING && <div className="alert alert-info" role="status">Choose an approved primary venue in Venue Details before confirming this event.</div>}
             <AttendeeRegistration user={user} requestId={id} summary={attendeeRegistration} />
+            <ChangeRequest
+              user={user}
+              request={request}
+              changeRequest={changeRequest}
+              canSubmit={canSubmitChange}
+              busy={acting || saving}
+              onUpdated={(response, step) => {
+                applyResponse(response)
+                setHistoryVersion((version) => version + 1)
+                setStatus({ type: 'success', message: CHANGE_REQUEST_MESSAGES[step] })
+              }}
+            />
             <SignOffReview
               user={user}
               requestId={id}
@@ -463,6 +489,7 @@ function RequestDetailPage() {
               primaryVenueRequired={primaryVenueRequired}
               safetyReviewStatus={safetyReview?.status ?? null}
               signOffReviewPending={signOffReview?.status === SIGN_OFF_REVIEW_PENDING}
+              changeRequestPending={changeRequest?.status === CHANGE_PENDING && changeRequest.significant === true}
               busy={acting || saving}
               onAction={handleAction}
             />

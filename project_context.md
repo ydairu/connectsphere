@@ -1,6 +1,6 @@
 # ConnectSphere Project Context
 
-Last reviewed: 31 October 2026 (SPM-89 local implementation; older implementation sections retain their historical dates)
+Last reviewed: 31 October 2026 (SPM-89 local implementation; SPM-20/SPM-40 change requests; SPM-71 and SPM-84 merged with SPM-68/69/85/87/39/41; older implementation sections retain their historical dates)
 
 ## Current SPM-89 state (31 October 2026)
 
@@ -40,6 +40,12 @@ The assigned Coordinator can choose a current approved venue booking as primary 
 The backfill script is dry-run-first and was not run against a live project. Already Confirmed multi-venue events without primary metadata need Coordinator selection before rollout. The locally available Product Backlog workbook was consulted for story interactions and left unchanged. The SPM-90 implementation meets the acceptance criteria in local automated checks; manual acceptance remains pending in `docs/testing/spm-90-manual-testing.md`. Acceptance mapping and the 29 October verification results are in `docs/evidence/spm-90-traceability.md`. No Firestore rules were changed or deployed.
 
 **SPM-19 integration (29 October 2026):** Once an approved primary venue is selected, new registrations use only that venue's capacity and name in availability, validation, confirmation and notices. Existing registration snapshots are retained. Events without a selected primary venue retain SPM-19's largest-approved-venue capacity rule.
+
+## Current SPM-20 / SPM-40 state (31 October 2026)
+
+The owning Organiser can request changes to a submitted event, and the assigned Coordinator sees them flagged, with the arrangements they may affect and how the booked venues suit the proposal, then accepts, declines or returns them (`shared/changeRequests.js`, `POST /api/requests/:id/change-requests`, `.../decision`, `GET .../assessment`). Submitting changes no event field and nothing is released or reset. An accepted change goes through the same save as a Coordinator's edit, so significant changes follow SPM-10, SPM-87 and the safety re-review, and reschedules reach registered Attendees (SPM-41).
+
+Both stories are **In Progress / not Done**. Criteria and evidence: `docs/evidence/spm-20-40-traceability.md`. The team decisions in effective-requirements.md §4.19 need PO confirmation, and no live Firebase check, peer review or human acceptance has been done. Local run on 31 Oct 2026 (Windows): lint and build passed (existing large-chunk warning); 147 Node, 101 frontend and 2,331 Vitest tests passed (57 opt-in skips); Playwright 124 of 124 passed before the final assessment layout fix, and the SPM-20, SPM-87 and SPM-92 journeys passed again after it.
 
 ## Current SPM-87 state (29 October 2026)
 
@@ -937,3 +943,13 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Status:** implemented locally, not Done. Human acceptance and peer review are pending; the backlog workbook was not updated.
 - **Local verification (30 Oct 2026, macOS):** see `docs/evidence/spm-84-traceability.md`.
 - **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No emulator or live-project check; Firestore rules were neither edited nor deployed.
+
+## SPM-59 withdraw and release the place — 31 October 2026
+
+- **Built:** where the Organiser allows it (and before their cut-off and the event start), a registered Attendee withdraws after confirming; it shows as Withdrawn and the registered count drops by one. The freed place goes to the next person on the waiting list by invitation (48 hours, shorter if registration closes or the event starts), held for them; they accept or decline, or it lapses and passes on; with no one waiting the place reopens. Waitlisted Attendees can leave the list. The Organiser and Coordinator see places held for invitations.
+- **Code:** `canWithdraw`, `canRespondToInvitation`, `settleWaitingList`, `placesHeld` (`shared/registration.js`); `registrationTransaction` and `settleEventRegistrations` with withdraw/leave/accept/decline (`registrationService.js`); routes under `/api/requests/:id/` (`registrations/withdraw`, `waiting-list/leave`, `invitation/accept`, `invitation/decline`). Summarised in AGENTS.md §6.
+- **Team decisions (31 Oct 2026, pending PO confirmation):** X1–X8 in effective-requirements.md §4.18. This closes SPM-39's capacity-rise gap and delivers SPM-39's former AC4.
+- **Built tests-first** from the criteria (`docs/evidence/spm-59-traceability.md`).
+- **Gaps:** expiry is checked on reads and changes only (X5), so an untouched event passes a lapsed invitation on only when next read.
+- **Status:** In Progress, Sprint 4; human acceptance and peer review pending. Local verification (31 Oct 2026, macOS, after merging SPM-84): lint and build passed; Node 147, frontend 101, root Vitest 2,348 (58 skipped) and Playwright 124/124 passed. The emulator test runs in CI only (no Java locally).
+- **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No live-project check; Firestore rules were neither edited nor deployed. The E2E spec shares SPM-19's 25 Nov 2026 date risk.

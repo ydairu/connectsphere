@@ -27,9 +27,14 @@
 //   start preparation                assigned Venue and Technical Support Staff   (SPM-88)
 //   sign-offs sent back for          the Venue Staff member of each booking sent   (SPM-87)
 //   re-approval                      back, and the technical reviewers
+//   change request submitted or      the assigned Coordinator, flagged when        (SPM-20, SPM-40)
+//   resubmitted                      significant
+//   change request accepted,         the owning Organiser, with the reason or      (SPM-20, SPM-40)
+//   declined or returned             message
 //   safety review recorded           the assigned Coordinator, with the Safety     (SPM-92)
 //                                    Officer's comments
 //   attendee registers                the Attendee, with the event's start and venue (SPM-19)
+//   freed place offered               the next waitlisted Attendee, with the invitation deadline (SPM-59)
 //   event cancelled or rescheduled    every registered Attendee, with no reason; a reschedule carries the
 //                                     new and previous start and end (SPM-41)
 //   request submitted into the        every Event Coordinator Lead, with the event's start; a Returned
@@ -72,6 +77,9 @@ export const REQUEST_CONFIRMED_NOTICE = 'request_confirmed'
 export const REQUEST_RETURNED_NOTICE = 'request_returned'
 // SPM-87: the Coordinator sent sign-offs back for re-approval after a significant change.
 export const SIGN_OFF_REAPPROVAL_REQUESTED_NOTICE = 'sign_off_reapproval_requested'
+// SPM-20 / SPM-40: an Organiser's change request, and the Coordinator's decision.
+export const CHANGE_REQUESTED_NOTICE = 'change_requested'
+export const CHANGE_REQUEST_DECIDED_NOTICE = 'change_request_decided'
 // SPM-92: the Safety Officer recorded the event's safety review.
 export const SAFETY_APPROVED_NOTICE = 'safety_approved'
 export const SAFETY_CHANGES_REQUESTED_NOTICE = 'safety_changes_requested'
@@ -87,6 +95,8 @@ export const EVENT_REASSIGNED_AWAY_NOTICE = 'event_reassigned_away'
 export const EVENT_COORDINATOR_ASSIGNED_NOTICE = 'event_coordinator_assigned'
 // SPM-19: the Attendee's registration was confirmed.
 export const REGISTRATION_CONFIRMED_NOTICE = 'registration_confirmed'
+// SPM-59: a waitlisted Attendee was offered a freed place.
+export const WAITING_LIST_INVITATION_NOTICE = 'waiting_list_invitation'
 
 function titleOf(request) {
   const title = request.core?.title
@@ -306,6 +316,24 @@ export function safetyReviewDecidedNotifications(event, actor, { outcome, commen
   return addressed([{ recipientUid: event.assignedCoordinatorUid, type, message, reason: comments || null }], event, actor, title, at)
 }
 
+/** SPM-40 — tells the assigned Coordinator a change request is waiting, flagging one that needs re-review. */
+export function changeRequestedNotifications(event, actor, { significant, resubmitted = false, reason = null, at }) {
+  const title = titleOf(event)
+  const message = `The organiser ${resubmitted ? 'resubmitted a' : 'requested a'} ${significant ? 'significant ' : ''}change to “${title}”.${significant ? ' Review the arrangements it may affect before deciding.' : ''}`
+  return addressed([{ recipientUid: event.assignedCoordinatorUid, type: CHANGE_REQUESTED_NOTICE, message, reason }], event, actor, title, at)
+}
+
+/** SPM-20 — tells the owning Organiser the Coordinator's decision: `decision` is accept, decline or return. */
+export function changeRequestDecidedNotifications(event, actor, { decision, reason = null, at }) {
+  const title = titleOf(event)
+  const message = {
+    accept: `Your change request for “${title}” was accepted.`,
+    decline: `Your change request for “${title}” was declined.`,
+    return: `Your change request for “${title}” was returned. Update it and resubmit.`,
+  }[decision]
+  return addressed([{ recipientUid: event.ownerUid, type: CHANGE_REQUEST_DECIDED_NOTICE, message, reason }], event, actor, title, at)
+}
+
 /**
  * SPM-87 — the notices for the staff whose sign-offs the Coordinator sent back for re-approval. `recipients`
  * is [{ recipientUid, labels }], one entry per staff member, naming what they are asked to review again.
@@ -419,6 +447,26 @@ export function registrationConfirmedNotifications(event, attendee, { venueNames
     message: `You are registered for “${title}”${where}.`,
     reason: null,
     eventStartsAt: event.core?.preferredDateTime ?? null,
+    eventRequestId: event.id,
+    eventTitle: title,
+    createdAt: at,
+    readAt: null,
+  }]
+}
+
+/**
+ * SPM-59 — the notice for the Attendee offered a freed place (AC3: "notified and invited to apply"). It carries the
+ * deadline (`invitationExpiresAt`), which the page shows in the reader's time zone.
+ */
+export function waitingListInvitationNotifications(event, entry, { at }) {
+  if (!entry?.attendeeUid) return []
+  const title = titleOf(event)
+  return [{
+    recipientUid: entry.attendeeUid,
+    type: WAITING_LIST_INVITATION_NOTICE,
+    message: `A place is available for “${title}”. Accept it before your invitation expires, or it passes to the next person.`,
+    reason: null,
+    invitationExpiresAt: entry.invitationExpiresAt ?? null,
     eventRequestId: event.id,
     eventTitle: title,
     createdAt: at,

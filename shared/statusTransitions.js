@@ -24,6 +24,7 @@ import {
 import { NOT_PERMITTED, isAssignedCoordinator, isOwningOrganiser } from './requestActors.js'
 import { safetyApproved } from './safetyReviewState.js'
 import { SIGN_OFF_REVIEW_UNDECIDED, signOffReviewPending } from './signOffReview.js'
+import { SIGNIFICANT_CHANGE_REQUEST_PENDING, significantChangeRequestPending } from './changeRequestState.js'
 import {
   CANCELLED,
   COMPLETED,
@@ -63,7 +64,7 @@ export { NOT_PERMITTED }
 export const ARRANGEMENTS_NOT_APPROVED = 'arrangements_not_approved'
 export const PRIMARY_VENUE_REQUIRED = 'primary_venue_required'
 // SPM-87: sign-offs changed since approval wait for the Coordinator's choice.
-export { SIGN_OFF_REVIEW_UNDECIDED }
+export { SIGN_OFF_REVIEW_UNDECIDED, SIGNIFICANT_CHANGE_REQUEST_PENDING }
 export const EVENT_NOT_ENDED = 'event_not_ended'
 export const INSUFFICIENT_INFORMATION = 'insufficient_information'
 export const SAFETY_APPROVAL_REQUIRED = 'safety_approval_required'
@@ -129,12 +130,14 @@ const TRANSITIONS = Object.freeze({
   // approved, when the assigned Event Coordinator confirms it, then its status changes to Confirmed."
   // SPM-91: "The event cannot become Confirmed without a valid safety approval." (CL3 G8!C2, C3)
   // SPM-87: nor while the Coordinator has not decided which changed sign-offs need re-approval.
+  // SPM-40: nor while a significant change request waits for the Coordinator's decision.
   [CONFIRM]: {
     from: [PLANNING],
     to: CONFIRMED,
     actor: isAssignedCoordinator,
     guard: (request) => !arrangementsApproved(request) ? ARRANGEMENTS_NOT_APPROVED
       : signOffReviewPending(request) ? SIGN_OFF_REVIEW_UNDECIDED
+      : significantChangeRequestPending(request) ? SIGNIFICANT_CHANGE_REQUEST_PENDING
       : request.primaryVenueReadiness?.ready !== true ? PRIMARY_VENUE_REQUIRED
         : safetyApproved(request) ? null : SAFETY_APPROVAL_REQUIRED,
   },

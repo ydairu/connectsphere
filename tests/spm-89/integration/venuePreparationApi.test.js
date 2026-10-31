@@ -42,6 +42,11 @@ describe('SPM-89 HTTP API with mocked token and in-memory Firestore', () => {
     const view = (await request(app).get('/api/requests/event').set(auth(coordinator.uid))).body
     expect(view.eventPreparationReadiness).toMatchObject({ ready: true, equipmentReady: true })
     expect(view.eventPreparationReadiness.venues).toHaveLength(2)
+    const edited = await request(app).patch('/api/requests/event').set(auth(coordinator.uid))
+      .send({ core: { description: 'Updated event details' } })
+    expect(edited.status).toBe(200)
+    expect(edited.body.eventPreparationReadiness).toMatchObject({ ready: true, equipmentReady: true })
+    expect(edited.body.eventPreparationReadiness.venues).toHaveLength(2)
     const history = (await request(app).get('/api/requests/event/history').set(auth(coordinator.uid))).body.entries
     expect(history).toEqual(expect.arrayContaining([expect.objectContaining({ bookingId: hall.id, venueName: 'Hall',
       field: `venuePreparation.${hall.id}.status`, oldValue: 'not_started', newValue: 'ready' })]))

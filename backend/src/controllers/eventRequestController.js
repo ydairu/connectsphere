@@ -11,6 +11,7 @@ import { presentRequest } from '../middleware/authorise.js'
 import { loadVenueBookingState } from '../services/primaryVenueService.js'
 import { NOT_PERMITTED, UNKNOWN_ACTION } from '../../../shared/statusTransitions.js'
 import { NOT_ASSIGNED_STAFF, UNKNOWN_ARRANGEMENT } from '../../../shared/arrangements.js'
+import { UNKNOWN_CHANGE_DECISION } from '../../../shared/changeRequests.js'
 import {
   REASON_INVALID,
   REASON_REQUIRED,
@@ -22,7 +23,7 @@ import { EventStaffAssignmentError } from '../services/eventStaffAssignmentServi
 import { AssignmentError, assignCoordinator, listAssignmentCandidates } from '../services/coordinatorLeadAssignmentService.js'
 
 const FORBIDDEN_REASONS = Object.freeze([NOT_PERMITTED, NOT_ASSIGNED_STAFF])
-const BAD_REQUEST_REASONS = Object.freeze([UNKNOWN_ACTION, UNKNOWN_ARRANGEMENT, REASON_REQUIRED, REASON_INVALID])
+const BAD_REQUEST_REASONS = Object.freeze([UNKNOWN_ACTION, UNKNOWN_ARRANGEMENT, REASON_REQUIRED, REASON_INVALID, UNKNOWN_CHANGE_DECISION])
 
 export function sendEventRequestError(error, res, next) {
   // SPM-9: not permitted → 403; a malformed action or reason → 400; otherwise the request's current state

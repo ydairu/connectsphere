@@ -4,6 +4,8 @@ import { createEquipmentRequestController } from '../controllers/equipmentReques
 import { createRequestController } from '../controllers/requestController.js'
 import { createSafetyReviewController } from '../controllers/safetyReviewController.js'
 import { createSignOffReviewController } from '../controllers/signOffReviewController.js'
+import { sendEventRequestError } from '../controllers/eventRequestController.js'
+import { assessChangeRequest } from '../services/changeRequestService.js'
 import { authoriseHistory, authoriseList, authoriseRead, authoriseWrite, sendHistory } from '../middleware/authorise.js'
 import { createCoordinatorNameLoader } from '../services/assignedCoordinatorService.js'
 import { createOwnerNameLoader } from '../services/requestOwnerService.js'
@@ -74,6 +76,14 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   // SPM-87: the Coordinator chooses which sign-offs changed since approval go back for re-approval. Who may
   // choose and what a choice writes are decided in shared/signOffReview.js.
   router.post('/:id/sign-off-review', authenticate, createSignOffReviewController(getEventRequestDb).decide)
+  // SPM-20, SPM-40: an Organiser's change request and the Coordinator's decision and assessment. Who may do each is
+  // decided in shared/changeRequests.js. There is deliberately no status in the body: the decision names an action.
+  router.post('/:id/change-requests', authenticate, controller.loadOne, controller.submitChangeRequest)
+  router.post('/:id/change-requests/decision', authenticate, controller.loadOne, controller.decideChangeRequest)
+  router.get('/:id/change-requests/assessment', authenticate, async (req, res, next) => {
+    try { res.json(await assessChangeRequest(req.params.id, req.user, getEventRequestDb())) }
+    catch (error) { sendEventRequestError(error, res, next) }
+  })
   // SPM-19: an Attendee registers; the owning Organiser and assigned Coordinator read the registered list.
   // Who may do either is decided in shared/registration.js.
   const registrations = createRegistrationController(getEventRequestDb)
@@ -81,6 +91,11 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   router.post('/:id/registrations', authenticate, registrations.register)
   // SPM-39: a full event's waiting list.
   router.post('/:id/waiting-list', authenticate, registrations.joinWaitingList)
+  // SPM-59: withdraw a registration, leave the waiting list, answer an invitation to a freed place.
+  router.post('/:id/registrations/withdraw', authenticate, registrations.withdraw)
+  router.post('/:id/waiting-list/leave', authenticate, registrations.leaveWaitingList)
+  router.post('/:id/invitation/accept', authenticate, registrations.acceptInvitation)
+  router.post('/:id/invitation/decline', authenticate, registrations.declineInvitation)
 
   router.get('/', authenticate, controller.loadAll, controller.loadOwnerNames, authoriseList, controller.sendList)
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead,
