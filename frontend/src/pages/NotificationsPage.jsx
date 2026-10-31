@@ -13,6 +13,7 @@ import {
   NEW_UNASSIGNED_REQUEST_NOTICE,
   REQUEST_CONFIRMED_NOTICE,
   REQUEST_RETURNED_NOTICE,
+  WAITING_LIST_INVITATION_NOTICE,
 } from '../../../shared/notifications.js'
 
 // The signed-in user's in-app notifications. Venue booking rejections link to the booking; other notices
@@ -49,6 +50,8 @@ function linkFor(notification) {
   if (notification.type === NEW_UNASSIGNED_REQUEST_NOTICE) return { to: '/requests/unassigned', label: 'View unassigned requests' }
   const to = `/requests/${notification.eventRequestId}`
   if (notification.type === REQUEST_RETURNED_NOTICE) return { to, label: 'Edit request' }
+  // SPM-59: the invited Attendee answers on the event page, which they can open while it is Confirmed.
+  if (notification.type === WAITING_LIST_INVITATION_NOTICE) return { to, label: 'View invitation' }
   if (notification.type === REQUEST_CONFIRMED_NOTICE) return { to, label: 'View arrangements' }
   return { to, label: 'View event' }
 }
@@ -124,6 +127,7 @@ function NotificationsPage() {
                       <h2>{notification.message}</h2>
                       {notification.reason && <p>{reasonLabel}: {notification.reason}</p>}
                       {/* SPM-19: a registration confirmation carries the event's start, shown in the reader's time zone. */}
+                      {formatDateTime(notification.invitationExpiresAt) && <p>Accept by: {formatDateTime(notification.invitationExpiresAt)}</p>}
                       {notification.type === EVENT_RESCHEDULED_NOTICE ? (
                         // SPM-41: the new and previous time, in the reader's time zone.
                         <>
