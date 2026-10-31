@@ -27,6 +27,10 @@
 //   start preparation                assigned Venue and Technical Support Staff   (SPM-88)
 //   sign-offs sent back for          the Venue Staff member of each booking sent   (SPM-87)
 //   re-approval                      back, and the technical reviewers
+//   change request submitted or      the assigned Coordinator, flagged when        (SPM-20, SPM-40)
+//   resubmitted                      significant
+//   change request accepted,         the owning Organiser, with the reason or      (SPM-20, SPM-40)
+//   declined or returned             message
 //   safety review recorded           the assigned Coordinator, with the Safety     (SPM-92)
 //                                    Officer's comments
 //   attendee registers                the Attendee, with the event's start and venue (SPM-19)
@@ -73,6 +77,9 @@ export const REQUEST_CONFIRMED_NOTICE = 'request_confirmed'
 export const REQUEST_RETURNED_NOTICE = 'request_returned'
 // SPM-87: the Coordinator sent sign-offs back for re-approval after a significant change.
 export const SIGN_OFF_REAPPROVAL_REQUESTED_NOTICE = 'sign_off_reapproval_requested'
+// SPM-20 / SPM-40: an Organiser's change request, and the Coordinator's decision.
+export const CHANGE_REQUESTED_NOTICE = 'change_requested'
+export const CHANGE_REQUEST_DECIDED_NOTICE = 'change_request_decided'
 // SPM-92: the Safety Officer recorded the event's safety review.
 export const SAFETY_APPROVED_NOTICE = 'safety_approved'
 export const SAFETY_CHANGES_REQUESTED_NOTICE = 'safety_changes_requested'
@@ -307,6 +314,24 @@ export function safetyReviewDecidedNotifications(event, actor, { outcome, commen
   if (!notices[outcome]) return []
   const [type, message] = notices[outcome]
   return addressed([{ recipientUid: event.assignedCoordinatorUid, type, message, reason: comments || null }], event, actor, title, at)
+}
+
+/** SPM-40 — tells the assigned Coordinator a change request is waiting, flagging one that needs re-review. */
+export function changeRequestedNotifications(event, actor, { significant, resubmitted = false, reason = null, at }) {
+  const title = titleOf(event)
+  const message = `The organiser ${resubmitted ? 'resubmitted a' : 'requested a'} ${significant ? 'significant ' : ''}change to “${title}”.${significant ? ' Review the arrangements it may affect before deciding.' : ''}`
+  return addressed([{ recipientUid: event.assignedCoordinatorUid, type: CHANGE_REQUESTED_NOTICE, message, reason }], event, actor, title, at)
+}
+
+/** SPM-20 — tells the owning Organiser the Coordinator's decision: `decision` is accept, decline or return. */
+export function changeRequestDecidedNotifications(event, actor, { decision, reason = null, at }) {
+  const title = titleOf(event)
+  const message = {
+    accept: `Your change request for “${title}” was accepted.`,
+    decline: `Your change request for “${title}” was declined.`,
+    return: `Your change request for “${title}” was returned. Update it and resubmit.`,
+  }[decision]
+  return addressed([{ recipientUid: event.ownerUid, type: CHANGE_REQUEST_DECIDED_NOTICE, message, reason }], event, actor, title, at)
 }
 
 /**

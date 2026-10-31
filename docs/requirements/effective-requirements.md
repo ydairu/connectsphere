@@ -923,6 +923,17 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 > **Week 7 effect (Change #3).** "Post-confirmation changes do not automatically unbook existing arrangements" is consistent with the per-arrangement isolation rule (§5.3): cancelling/changing **one** venue arrangement does not auto-remove the others.
 
+**[Implemented — SPM-20, SPM-40, 31 Oct 2026 — team decisions pending PO confirmation]** Rules in `shared/changeRequests.js`. The owning Organiser requests changes; the assigned Coordinator accepts, declines or returns them. An accepted change is saved through the same save as a Coordinator's edit, so SPM-10, SPM-87, SPM-91 and SPM-41 apply unchanged. Choices the criteria left open:
+
+- **Eligible statuses.** Submitted, Under Review, Planning, Confirmed and Preparation, once a Coordinator is assigned and before the event starts. A Returned request is edited directly, as before.
+- **One open request at a time,** and none while a cancellation request is open. A significant change cannot be accepted while a cancellation request is open (SPM-10 AC7). An open request closes when its event closes.
+- **Permitted fields.** Title, purpose, description and the eight SPM-10 significant fields. Registration settings keep their own edit (SPM-19). The event has no contact field.
+- **A postponement** is a date or time change, handled like any other significant change.
+- **A pending significant request blocks progress.** Until the Coordinator decides it, Confirm and submission for the safety check are refused (`significant_change_request_pending`), so the event is not reviewed or confirmed on details about to change. An ordinary request, or one returned to the Organiser, blocks nothing. Start Preparation is not blocked.
+- **At Planning, Submitted or Under Review,** an accepted change has the existing effects of a Coordinator's edit at that status.
+- **Declining or returning** needs a message; a returned request is modified and resubmitted as the same request, or declined by the Coordinator.
+
+
 ### 4.20 Notification System
 
 **[Customer-confirmed]** Notify affected users about material changes, cancellations, availability failures, waiting-list opportunities, and relevant actions.
@@ -958,7 +969,7 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 - **E5:** rejecting an event that still has registrations (possible only after a reschedule moved it back to Planning) sends its Attendees the cancellation notice.
 - **No reason to Attendees:** a cancellation or rejection reason may be internal or the Organiser's own, so Attendee notices carry none.
 
-**[Known gaps — SPM-41]** SPM-20 (Organiser change requests) does not exist yet. When it applies an accepted date change, it must go through the same section-edit save (`store.update` with `consequences`) for Attendees to be notified. A venue change (SPM-74, SPM-90 primary switch) is not announced to Attendees by SPM-41.
+**[Resolved — SPM-20, 31 Oct 2026]** An accepted change request is saved through the section-edit save, so registered Attendees are notified of a reschedule. The earlier gap: SPM-20 (Organiser change requests) did not exist yet. When it applies an accepted date change, it must go through the same section-edit save (`store.update` with `consequences`) for Attendees to be notified. A venue change (SPM-74, SPM-90 primary switch) is not announced to Attendees by SPM-41.
 
 **[Implemented — SPM-61, 25 Oct 2026]** The same channel now tells the owning Organiser, and nobody else, when the assigned Coordinator approves, rejects (with the reason), confirms or returns (with the clarification message) their request, in the status-change transaction. This closes the SPM-25 return-notice and SPM-45 rejection-notice gaps recorded in §4.4 and §4.6.
 
