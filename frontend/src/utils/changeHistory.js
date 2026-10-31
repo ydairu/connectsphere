@@ -11,10 +11,14 @@ function fieldDefinition(path) {
 }
 
 /** "Event details · Title" for core.title; the raw path for a field the page does not define. */
-export function fieldLabel(path) {
+export function fieldLabel(path, venueName = null) {
   if (path === 'primaryVenue') return 'Primary venue'
   // SPM-87: the Coordinator's choice after a significant change (old value: what changed; new: what went back).
   if (path === 'signOffReapproval') return 'Sign-offs sent back for re-approval'
+  if (String(path).startsWith('venuePreparation.') && String(path).split('.').length === 3) {
+    const field = String(path).split('.')[2]
+    return `Venue preparation · ${venueName ?? 'Venue'} · ${field === 'status' ? 'Status' : 'Notes'}`
+  }
   const { section, definition } = fieldDefinition(path)
   return definition ? `${sectionTitle(section)} · ${definition.shortLabel ?? definition.label}` : String(path)
 }
@@ -28,6 +32,7 @@ function formatDateTime(value) {
 export function formatHistoryValue(path, value) {
   if (value === null || value === undefined || value === '') return EMPTY_VALUE
   if (path === 'primaryVenue' && typeof value === 'object' && !Array.isArray(value)) return value.venueName ?? EMPTY_VALUE
+  if (String(path).startsWith('venuePreparation.') && String(path).endsWith('.status')) return String(optionLabel(SECTION_FIELDS.venuePreparation.fields[0], value))
   if (Array.isArray(value)) return value.length === 0 ? EMPTY_VALUE : value.map((item) => formatHistoryValue(null, item)).join(', ')
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   if (typeof value === 'object') return JSON.stringify(value)

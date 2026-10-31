@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { TECHNICAL_STAFF, VENUE_STAFF, canEdit } from './permissions.js'
 import { CANCELLED, COMPLETED, CONFIRMED, PLANNING, PREPARATION, REJECTED } from './status.js'
 import { chooseEventStaff, countActiveEventStaff } from './eventStaffAssignment.js'
+import { canUpdateBookingPreparation } from './venuePreparation.js'
 
 const users = [
   { uid: 'a', roles: [VENUE_STAFF] },
@@ -31,13 +32,14 @@ describe('SPM-71 event staff selection', () => {
     assert.equal(chooseEventStaff(users, TECHNICAL_STAFF, new Map([['t', 2]]), {}).uid, 'b')
   })
 
-  test('only the canonical member may edit their preparation section in Preparation', () => {
-    const request = { status: PREPARATION, assignedStaffUids: ['a', 'b', 'c'],
+  test('only the booking assignee may edit its venue preparation in Preparation; equipment uses the canonical member', () => {
+    const request = { id: 'event', status: PREPARATION, assignedStaffUids: ['a', 'b', 'c'],
       assignedVenueStaffUid: 'a', assignedTechnicalStaffUid: 'b' }
-    assert.equal(canEdit(users[0], request, 'venuePreparation'), true)
-    assert.equal(canEdit(users[2], request, 'venuePreparation'), false)
+    const booking = { id: 'hall', venueNeedId: 'hall', eventRequestId: 'event', status: 'approved', assignedVenueStaffUid: 'a' }
+    assert.equal(canUpdateBookingPreparation(users[0], request, booking, [booking]), true)
+    assert.equal(canUpdateBookingPreparation(users[2], request, booking, [booking]), false)
     assert.equal(canEdit(users[1], request, 'equipmentPreparation'), true)
     assert.equal(canEdit(users[1], request, 'venuePreparation'), false)
-    assert.equal(canEdit(users[0], { ...request, status: PLANNING }, 'venuePreparation'), false)
+    assert.equal(canUpdateBookingPreparation(users[0], { ...request, status: PLANNING }, booking, [booking]), false)
   })
 })

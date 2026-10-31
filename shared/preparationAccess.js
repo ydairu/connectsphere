@@ -4,7 +4,7 @@
 // shared/permissions.js, which imports preparation.js.
 
 import { canEdit, editableSections, inScopeAs, rolesOf } from './permissions.js'
-import { PREPARATION_SECTIONS, preparationReadOnlyReason, preparationShown } from './preparation.js'
+import { EQUIPMENT_PREPARATION, preparationReadOnlyReason, preparationShown } from './preparation.js'
 
 export const PREPARATION_NOT_EVENT_ASSIGNEE = 'not_event_assignee'
 
@@ -17,11 +17,11 @@ export const PREPARATION_NOT_EVENT_ASSIGNEE = 'not_event_assignee'
 export function preparationEditing(user, request) {
   if (!preparationShown(request)) return null
   const result = {}
-  for (const section of PREPARATION_SECTIONS) {
+  for (const section of [EQUIPMENT_PREPARATION]) {
     const editsAs = rolesOf(user).some((role) => editableSections([role]).includes(section) && inScopeAs(role, user, request))
     if (!editsAs) continue
     const editable = canEdit(user, request, section)
-    const canonicalUid = section === 'venuePreparation' ? request.assignedVenueStaffUid : request.assignedTechnicalStaffUid
+    const canonicalUid = request.assignedTechnicalStaffUid
     result[section] = { editable, readOnlyReason: editable ? null :
       canonicalUid && canonicalUid !== user.uid ? PREPARATION_NOT_EVENT_ASSIGNEE : preparationReadOnlyReason(section, request) }
   }

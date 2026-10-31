@@ -61,10 +61,9 @@ import { SECTION_ORDER, optionLabel, preparationReadOnlyText, sectionFields, sec
 // that it is view-only (ownerName / isOwnRequest in the response, sent only to Organisers).
 // SPM-28: the assigned Coordinator and the owning Organiser see the field change history at the end of the
 // page (canViewChangeHistory in the response); it reloads after a save.
-// SPM-48: assigned Venue Staff and Technical Support Staff see their preparation card (venuePreparation /
-// equipmentPreparation in the request), editable only while editableSections says so; otherwise it says
-// why (preparation in the response). The assigned Coordinator sees both read-only. The API sends neither to
-// an Organiser or Attendee, so they see nothing new.
+// SPM-89: Venue Staff edit per-booking preparation in the venue booking flow. The assigned
+// Coordinator sees per-venue statuses and aggregate readiness here. SPM-48's equipment
+// preparation card remains on this page for assigned Technical Staff and the Coordinator.
 // SPM-10: saving a significant field (shared/significantChanges.js) on a Planning or Confirmed event first
 // asks for confirmation on the page: the sign-offs will reset and a Confirmed event will move back to
 // Planning. The server decides all of it; the page only explains it, then shows the response.
@@ -174,6 +173,7 @@ function RequestDetailPage() {
   const [primaryVenueRequired, setPrimaryVenueRequired] = useState(false)
   const [owner, setOwner] = useState(null)
   const [preparation, setPreparation] = useState(null)
+  const [eventPreparationReadiness, setEventPreparationReadiness] = useState(null)
   const [safetyReview, setSafetyReview] = useState(null)
   const [canDecideSafety, setCanDecideSafety] = useState(false)
   const [signOffReview, setSignOffReview] = useState(null)
@@ -207,6 +207,7 @@ function RequestDetailPage() {
     setCanSetPrimary(response.canSetPrimaryVenue === true)
     setPrimaryVenueRequired(response.primaryVenueRequired === true)
     setPreparation(response.preparation ?? null)
+    setEventPreparationReadiness(response.eventPreparationReadiness ?? null)
     setSafetyReview(response.safetyReview ?? null)
     setCanDecideSafety(response.canDecideSafetyReview === true)
     setSignOffReview(response.signOffReview ?? null)
@@ -498,7 +499,11 @@ function RequestDetailPage() {
             </>}
             {activeTab === 'venue-details' && <>
               {renderSection('venue')}
-              {renderSection('venuePreparation')}
+              {eventPreparationReadiness && <Card className="request-form-section"><h2>Event preparation readiness</h2>
+                <p role="status">{eventPreparationReadiness.ready ? 'Ready' : 'Not ready'}</p>
+                <p>Equipment preparation: {eventPreparationReadiness.equipmentReady ? 'Ready' : 'Not ready'}</p>
+                {eventPreparationReadiness.venues.map((venue) => <p key={venue.bookingId}>{venue.venueName}: {venue.status === 'ready' ? 'Ready' : venue.status === 'in_progress' ? 'In Progress' : 'Not Started'}</p>)}
+              </Card>}
               {(roles?.includes(COORDINATOR) || roles?.includes(ORGANISER)) && <VenueBookingOverview user={user} eventId={id} eventStatus={request.status} canManage={roles?.includes(COORDINATOR)} canSetPrimary={canSetPrimary} primaryVenue={request.primaryVenue} onPrimaryChanged={async () => { applyResponse(await getRequest(user, id)); setHistoryVersion((version) => version + 1) }} />}
               {!roles?.includes(COORDINATOR) && !roles?.includes(ORGANISER) && <Card className="request-form-section"><h2>Event location</h2><p>{request.primaryVenue?.venueName ?? 'Location to be announced'}</p>{request.primaryVenue?.location && <p>{request.primaryVenue.location}</p>}</Card>}
               {(roles?.includes(COORDINATOR) || roles?.includes(VENUE_STAFF)) && <Card className="request-form-section"><h2>Venue booking requests</h2><Link to={`/requests/${id}/venue-bookings`}>Open venue booking requests</Link></Card>}

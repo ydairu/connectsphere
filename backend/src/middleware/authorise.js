@@ -73,7 +73,7 @@ function outOfScope(user, res) {
  * `canViewRegistrations` (SPM-19) says whether this user may read GET /api/requests/:id/registrations: the owning
  * Organiser and the assigned Coordinator. GET /api/requests/:id adds `attendeeRegistration` for an Attendee.
  */
-export function presentRequest(user, request, { coordinatorName = null, ownerNames, venueBookingReadiness = null, primaryVenueReadiness = null } = {}) {
+export function presentRequest(user, request, { coordinatorName = null, ownerNames, venueBookingReadiness = null, primaryVenueReadiness = null, eventPreparationReadiness = null } = {}) {
   const current = { ...request, venueBookingReadiness, primaryVenueReadiness }
   return {
     request: projectRequest(user, request),
@@ -81,6 +81,7 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
     availableActions: allAvailableActions(user, current, new Date()),
     arrangements: arrangementsSummary(user, current),
     venueBookingReadiness: venueBookingReadiness && viewableSectionsFor(user, request).includes('venue') ? venueBookingReadiness : null,
+    eventPreparationReadiness: isAssignedCoordinator(user, request) ? eventPreparationReadiness : null,
     primaryVenueRequired: primaryVenueReadiness?.ready === false && venueBookingReadiness?.ready === true &&
       rolesOf(user).includes(COORDINATOR) && request.assignedCoordinatorUid === user.uid,
     canSetPrimaryVenue: rolesOf(user).includes(COORDINATOR) && request.assignedCoordinatorUid === user.uid &&

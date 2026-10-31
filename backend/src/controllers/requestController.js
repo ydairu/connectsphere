@@ -11,7 +11,7 @@ import { MARKING_STATUSES } from '../../../shared/signOffReview.js'
 import { presentRequest } from '../middleware/authorise.js'
 import { StaleWriteError } from '../services/eventRequestStore.js'
 import { STATUS_CHANGED, userActor } from '../services/statusHistory.js'
-import { loadEventVenueBookings, loadVenueBookingReadiness } from '../services/venueBookingService.js'
+import { loadEventPreparationReadiness, loadEventVenueBookings, loadVenueBookingReadiness } from '../services/venueBookingService.js'
 
 function newestFirst(a, b) {
   return (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0)
@@ -108,7 +108,8 @@ export function createRequestController(store, loadCoordinatorName, loadOwnerNam
         const coordinatorName = await loadCoordinatorName(req.user, request)
         const ownerNames = await loadOwnerNames(req.user, [request])
         const venueBookingReadiness = getDb ? await loadVenueBookingReadiness(req.params.id, getDb()) : null
-        return res.json(presentRequest(req.user, request, { coordinatorName, ownerNames, venueBookingReadiness }))
+        const eventPreparationReadiness = getDb ? await loadEventPreparationReadiness(req.params.id, request, getDb()) : null
+        return res.json(presentRequest(req.user, request, { coordinatorName, ownerNames, venueBookingReadiness, eventPreparationReadiness }))
       } catch (error) {
         if (error instanceof StaleWriteError) {
           return res.status(409).json({ message: 'This request changed since it was loaded. Reload and try again.' })

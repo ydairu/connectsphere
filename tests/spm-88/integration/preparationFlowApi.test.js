@@ -59,16 +59,15 @@ describe('SPM-88 — start Preparation', () => {
     expect(committed[0].writes.filter((path) => path.startsWith('notifications/'))).toHaveLength(3)
   })
 
-  it('lets assigned staff edit only their preparation section, while the Organiser and Attendee never receive it', async () => {
+  it('lets Technical Staff edit equipment preparation; venue preparation now belongs to bookings', async () => {
     await startPreparation()
     const venueEdit = await api.call('PATCH', `/api/requests/${CONFIRMED_ID}`, venueStaff, { venuePreparation: { status: 'ready' } })
-    expect(venueEdit.status).toBe(200)
+    expect(venueEdit.status).toBe(403)
     const techEdit = await api.call('PATCH', `/api/requests/${CONFIRMED_ID}`, technicalStaff, { equipmentPreparation: { notes: 'Tested' } })
     expect(techEdit.status).toBe(200)
     expect((await api.call('PATCH', `/api/requests/${CONFIRMED_ID}`, venueStaff, { equipmentPreparation: { status: 'ready' } })).status).toBe(403)
-    expect((await api.view(coordinator3)).json.request).toMatchObject({
-      venuePreparation: { status: 'ready' }, equipmentPreparation: { notes: 'Tested' },
-    })
+    expect((await api.view(coordinator3)).json.request).toMatchObject({ equipmentPreparation: { notes: 'Tested' } })
+    expect((await api.view(coordinator3)).json.request).not.toHaveProperty('venuePreparation')
     for (const account of [organiserA1, attendee]) {
       const view = await api.view(account)
       expect(view.json.request.status).toBe(PREPARATION)

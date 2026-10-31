@@ -3,6 +3,11 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 export function getVenueBookings(user, eventId) {
   return authenticatedRequest(user, `/api/requests/${eventId}/venue-bookings`)
 }
+export function updateVenueBookingPreparation(user, eventId, bookingId, patch) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/venue-bookings/${bookingId}/preparation`, {
+    method: 'PATCH', body: JSON.stringify(patch),
+  })
+}
 export function setPrimaryVenue(user, eventId, bookingId, expectedPrimaryVenueBookingId) {
   return authenticatedRequest(user, `/api/requests/${eventId}/primary-venue`, {
     method: 'PUT', body: JSON.stringify({ bookingId, expectedPrimaryVenueBookingId }),

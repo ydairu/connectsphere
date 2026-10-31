@@ -2,7 +2,7 @@
 // Coordinator changes the expected attendance, confirms the in-page warning, and sees the event back in Planning
 // with the technical sign-off kept but marked Changed since approval, and the history entry marked Significant.
 // The Coordinator sends the technical sign-off back for re-approval. The assigned Venue Staff then see the
-// in-app notification and a read-only Venue preparation card. Firebase is the in-memory double; the API and app
+// in-app notification. Firebase is the in-memory double; the API and app
 // are real.
 
 import { SEED_ACCOUNTS, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
@@ -65,9 +65,7 @@ test.describe('SPM-10 — Edit event information and flag significant changes fo
 
     await page.goto(`/requests/${confirmed.id}`)
     await page.getByRole('tab', { name: 'Venue Details' }).click()
-    const card = page.locator('.request-form-section', { has: page.getByRole('heading', { name: 'Venue preparation' }) })
-    await expect(card.getByText('Read only')).toBeVisible()
-    await expect(card.getByText('Available once the event is in Preparation.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Venue preparation' })).toHaveCount(0)
     await expect(page.getByLabel('Venue preparation status')).toHaveCount(0)
   })
 })

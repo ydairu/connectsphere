@@ -41,10 +41,10 @@ function ChangeHistory({ user, requestId, refreshKey }) {
       {!error && entries?.length > 0 && (
         <ol className="value-list" aria-label="Change history entries" style={{ listStyle: 'none', padding: 0 }}>
           {entries.map((entry, index) => (
-            <li key={entry.id ?? index} className="profile-row" aria-label={fieldLabel(entry.field)}>
+            <li key={entry.id ?? index} className="profile-row" aria-label={fieldLabel(entry.field, entry.venueName)}>
               <span>{formatHistoryTime(entry.at)}</span>
               <div>
-                <strong>{fieldLabel(entry.field)}</strong>
+                <strong>{fieldLabel(entry.field, entry.venueName)}</strong>
                 {entry.significant === true && <span className="significant-badge">Significant</span>}
                 <p style={{ margin: '6px 0 0' }}>
                   <span className="value-empty">{formatHistoryValue(entry.field, entry.oldValue)}</span>

@@ -509,6 +509,8 @@ Implemented by `shared/assignedCoordinator.js` and `backend/src/services/assigne
 
 #### SPM-48 — Venue Staff and Technical Support Staff Update Preparation Status
 
+**[Later Sprint 4 extension — SPM-89, 31 Oct 2026]** The Product Backlog now requires venue preparation separately for each approved venue booking (G8!C50). The SPM-48 event-wide `venuePreparation` value is legacy data, not the active venue preparation section. A current approved booking carries its own status and notes with the SPM-48 values and validation. Assigned Venue Staff edit their own booking in Preparation; the assigned Coordinator sees each venue's preparation and an aggregate of every current approved venue plus equipment. Organisers and Attendees receive no preparation data. Existing event-wide values require the SPM-89 backfill decision described in `project_context.md`; this later rule does not rewrite the historical SPM-48 decision below.
+
 **[Customer-confirmed]** G8 clarification answers, quoted exactly:
 
 - G8 Session 1 (Lim Natthida): *"Event Coordinator edits main details; Organiser can request edits; Venue and Tech staff update their respective preparation/reservation sections."*

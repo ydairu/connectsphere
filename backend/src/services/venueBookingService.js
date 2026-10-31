@@ -11,6 +11,8 @@ import { recordStatusChange, userActor } from './statusHistory.js'
 import { CONFIRMED, PLANNING, PREPARATION } from '../../../shared/status.js'
 import { recordPrimaryVenueChange } from './primaryVenueHistory.js'
 import { INVALIDATED_BY_VENUE_BOOKING_CANCELLED, INVALIDATED_BY_VENUE_BOOKING_REQUESTED, safetyReviewInvalidation } from '../../../shared/safetyReviewState.js'
+import { bookingPreparation, canUpdateBookingPreparation, currentApprovedVenueBookings, eventPreparationReadiness, venuePreparationErrors } from '../../../shared/venuePreparation.js'
+import { FIELD_CHANGED, sameValue } from '../../../shared/changeHistory.js'
 
 export const BOOKINGS = 'venueBookingRequests'
 export class VenueBookingError extends Error {
@@ -351,6 +353,50 @@ export async function loadVenueBookingReadiness(eventId, db = getAdminDb(), now 
   return venueBookingReadiness(rows(snapshot), now)
 }
 
+export async function loadEventPreparationReadiness(eventId, event, db = getAdminDb()) {
+  const bookings = await loadEventVenueBookings(eventId, db)
+  return eventPreparationReadiness(event, bookings)
+}
+
+export async function updateVenueBookingPreparation(eventId, bookingId, patch, user, db = getAdminDb()) {
+  return db.runTransaction(async (tx) => {
+    const eventRef = db.collection('eventRequests').doc(eventId)
+    const bookingRef = db.collection(BOOKINGS).doc(bookingId)
+    const eventSnap = await tx.get(eventRef)
+    const bookingSnap = await tx.get(bookingRef)
+    if (!eventSnap.exists || !bookingSnap.exists || bookingSnap.data().eventRequestId !== eventId) {
+      throw new VenueBookingError(404, 'Booking request not found.')
+    }
+    const event = { id: eventId, ...eventSnap.data() }
+    const booking = { id: bookingId, ...bookingSnap.data() }
+    if (!canReadVenueBooking(user, event, booking)) throw new VenueBookingError(404, 'Booking request not found.')
+    if (!rolesOf(user).includes(VENUE_STAFF) || booking.assignedVenueStaffUid !== user.uid) {
+      throw new VenueBookingError(403, 'Only this booking’s assigned Venue Staff member can update its preparation.')
+    }
+    const bookings = rows(await tx.get(db.collection(BOOKINGS).where('eventRequestId', '==', eventId)))
+    if (!canUpdateBookingPreparation(user, event, booking, bookings)) {
+      throw new VenueBookingError(409, event.status !== PREPARATION
+        ? 'Venue preparation is available only while the event is in Preparation.'
+        : 'This is no longer a current approved booking.')
+    }
+    const errors = venuePreparationErrors(patch)
+    if (Object.keys(errors).length) throw new VenueValidationError(errors)
+    const before = bookingPreparation(booking)
+    const after = { ...before, ...patch }
+    const changes = Object.keys(patch).filter((field) => !sameValue(before[field], after[field]))
+    if (changes.length === 0) return { booking: { ...booking, preparation: before }, changed: false }
+    const at = new Date().toISOString()
+    tx.update(bookingRef, { preparation: after, updatedAt: at })
+    tx.update(eventRef, { updatedAt: at })
+    for (const field of changes) tx.set(eventRef.collection('activity').doc(), {
+      type: FIELD_CHANGED, field: `venuePreparation.${bookingId}.${field}`,
+      bookingId, venueName: booking.venueName, oldValue: before[field], newValue: after[field],
+      actor: { type: 'user', uid: user.uid, name: user.name ?? null, role: VENUE_STAFF }, at,
+    })
+    return { booking: { ...booking, preparation: after }, changed: true }
+  })
+}
+
 export async function listEventVenueBookings(eventId, user, db = getAdminDb(), now = new Date()) {
   const snapshot = await db.collection('eventRequests').doc(eventId).get()
   if (!snapshot.exists) throw new VenueBookingError(404, 'Event not found.')
@@ -360,6 +406,7 @@ export async function listEventVenueBookings(eventId, user, db = getAdminDb(), n
   const organiser = inScopeAs(ORGANISER, user, event)
   const visible = bookings.filter((b) => canReadVenueBooking(user, event, b))
   if (!coordinator && !organiser && !visible.length) throw new VenueBookingError(404, 'Event not found.')
+  const currentApprovedIds = new Set(currentApprovedVenueBookings(bookings).map((booking) => booking.id))
   return { event: projectRequest(user, event), canSubmit: canRequestVenue(user, event),
     bookings: await Promise.all(visible.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(async (b) => {
       // A dual-role user keeps their assigned staff view, but other bookings in their organisation
@@ -368,6 +415,10 @@ export async function listEventVenueBookings(eventId, user, db = getAdminDb(), n
       if (organiser && !coordinator && !staffAccess) return presentOrganiserBooking(b, now)
       const presented = presentBooking(b, canRejectVenueBooking(user, event, b, now), canApproveVenueBooking(user, event, b, now), now,
         canCancelVenueBooking(user, event, b, now) && !b.replacedById)
+      if (currentApprovedIds.has(b.id) && (coordinator || staffAccess)) {
+        presented.preparation = bookingPreparation(b)
+        presented.canUpdatePreparation = canUpdateBookingPreparation(user, event, b, bookings)
+      }
       if (presented.status === BOOKING_PENDING || presented.awaitingReapproval) {
         const venue = await db.collection('venues').doc(b.venueId).get()
         const { problems, warnings } = venue.exists ? venueBookingSuitability(event, b, venue.data())
