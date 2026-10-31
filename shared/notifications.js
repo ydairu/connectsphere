@@ -34,6 +34,9 @@
 //                                     new and previous start and end (SPM-41)
 //   request submitted into the        every Event Coordinator Lead, with the event's start; a Returned
 //   unassigned queue                  request resubmitted to its Coordinator notifies no one  (SPM-85)
+//   Lead assigns a Coordinator        the Coordinator, and the owning Organiser with the Coordinator's name
+//   Lead reassigns the event          the new Coordinator, the previous Coordinator (no link: they no
+//                                     longer have the event) and the owning Organiser  (SPM-84)
 // The user who acted is never notified of their own action, except the SPM-19 registration confirmation,
 // which is the Attendee's own record of what they registered for.
 
@@ -78,6 +81,10 @@ export const ATTENDEE_EVENT_CANCELLED_NOTICE = 'attendee_event_cancelled'
 export const EVENT_RESCHEDULED_NOTICE = 'event_rescheduled'
 // SPM-85: a newly submitted request is waiting in the Event Coordinator Lead's unassigned queue.
 export const NEW_UNASSIGNED_REQUEST_NOTICE = 'new_unassigned_request'
+// SPM-84: the Lead assigned or reassigned the event's Coordinator — one type per recipient.
+export const EVENT_ASSIGNED_TO_YOU_NOTICE = 'event_assigned_to_you'
+export const EVENT_REASSIGNED_AWAY_NOTICE = 'event_reassigned_away'
+export const EVENT_COORDINATOR_ASSIGNED_NOTICE = 'event_coordinator_assigned'
 // SPM-19: the Attendee's registration was confirmed.
 export const REGISTRATION_CONFIRMED_NOTICE = 'registration_confirmed'
 
@@ -182,6 +189,48 @@ export function newUnassignedRequestNotifications(request, actor, { recipientUid
     reason: null,
     eventStartsAt: request.core?.preferredDateTime ?? null,
   })), request, actor, title, at)
+}
+
+/**
+ * SPM-84 — the notices when Lead `actor` assigns (`change` 'assigned', SPM-68) or reassigns (`change` 'reassigned',
+ * SPM-69) `request` (the record before the change, with its id) to `coordinator` { uid, name }. The new Coordinator
+ * and the owning Organiser are told, with the event's start; on a reassignment the previous Coordinator
+ * (`previousCoordinatorUid`) is told too, without the start, and the page gives that notice no link because they no
+ * longer have the event. [Team decisions, 30 Oct 2026, pending PO confirmation] only the owning Organiser, not
+ * colleagues (as SPM-61), and a Coordinator profile without a name gets a message that does not name them. The
+ * acting Lead is never notified, and no other Lead is (CL3 G8!C43).
+ */
+export function coordinatorAssignmentNotifications(request, actor, { change, coordinator, previousCoordinatorUid = null, at }) {
+  const title = titleOf(request)
+  const reassigned = change === 'reassigned'
+  const name = typeof coordinator?.name === 'string' && coordinator.name.trim() !== '' ? coordinator.name.trim() : null
+  const eventStartsAt = request.core?.preferredDateTime ?? null
+  const notices = [{
+    recipientUid: coordinator?.uid,
+    type: EVENT_ASSIGNED_TO_YOU_NOTICE,
+    change,
+    message: `“${title}” has been ${reassigned ? 'reassigned' : 'assigned'} to you.`,
+    reason: null,
+    eventStartsAt,
+  }]
+  if (reassigned) {
+    notices.push({
+      recipientUid: previousCoordinatorUid,
+      type: EVENT_REASSIGNED_AWAY_NOTICE,
+      change,
+      message: `“${title}” has been reassigned to ${name ?? 'another Event Coordinator'}. You no longer manage it.`,
+      reason: null,
+    })
+  }
+  notices.push({
+    recipientUid: request.ownerUid,
+    type: EVENT_COORDINATOR_ASSIGNED_NOTICE,
+    change,
+    message: name ? `${name} is now the Event Coordinator for “${title}”.` : `An Event Coordinator has been assigned to “${title}”.`,
+    reason: null,
+    eventStartsAt,
+  })
+  return addressed(notices, request, actor, title, at)
 }
 
 /** SPM-88: assigned Venue and Technical Support Staff learn that preparation has started. */

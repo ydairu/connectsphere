@@ -83,6 +83,7 @@
     "test:spm41": "vitest run tests/spm-41/ && playwright test tests/spm-41/",
     "test:spm85": "vitest run tests/spm-85/ && playwright test tests/spm-85/",
     "test:spm69": "vitest run tests/spm-69/ && playwright test tests/spm-69/",
+    "test:spm84": "vitest run tests/spm-84/ && playwright test tests/spm-84/",
     "test:spm39": "vitest run tests/spm-39/ && playwright test tests/spm-39/",
     "test:spm39:emulator": "node tests/spm-39/runEmulatorTests.js"
   },

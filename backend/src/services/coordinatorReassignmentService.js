@@ -28,9 +28,11 @@ import {
   mayReassignCoordinator,
   reassignmentStatusRefusal,
 } from '../../../shared/coordinatorReassignment.js'
+import { coordinatorAssignmentNotifications } from '../../../shared/notifications.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
 import { ACTIVITY_SUBCOLLECTION, ASSIGNMENT_LOCK_PATH, loadActiveCounts, loadCoordinators } from './coordinatorAssignmentService.js'
 import { EventRequestNotFoundError } from './eventRequestService.js'
+import { addNotifications } from './notificationService.js'
 import { userActor } from './statusHistory.js'
 import { requireRequestScope } from './statusTransitionService.js'
 
@@ -133,6 +135,13 @@ export async function reassignEventRequest(id, user, input, db = getAdminDb(), n
       actor: userActor(user),
       at: now.toISOString(),
     })
+    // SPM-84: in the same transaction, so the notices exist only if the reassignment is saved.
+    addNotifications(tx, db, coordinatorAssignmentNotifications(request, user, {
+      change: 'reassigned',
+      coordinator: target,
+      previousCoordinatorUid: request.assignedCoordinatorUid,
+      at: now.toISOString(),
+    }))
     return { request: updated, coordinator: { name: target.name } }
   })
 }
