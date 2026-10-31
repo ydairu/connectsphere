@@ -30,6 +30,7 @@
 //   safety review recorded           the assigned Coordinator, with the Safety     (SPM-92)
 //                                    Officer's comments
 //   attendee registers                the Attendee, with the event's start and venue (SPM-19)
+//   freed place offered               the next waitlisted Attendee, with the invitation deadline (SPM-59)
 //   event cancelled or rescheduled    every registered Attendee, with no reason; a reschedule carries the
 //                                     new and previous start and end (SPM-41)
 //   request submitted into the        every Event Coordinator Lead, with the event's start; a Returned
@@ -87,6 +88,8 @@ export const EVENT_REASSIGNED_AWAY_NOTICE = 'event_reassigned_away'
 export const EVENT_COORDINATOR_ASSIGNED_NOTICE = 'event_coordinator_assigned'
 // SPM-19: the Attendee's registration was confirmed.
 export const REGISTRATION_CONFIRMED_NOTICE = 'registration_confirmed'
+// SPM-59: a waitlisted Attendee was offered a freed place.
+export const WAITING_LIST_INVITATION_NOTICE = 'waiting_list_invitation'
 
 function titleOf(request) {
   const title = request.core?.title
@@ -419,6 +422,26 @@ export function registrationConfirmedNotifications(event, attendee, { venueNames
     message: `You are registered for “${title}”${where}.`,
     reason: null,
     eventStartsAt: event.core?.preferredDateTime ?? null,
+    eventRequestId: event.id,
+    eventTitle: title,
+    createdAt: at,
+    readAt: null,
+  }]
+}
+
+/**
+ * SPM-59 — the notice for the Attendee offered a freed place (AC3: "notified and invited to apply"). It carries the
+ * deadline (`invitationExpiresAt`), which the page shows in the reader's time zone.
+ */
+export function waitingListInvitationNotifications(event, entry, { at }) {
+  if (!entry?.attendeeUid) return []
+  const title = titleOf(event)
+  return [{
+    recipientUid: entry.attendeeUid,
+    type: WAITING_LIST_INVITATION_NOTICE,
+    message: `A place is available for “${title}”. Accept it before your invitation expires, or it passes to the next person.`,
+    reason: null,
+    invitationExpiresAt: entry.invitationExpiresAt ?? null,
     eventRequestId: event.id,
     eventTitle: title,
     createdAt: at,

@@ -68,6 +68,9 @@ export const SECTION_FIELDS = Object.freeze({
       { name: 'opensAt', label: 'Registration opens', shortLabel: 'Opens', type: 'datetime' },
       { name: 'closesAt', label: 'Registration closes', shortLabel: 'Closes', type: 'datetime' },
       { name: 'capacity', label: 'Registration capacity', shortLabel: 'Capacity', type: 'number' },
+      // SPM-59: whether Attendees may withdraw, and until when (the event start when not set).
+      { name: 'withdrawalAllowed', label: 'Attendees may withdraw', shortLabel: 'Withdrawal allowed', type: 'boolean' },
+      { name: 'withdrawalClosesAt', label: 'Withdrawal closes', shortLabel: 'Withdrawal closes', type: 'datetime' },
       { name: 'notes', label: 'Registration notes', type: 'textarea' },
     ],
   },

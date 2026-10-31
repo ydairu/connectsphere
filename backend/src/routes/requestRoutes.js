@@ -79,6 +79,11 @@ export function createRequestRoutes({ authenticate, store, getUserDb, getEventRe
   router.post('/:id/registrations', authenticate, registrations.register)
   // SPM-39: a full event's waiting list.
   router.post('/:id/waiting-list', authenticate, registrations.joinWaitingList)
+  // SPM-59: withdraw a registration, leave the waiting list, answer an invitation to a freed place.
+  router.post('/:id/registrations/withdraw', authenticate, registrations.withdraw)
+  router.post('/:id/waiting-list/leave', authenticate, registrations.leaveWaitingList)
+  router.post('/:id/invitation/accept', authenticate, registrations.acceptInvitation)
+  router.post('/:id/invitation/decline', authenticate, registrations.declineInvitation)
 
   router.get('/', authenticate, controller.loadAll, controller.loadOwnerNames, authoriseList, controller.sendList)
   router.get('/:id', authenticate, controller.loadOne, controller.loadAssignedCoordinatorName, controller.loadOwnerNames, authoriseRead,
