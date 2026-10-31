@@ -23,6 +23,7 @@ import {
   safetyReviewStatus,
   shownSafetyReviewStatus,
 } from './safetyReviewState.js'
+import { SIGN_OFF_REVIEW_UNDECIDED, signOffReviewPending } from './signOffReview.js'
 import { CONFIRMED, PLANNING } from './status.js'
 
 export * from './safetyReviewState.js'
@@ -81,6 +82,9 @@ export function canSubmitForSafetyReview(user, request) {
   if (status === SAFETY_APPROVED) return { allowed: false, reason: SAFETY_ALREADY_APPROVED }
   if (status === SAFETY_REJECTED) return { allowed: false, reason: SAFETY_ARRANGEMENT_NOT_REVISED }
   if (!arrangementsApproved(request)) return { allowed: false, reason: ARRANGEMENTS_NOT_READY }
+  // SPM-87 AC4, AC6: sign-offs changed since approval block submission until the Coordinator decides; once
+  // they record that none need re-approval, the existing approvals count.
+  if (signOffReviewPending(request)) return { allowed: false, reason: SIGN_OFF_REVIEW_UNDECIDED }
   return { allowed: true }
 }
 

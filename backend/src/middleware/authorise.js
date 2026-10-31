@@ -6,7 +6,7 @@
 // predicates, and combining them lets one role's open gate unlock another role's sections (the
 // multi-role leak; CLAUDE.md, "Evaluate per role, then union the results").
 
-import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, projectRequest, rolesOf, viewableSectionsFor } from '../../../shared/permissions.js'
+import { COORDINATOR, SECTIONS, canEdit, forbiddenFields, inScope, isAssignedCoordinator, projectRequest, rolesOf, viewableSectionsFor } from '../../../shared/permissions.js'
 import { canReassignCoordinator } from '../../../shared/coordinatorReassignment.js'
 import { assignedCoordinatorSummary } from '../../../shared/assignedCoordinator.js'
 import { reservedEquipmentSummary } from '../../../shared/equipmentReservation.js'
@@ -16,6 +16,7 @@ import { preparationEditing } from '../../../shared/preparationAccess.js'
 import { canCheckVenueSuitability } from '../../../shared/venueSuitability.js'
 import { CONFIRMED, PLANNING } from '../../../shared/status.js'
 import { canDecideSafetyReview, safetyReviewListStatus, safetyReviewSummary } from '../../../shared/safetyReview.js'
+import { signOffReviewSummary } from '../../../shared/signOffReview.js'
 import { canViewRegistrations } from '../../../shared/registration.js'
 import {
   allAvailableActions,
@@ -88,6 +89,10 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
     clarificationRequests: clarificationSummary(user, request),
     canReassignCoordinator: canReassignCoordinator(user, request),
     assignedCoordinator: assignedCoordinatorSummary(user, request, coordinatorName),
+    assignedEventStaff: rolesOf(user).includes(COORDINATOR) && isAssignedCoordinator(user, request) ? {
+      venue: request.assignedVenueStaffUid ? request.assignedVenueStaffName ?? 'Venue Staff' : null,
+      technical: request.assignedTechnicalStaffUid ? request.assignedTechnicalStaffName ?? 'Technical Support Staff' : null,
+    } : null,
     cancellation: cancellationNotice(user, request),
     rejection: rejectionNotice(user, request),
     completion: completionNotice(user, request),
@@ -97,6 +102,8 @@ export function presentRequest(user, request, { coordinatorName = null, ownerNam
     reservedEquipment: reservedEquipmentSummary(user, request),
     safetyReview: safetyReviewSummary(user, request),
     canDecideSafetyReview: canDecideSafetyReview(user, request).allowed,
+    // SPM-87: sign-offs changed since approval and the Coordinator's choice, for the assigned Coordinator only.
+    signOffReview: signOffReviewSummary(user, request),
     canViewRegistrations: canViewRegistrations(user, request),
     ...requestOwnerFields(user, request, ownerNames),
   }

@@ -1,5 +1,5 @@
 import { COORDINATOR, ORGANISER, VENUE_STAFF, inScopeAs, isAssignedCoordinator, projectRequest, rolesOf } from '../../../shared/permissions.js'
-import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_CANCELLED, BOOKING_EXPIRED, VENUE_BOOKING_CANCELLED, effectiveVenueBookingStatus, canReadVenueBooking, canRejectVenueBooking, canApproveVenueBooking, canCancelVenueBooking, canRequestVenue, chooseVenueStaff, normaliseVenueBooking, normaliseVenueBookingRejection, venueBookingApprovalErrors, venueBookingCancellationErrors, venueBookingSuitability, venueBookingReadiness, venueNeedId } from '../../../shared/venueBooking.js'
+import { awaitingReapproval, BOOKING_PENDING, BOOKING_APPROVED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_CANCELLED, BOOKING_EXPIRED, VENUE_BOOKING_CANCELLED, effectiveVenueBookingStatus, canReadVenueBooking, canRejectVenueBooking, canApproveVenueBooking, canCancelVenueBooking, canRequestVenue, chooseVenueStaff, normaliseVenueBooking, normaliseVenueBookingRejection, venueBookingApprovalErrors, venueBookingCancellationErrors, venueBookingSuitability, venueBookingReadiness, venueNeedId } from '../../../shared/venueBooking.js'
 import { AVAILABILITY_STATUS, REMOVED_STATUSES, tentativeHoldExpiresAt, validateAvailabilityRange } from '../../../shared/venueAvailability.js'
 import { venueBookingApprovedNotifications, venueBookingRejectedNotifications } from '../../../shared/notifications.js'
 import { getAdminDb } from '../config/firebaseAdmin.js'
@@ -58,8 +58,13 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
     const allocation = await tx.get(allocationRef)
     const users = rows(await tx.get(db.collection('users'))).map((u) => ({ ...u, uid: u.id }))
     const pending = rows(await tx.get(db.collection(BOOKINGS).where('status', '==', BOOKING_PENDING)))
-    const assignee = old ? users.find((u) => u.uid === old.assignedVenueStaffUid && rolesOf(u).includes(VENUE_STAFF)) : chooseVenueStaff(users, pending, allocation.data()?.lastUid, now)
-    if (!assignee) throw new VenueBookingError(409, old ? 'The assigned Venue Staff account is unavailable. Restore its access before revising this request.' : 'No Venue Staff account is available. A request and hold have not been created.')
+    const assignedUid = event.assignedVenueStaffUid ?? old?.assignedVenueStaffUid
+    const assignee = assignedUid
+      ? users.find((u) => u.uid === assignedUid && rolesOf(u).includes(VENUE_STAFF))
+      : chooseVenueStaff(users, pending, allocation.data()?.lastUid, now)
+    if (!assignee) throw new VenueBookingError(409, assignedUid
+      ? 'The event’s assigned Venue Staff account is unavailable. Restore its access before submitting this request.'
+      : 'No Venue Staff account is available. A request and hold have not been created.')
 
     let oldHold = null
     let oldLock = null
@@ -102,7 +107,10 @@ export async function submitVenueBooking(eventId, input, user, db = getAdminDb()
       status: AVAILABILITY_STATUS.TENTATIVE_HOLD, lifecycleStatus: 'active', holdExpiresAt: booking.holdExpiresAt,
       createdAt: at, createdByUid: user.uid })
     tx.set(lockRef, { venueId: value.venueId, lastCommitmentId: holdRef.id, updatedAt: at })
-    tx.set(allocationRef, { lastUid: old ? allocation.data()?.lastUid ?? assignee.uid : assignee.uid, updatedAt: at })
+    // Event-owned requests do not advance the older per-request rotation.
+    if (!event.assignedVenueStaffUid) {
+      tx.set(allocationRef, { lastUid: old ? allocation.data()?.lastUid ?? assignee.uid : assignee.uid, updatedAt: at })
+    }
     // SPM-91: a new or replacement venue has not been safety-reviewed, so the current review is withdrawn.
     const safetyReview = safetyReviewInvalidation(event, INVALIDATED_BY_VENUE_BOOKING_REQUESTED, at)
     tx.update(eventRef, { assignedStaffUids: [...new Set([...(event.assignedStaffUids ?? []), assignee.uid])], ...(safetyReview ? { safetyReview } : {}), updatedAt: at })
@@ -123,13 +131,16 @@ export async function rejectVenueBooking(eventId, bookingId, input, user, db = g
       bookingSnapshot.data().assignedVenueStaffUid !== user.uid) throw new VenueBookingError(404, 'Booking request not found.')
     const event = { ...eventSnapshot.data(), id: eventId }
     const booking = { ...bookingSnapshot.data(), id: bookingId }
-    if (!canRejectVenueBooking(user, event, booking, now)) throw new VenueBookingError(409, 'Only a pending booking in Planning with an unexpired hold can be rejected.')
+    if (!canRejectVenueBooking(user, event, booking, now)) throw new VenueBookingError(409, 'Only a pending booking in Planning with an unexpired hold, or one sent back for re-approval, can be rejected.')
     const { value, errors } = normaliseVenueBookingRejection(input)
     if (Object.keys(errors).length) throw new VenueValidationError(errors)
+    // SPM-87: a booking sent back for re-approval holds a confirmed reservation, not a tentative hold.
+    const reapproval = awaitingReapproval(booking)
     const holdRef = db.collection('venueAvailability').doc(booking.holdId)
     const holdSnapshot = await tx.get(holdRef)
     if (!holdSnapshot.exists || holdSnapshot.data().bookingRequestId !== bookingId || holdSnapshot.data().eventRequestId !== eventId ||
-      holdSnapshot.data().venueId !== booking.venueId || holdSnapshot.data().status !== AVAILABILITY_STATUS.TENTATIVE_HOLD) {
+      holdSnapshot.data().venueId !== booking.venueId ||
+      holdSnapshot.data().status !== (reapproval ? AVAILABILITY_STATUS.CONFIRMED_BOOKING : AVAILABILITY_STATUS.TENTATIVE_HOLD)) {
       throw new VenueBookingError(409, 'The booking hold has changed. Reload before rejecting.')
     }
     const venueLock = lockFor(db, booking.venueId)
@@ -138,7 +149,8 @@ export async function rejectVenueBooking(eventId, bookingId, input, user, db = g
     const allocation = await tx.get(allocationRef)
     const at = now.toISOString()
     const rejection = { status: BOOKING_REJECTED, rejectionReason: value.reason,
-      suggestedAlternative: value.suggestedAlternative, rejectedByUid: user.uid, rejectedAt: at, updatedAt: at }
+      suggestedAlternative: value.suggestedAlternative, rejectedByUid: user.uid, rejectedAt: at, updatedAt: at,
+      ...(reapproval ? { reapprovalRequestedAt: null, reapprovalRequestedByUid: null } : {}) }
     tx.update(bookingRef, rejection)
     if (!REMOVED_STATUSES.has(holdSnapshot.data().lifecycleStatus)) {
       tx.update(holdRef, { lifecycleStatus: 'removed', removedAt: at, removedByUid: user.uid })
@@ -149,8 +161,15 @@ export async function rejectVenueBooking(eventId, bookingId, input, user, db = g
     if (event.arrangementApprovals?.venue) {
       eventUpdate.arrangementApprovals = Object.fromEntries(Object.entries(event.arrangementApprovals).filter(([key]) => key !== 'venue'))
     }
+    // SPM-87 with SPM-90: a rejected re-approval removes the venue, so it can no longer be the primary venue.
+    if (reapproval && event.primaryVenue?.bookingId === bookingId) {
+      eventUpdate.primaryVenue = null
+      eventUpdate.primaryVenueSelectionRequired = true
+      recordPrimaryVenueChange(tx, eventRef, event.primaryVenue, null,
+        { type: 'user', uid: user.uid, name: user.name ?? null, role: VENUE_STAFF }, at)
+    }
     tx.update(eventRef, eventUpdate)
-    tx.set(eventRef.collection('activity').doc(), { type: 'venue_booking_rejected', bookingRequestId: bookingId,
+    tx.set(eventRef.collection('activity').doc(), { type: 'venue_booking_rejected', bookingRequestId: bookingId, reapproval,
       reason: value.reason, suggestedAlternative: value.suggestedAlternative, actor: { uid: user.uid, role: VENUE_STAFF }, at })
     addNotifications(tx, db, venueBookingRejectedNotifications(event, booking, user, { reason: value.reason, at }))
     return presentBooking({ ...booking, ...rejection }, false, false, now)
@@ -170,9 +189,10 @@ export async function approveVenueBooking(eventId, bookingId, input, user, db = 
       bookingSnapshot.data().assignedVenueStaffUid !== user.uid) throw new VenueBookingError(404, 'Booking request not found.')
     const event = { ...eventSnapshot.data(), id: eventId }
     const booking = { ...bookingSnapshot.data(), id: bookingId }
-    if (!canApproveVenueBooking(user, event, booking, decisionNow)) throw new VenueBookingError(409, 'Only a pending booking in Planning with an unexpired hold can be approved. Reload the booking.')
+    if (!canApproveVenueBooking(user, event, booking, decisionNow)) throw new VenueBookingError(409, 'Only a pending booking in Planning with an unexpired hold, or one sent back for re-approval, can be approved. Reload the booking.')
     const errors = venueBookingApprovalErrors(input)
     if (Object.keys(errors).length) throw new VenueValidationError(errors)
+    if (awaitingReapproval(booking)) return reapproveInTransaction(tx, { db, eventRef, bookingRef, event, booking, user, now, decisionNow })
     const range = validateAvailabilityRange({ from: booking.startsAt, to: booking.endsAt })
     const eventWindow = eventPeriod(event)
     const attendeeCount = booking.attendeeCount ?? event.core?.expectedAttendees
@@ -214,6 +234,38 @@ export async function approveVenueBooking(eventId, bookingId, input, user, db = 
     addNotifications(tx, db, venueBookingApprovedNotifications(event, booking, user, { at }))
     return presentBooking({ ...booking, ...approval }, false, false, decisionNow)
   })
+}
+
+// SPM-87: approving again a booking the Coordinator sent back for re-approval. Its reservation is already
+// confirmed, so only the event window, the attendance and the venue's suitability are checked again; the
+// reservation itself must still be the confirmed one.
+async function reapproveInTransaction(tx, { db, eventRef, bookingRef, event, booking, user, now, decisionNow }) {
+  const eventWindow = eventPeriod(event)
+  const attendeeCount = booking.attendeeCount ?? event.core?.expectedAttendees
+  if (!eventWindow || booking.startsAt < eventWindow.startsAt || booking.endsAt > eventWindow.endsAt ||
+    !Number.isInteger(attendeeCount) || attendeeCount <= 0 || attendeeCount > event.core?.expectedAttendees) {
+    throw new VenueBookingError(409, 'The booked period or attendance no longer fits the event. Reject it so the Coordinator can request a replacement.')
+  }
+  const holdRef = db.collection('venueAvailability').doc(booking.holdId)
+  const hold = (await tx.get(holdRef)).data()
+  if (!hold || hold.bookingRequestId !== booking.id || hold.eventRequestId !== event.id || hold.venueId !== booking.venueId ||
+    hold.status !== AVAILABILITY_STATUS.CONFIRMED_BOOKING || REMOVED_STATUSES.has(hold.lifecycleStatus) ||
+    hold.startsAt !== booking.startsAt || hold.endsAt !== booking.endsAt) {
+    throw new VenueBookingError(409, 'The confirmed reservation has changed. Reload the booking.')
+  }
+  const venueSnapshot = await tx.get(db.collection('venues').doc(booking.venueId))
+  if (!venueSnapshot.exists) throw new VenueBookingError(409, 'This venue is no longer in the catalogue. Reject the booking so the Coordinator can replace it.')
+  const suitability = venueBookingSuitability(event, booking, venueSnapshot.data())
+  if (suitability.problems.length) throw new VenueBookingError(409, suitability.problems.map((problem) => problem.message).join(' '))
+  const at = (now ?? new Date()).toISOString()
+  const approval = { reapprovalRequestedAt: null, reapprovalRequestedByUid: null, reapprovedByUid: user.uid, reapprovedAt: at,
+    approvalWarnings: suitability.warnings, updatedAt: at }
+  tx.update(bookingRef, approval)
+  tx.update(eventRef, { updatedAt: at })
+  tx.set(eventRef.collection('activity').doc(), { type: 'venue_booking_reapproved', bookingRequestId: booking.id,
+    actor: { uid: user.uid, role: VENUE_STAFF }, at })
+  addNotifications(tx, db, venueBookingApprovedNotifications(event, booking, user, { at }))
+  return presentBooking({ ...booking, ...approval }, false, false, decisionNow)
 }
 
 export async function cancelVenueBooking(eventId, bookingId, input, user, db = getAdminDb(), now = new Date()) {
@@ -276,8 +328,9 @@ export async function cancelVenueBooking(eventId, bookingId, input, user, db = g
 }
 
 function presentBooking(booking, canReject = false, canApprove = false, now = new Date(), canCancel = false) {
-  const keys = ['id', 'eventRequestId', 'eventTitle', 'expectedAttendees', 'attendeeCount', 'venueNeedId', 'venueId', 'venueName', 'startsAt', 'endsAt', 'requirements', 'specialRequests', 'status', 'assignedVenueStaffName', 'holdExpiresAt', 'capacityWarning', 'createdAt', 'replacesId', 'replacedById', 'rejectionReason', 'suggestedAlternative', 'rejectedAt', 'approvedAt', 'cancelledAt', 'approvalWarnings']
-  return { ...Object.fromEntries(keys.filter((key) => booking[key] !== undefined).map((key) => [key, booking[key]])), status: effectiveVenueBookingStatus(booking, now), canReject, canApprove, canCancel }
+  const keys = ['id', 'eventRequestId', 'eventTitle', 'expectedAttendees', 'attendeeCount', 'venueNeedId', 'venueId', 'venueName', 'startsAt', 'endsAt', 'requirements', 'specialRequests', 'status', 'assignedVenueStaffName', 'holdExpiresAt', 'capacityWarning', 'createdAt', 'replacesId', 'replacedById', 'rejectionReason', 'suggestedAlternative', 'rejectedAt', 'approvedAt', 'cancelledAt', 'approvalWarnings', 'reapprovedAt']
+  return { ...Object.fromEntries(keys.filter((key) => booking[key] !== undefined).map((key) => [key, booking[key]])), status: effectiveVenueBookingStatus(booking, now),
+    awaitingReapproval: awaitingReapproval(booking), canReject, canApprove, canCancel }
 }
 
 // The Organiser sees booking outcomes, not staff assignment, internal requirements or approval notes.
@@ -285,6 +338,11 @@ function presentOrganiserBooking(booking, now) {
   const fields = ['id', 'venueNeedId', 'replacesId', 'venueName', 'startsAt', 'endsAt', 'createdAt', 'approvedAt', 'cancelledAt']
   return { ...Object.fromEntries(fields.filter((key) => booking[key] !== undefined).map((key) => [key, booking[key]])),
     status: effectiveVenueBookingStatus(booking, now) }
+}
+
+/** SPM-87: every venue booking of the event, with its id, for marking the sign-offs on a significant change. */
+export async function loadEventVenueBookings(eventId, db = getAdminDb()) {
+  return rows(await db.collection(BOOKINGS).where('eventRequestId', '==', eventId).get())
 }
 
 export async function loadVenueBookingReadiness(eventId, db = getAdminDb(), now = new Date(), tx = null) {
@@ -310,7 +368,7 @@ export async function listEventVenueBookings(eventId, user, db = getAdminDb(), n
       if (organiser && !coordinator && !staffAccess) return presentOrganiserBooking(b, now)
       const presented = presentBooking(b, canRejectVenueBooking(user, event, b, now), canApproveVenueBooking(user, event, b, now), now,
         canCancelVenueBooking(user, event, b, now) && !b.replacedById)
-      if (presented.status === BOOKING_PENDING) {
+      if (presented.status === BOOKING_PENDING || presented.awaitingReapproval) {
         const venue = await db.collection('venues').doc(b.venueId).get()
         const { problems, warnings } = venue.exists ? venueBookingSuitability(event, b, venue.data())
           : { problems: [{ check: 'venue', message: 'This venue is unavailable. Ask the Coordinator to replace the request.' }], warnings: [] }

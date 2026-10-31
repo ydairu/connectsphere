@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { COORDINATOR, ORGANISER, TECHNICAL_STAFF, VENUE_STAFF } from '../../../shared/permissions.js'
-import { CONFIRMED, DRAFT, PLANNING } from '../../../shared/status.js'
+import { CONFIRMED, DRAFT, PLANNING, PREPARATION } from '../../../shared/status.js'
 import { CANCELLATION_REQUEST_OPEN, SIGNIFICANT_FIELDS, significantFieldsIn } from '../../../shared/significantChanges.js'
 import ArrangementsSummary from '../components/ArrangementsSummary.jsx'
 import AttendeeRegistration from '../components/AttendeeRegistration.jsx'
@@ -20,6 +20,8 @@ import StatusActions, { StatusNotices } from '../components/StatusActions.jsx'
 import StatusPill from '../components/StatusPill.jsx'
 import SafetyReview from '../components/SafetyReview.jsx'
 import SafetyStatusPill from '../components/SafetyStatusPill.jsx'
+import SignOffReview from '../components/SignOffReview.jsx'
+import { SIGN_OFF_REVIEW_PENDING } from '../../../shared/signOffReview.js'
 import Tabs from '../components/Tabs.jsx'
 import VenueBookingOverview from '../components/VenueBookingOverview.jsx'
 import { useAuth } from '../hooks/useAuth.js'
@@ -70,6 +72,8 @@ import { SECTION_ORDER, optionLabel, preparationReadOnlyText, sectionFields, sec
 // significant change while a cancellation request is open (409, AC7) puts the significant fields back to
 // their saved values and keeps unsaved ordinary edits; a stale write (409) reloads the latest record.
 // Nothing is saved again automatically.
+// SPM-87: a significant change on a Planning, Confirmed or Preparation event keeps the sign-offs but marks them
+// Changed since approval; the assigned Coordinator chooses which go back (signOffReview in the response).
 // SPM-91/92: the safety check (safetyReview in the response) is shown beside the status and on the Event
 // Status tab; the Coordinator submits it through the status actions. A Safety Officer (canDecideSafetyReview)
 // sees the booked venues and records the review; the event then leaves their scope, so they are taken back to
@@ -161,6 +165,7 @@ function RequestDetailPage() {
   const [clarificationRequests, setClarificationRequests] = useState(null)
   const [canReassign, setCanReassign] = useState(false)
   const [assignedCoordinator, setAssignedCoordinator] = useState(null)
+  const [assignedEventStaff, setAssignedEventStaff] = useState(null)
   const [cancellation, setCancellation] = useState(null)
   const [rejection, setRejection] = useState(null)
   const [completion, setCompletion] = useState(null)
@@ -171,6 +176,7 @@ function RequestDetailPage() {
   const [preparation, setPreparation] = useState(null)
   const [safetyReview, setSafetyReview] = useState(null)
   const [canDecideSafety, setCanDecideSafety] = useState(false)
+  const [signOffReview, setSignOffReview] = useState(null)
   const [attendeeRegistration, setAttendeeRegistration] = useState(null)
   const [canViewRegistrations, setCanViewRegistrations] = useState(false)
   const [historyVersion, setHistoryVersion] = useState(0)
@@ -193,6 +199,7 @@ function RequestDetailPage() {
     setClarificationRequests(response.clarificationRequests ?? null)
     setCanReassign(response.canReassignCoordinator === true)
     setAssignedCoordinator(response.assignedCoordinator ?? null)
+    setAssignedEventStaff(response.assignedEventStaff ?? null)
     setCancellation(response.cancellation ?? null)
     setRejection(response.rejection ?? null)
     setCompletion(response.completion ?? null)
@@ -202,6 +209,7 @@ function RequestDetailPage() {
     setPreparation(response.preparation ?? null)
     setSafetyReview(response.safetyReview ?? null)
     setCanDecideSafety(response.canDecideSafetyReview === true)
+    setSignOffReview(response.signOffReview ?? null)
     setAttendeeRegistration(response.attendeeRegistration ?? null)
     setCanViewRegistrations(response.canViewRegistrations === true)
     setOwner(typeof response.isOwnRequest === 'boolean' ? { name: response.ownerName ?? null, isOwn: response.isOwnRequest } : null)
@@ -264,7 +272,7 @@ function RequestDetailPage() {
 
     // SPM-10: a significant change on a Planning or Confirmed event is confirmed on the page first.
     const significant = significantFieldsIn(patch)
-    if (significant.length > 0 && [PLANNING, CONFIRMED].includes(request.status)) {
+    if (significant.length > 0 && [PLANNING, CONFIRMED, PREPARATION].includes(request.status)) {
       setStatus(null)
       setPendingSignificant({ fields: significant, status: request.status })
       return
@@ -435,6 +443,17 @@ function RequestDetailPage() {
             {request.primaryVenue && <Card className="request-form-section"><h2>Event location</h2><p><strong>{request.primaryVenue.venueName}</strong></p>{request.primaryVenue.location && <p>{request.primaryVenue.location}</p>}</Card>}
             {primaryVenueRequired && request.status === PLANNING && <div className="alert alert-info" role="status">Choose an approved primary venue in Venue Details before confirming this event.</div>}
             <AttendeeRegistration user={user} requestId={id} summary={attendeeRegistration} />
+            <SignOffReview
+              user={user}
+              requestId={id}
+              review={signOffReview}
+              busy={acting || saving}
+              onDecided={(response, sentBack) => {
+                applyResponse(response)
+                setHistoryVersion((version) => version + 1)
+                setStatus({ type: 'success', message: sentBack > 0 ? 'The selected sign-offs were sent back for re-approval.' : 'Recorded that no sign-off needs re-approval.' })
+              }}
+            />
             <StatusActions
               status={request.status}
               actions={availableActions}
@@ -442,6 +461,7 @@ function RequestDetailPage() {
               cancellationRequest={cancellationRequest}
               primaryVenueRequired={primaryVenueRequired}
               safetyReviewStatus={safetyReview?.status ?? null}
+              signOffReviewPending={signOffReview?.status === SIGN_OFF_REVIEW_PENDING}
               busy={acting || saving}
               onAction={handleAction}
             />
@@ -467,6 +487,11 @@ function RequestDetailPage() {
             {renderSection('internal')}
             <StatusNotices cancellation={cancellation} rejection={rejection} completion={completion} />
             <AssignedCoordinator coordinator={assignedCoordinator} />
+            {assignedEventStaff && <Card className="request-form-section">
+              <h2>Assigned event staff</h2>
+              <p>Venue Staff: {assignedEventStaff.venue ?? 'Not yet assigned'}</p>
+              <p>Technical Support Staff: {assignedEventStaff.technical ?? 'Not yet assigned'}</p>
+            </Card>}
             {roles?.includes(ORGANISER) && <ArrangementsSummary request={request} arrangements={arrangements} reservedEquipment={reservedEquipment} />}
             <ClarificationRequests status={request.status} entries={clarificationRequests} />
             <EventRegistrations user={user} requestId={id} canView={canViewRegistrations} />
@@ -502,17 +527,17 @@ function RequestDetailPage() {
               <div className="significant-confirmation" role="alertdialog" aria-labelledby="significant-confirmation-title" aria-describedby="significant-confirmation-text">
                 <h2 id="significant-confirmation-title">Confirm significant change</h2>
                 <p id="significant-confirmation-text">
-                  You changed {pendingSignificant.fields.map((path) => fieldLabel(path)).join(', ')}. Saving resets the venue and technical
-                  sign-offs to Awaiting approval
-                  {pendingSignificant.status === CONFIRMED
-                    ? ' and moves the event back to Planning. It cannot be confirmed again until both sign-offs are approved.'
-                    : '. The event cannot be confirmed until both sign-offs are approved again.'}{' '}
+                  You changed {pendingSignificant.fields.map((path) => fieldLabel(path)).join(', ')}. Saving keeps the recorded venue and technical
+                  sign-offs but marks them Changed since approval; you then choose which need re-approval
+                  {[CONFIRMED, PREPARATION].includes(pendingSignificant.status)
+                    ? `. The event moves back from ${statusLabel(pendingSignificant.status)} to Planning and cannot be confirmed again until you have decided and any sign-offs you send back are approved.`
+                    : '. The event cannot be confirmed until you have decided and any sign-offs you send back are approved.'}{' '}
                   {[SAFETY_APPROVED, SAFETY_REVIEW_PENDING].includes(safetyReview?.status) &&
                     'The safety check is withdrawn, and the event must pass a new one before it can be confirmed. '}
                   Assigned venue and technical staff will be notified.
                 </p>
                 <div className="form-actions">
-                  <Button type="button" onClick={confirmSignificantSave} disabled={saving}>Save and reset sign-offs</Button>
+                  <Button type="button" onClick={confirmSignificantSave} disabled={saving}>Save significant change</Button>
                   <Button type="button" variant="secondary" onClick={() => setPendingSignificant(null)} disabled={saving}>Keep editing</Button>
                 </div>
               </div>

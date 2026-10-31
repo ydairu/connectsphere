@@ -141,7 +141,8 @@ describe('SPM-91 — submitting an event for safety review', () => {
     expect(saved.status).toBe(200)
     expect(api.stored(EVENT_ID).safetyReview).toMatchObject({ status: SAFETY_INVALIDATED, invalidatedReason: INVALIDATED_BY_SIGNIFICANT_CHANGE })
     expect(saved.json.safetyReview.status).toBe(SAFETY_INVALIDATED)
-    expect((await act(coordinator, CONFIRM)).json.reason).toBe('arrangements_not_approved')
+    // SPM-87: the sign-offs are kept but wait for the Coordinator's choice.
+    expect((await act(coordinator, CONFIRM)).json.reason).toBe('sign_off_review_pending')
   })
 })
 
@@ -290,9 +291,11 @@ describe('SPM-92 — the Safety Officer records the review', () => {
     expect((await view(coordinator)).json.availableActions).toEqual(['reject'])
     expect((await act(coordinator, SUBMIT_SAFETY_REVIEW)).json.reason).toBe('safety_arrangement_not_revised')
 
-    // Revising the venue arrangement (a significant change, which also clears the technical sign-off) allows
-    // another review once the arrangements are approved again.
+    // Revising the venue arrangement (a significant change) allows another review once the Coordinator has
+    // decided which changed sign-offs need re-approval (SPM-87) and those are approved again.
     expect((await api.call('PATCH', `/api/requests/${EVENT_ID}`, coordinator, { venue: { layoutPreference: 'classroom' } })).status).toBe(200)
+    expect((await act(coordinator, SUBMIT_SAFETY_REVIEW)).json.reason).toBe('sign_off_review_pending')
+    expect((await api.call('POST', `/api/requests/${EVENT_ID}/sign-off-review`, coordinator, { reapprove: ['technical'] })).status).toBe(200)
     expect((await act(technicalStaff, APPROVE_TECHNICAL)).status).toBe(200)
     expect((await act(coordinator, SUBMIT_SAFETY_REVIEW)).status).toBe(200)
   })

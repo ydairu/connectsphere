@@ -1,12 +1,18 @@
 # ConnectSphere Project Context
 
-Last reviewed: 29 October 2026 (SPM-68 Lead assignment, SPM-85 Lead new-request notice, SPM-69 Lead reassignment, SPM-84 assignment notices, SPM-90 and SPM-19 integration; older implementation sections retain their historical dates)
+Last reviewed: 30 October 2026 (SPM-71 and SPM-84 merged with SPM-68/69/85/87/39/41; older implementation sections retain their historical dates)
 
 ## Current implementation map (27 October 2026)
 
 The browser has routes for authentication, profiles, requests and drafts, venue catalogue and bookings, equipment inventory and requests, reservations, and notifications (`frontend/src/App.jsx`). Express mounts health, profile, event request, scoped request, venue, equipment, and notification APIs (`backend/src/app.js`). `shared/` holds policy and validation used by both applications. Product request data goes through the Express API; the browser reads its own `users/{uid}` profile under Firestore rules. See `docs/architecture/` for current diagrams and data boundaries.
 
-The implemented role model includes Safety Officer and, since SPM-68, Event Coordinator Lead. Submission no longer assigns a Coordinator; the Lead assigns one from the unassigned queue. SPM-90 has local primary-venue selection, confirmation gating, attendee location projection and change history. SPM-19 adds Attendee registration and an Organiser's registration settings at Confirmed or Preparation. Confirm also requires the recorded SPM-91/92 safety approval. Live-project backfill and human acceptance remain outstanding. The available backlog workbook is a reference for story interactions; its status is not used to judge application implementation. CI has three jobs for code checks, Firestore emulator transactions, and Playwright. The earlier September observations below are historical checkpoints, not a current inventory of routes, seed counts, or CI.
+The implemented role model includes Safety Officer and Event Coordinator Lead. First submission enters the Lead's unassigned queue; the Lead assigns a Coordinator. The assigned Coordinator's approval into Planning assigns Venue and Technical Support Staff. SPM-90 has local primary-venue selection, confirmation gating, attendee location projection and change history. SPM-19 adds Attendee registration and an Organiser's registration settings at Confirmed or Preparation. Confirm also requires the recorded SPM-91/92 safety approval. Live-project backfill and human acceptance remain outstanding. The available backlog workbook is a reference for story interactions; its status is not used to judge application implementation. CI has three jobs for code checks, Firestore emulator transactions, and Playwright. The earlier September observations below are historical checkpoints, not a current inventory of routes, seed counts, or CI.
+
+## Current SPM-71 state (29 October 2026)
+
+The assigned Coordinator's Under Review → Planning action now chooses one Venue Staff and one Technical Support Staff event assignee inside the status transaction. The fewest active events (Planning, Confirmed, Preparation) wins; each role's persisted assignment sequence breaks ties by least recent assignment. The event stores canonical staff UIDs and display-name snapshots, while `assignedStaffUids` retains historical request reviewers' event scope. The selected members receive an in-app assignment notice, appear in their scoped event list, and become the assignees of new and replacement venue/equipment requests. Only the canonical member of each role may edit that role's preparation section in Preparation. Historical booking and equipment request assignees retain their existing decision rights.
+
+The dry-run-first `backend/scripts/backfillEventStaff.js` plans and applies missing assignments on active events, preferring the newest current venue booking reviewer and newest equipment request reviewer. Its **read-only** run against the configured Firebase project found 139 active events needing assignment; two had conflicting historical Venue Staff reviewers. The complete proposed-assignment snapshot is in `docs/evidence/spm-71-backfill-dry-run.md`. Write mode has not run. The Product Backlog workbook's SPM-71 acceptance criteria now omit the no-available-staff case by explicit team direction and its status is **In Progress**. Before this merge, local verification passed: 146 Node tests, 101 frontend tests, 1,989 root Vitest tests (56 opt-in cases skipped), 114 Playwright Chromium tests, lint, production build, and the new Firestore emulator concurrency test. See `docs/evidence/spm-71-traceability.md` and `docs/testing/spm-71-manual-testing.md`. Human acceptance, live-project write-mode backfill and live API verification are pending; no Firestore rules were changed or deployed.
 
 ## Current SPM-68 state (29 October 2026)
 
@@ -29,11 +35,17 @@ The backfill script is dry-run-first and was not run against a live project. Alr
 
 **SPM-19 integration (29 October 2026):** Once an approved primary venue is selected, new registrations use only that venue's capacity and name in availability, validation, confirmation and notices. Existing registration snapshots are retained. Events without a selected primary venue retain SPM-19's largest-approved-venue capacity rule.
 
+## Current SPM-87 state (29 October 2026)
+
+A significant change at Planning, Confirmed or Preparation no longer clears the venue and technical sign-offs. It keeps them and marks them "Changed since approval", and the assigned Coordinator chooses which go back to Awaiting approval, or records that none need it (`shared/signOffReview.js`, `POST /api/requests/:id/sign-off-review`). Confirmed and Preparation events move back to Planning with the safety approval withdrawn. An undecided review, or any sign-off Awaiting approval, blocks submission for the safety check and Confirm. A venue booking sent back keeps its reservation and returns to its Venue Staff member's queue to approve or reject again; a technical sign-off sent back is re-confirmed with SPM-56's Re-confirm, now also for Reserved requests. The Coordinator's choice is recorded in the change history. This closes SPM-88's Preparation re-review dependency and SPM-62's held re-confirmation gap.
+
+SPM-87 is **In Progress / not Done**. Every acceptance criterion has code and automated tests (`docs/evidence/spm-87-traceability.md`); the team decisions in effective-requirements.md §4.7 need PO confirmation, and no live Firebase check, peer review or human acceptance has been done. Manual checks: `docs/testing/spm-87-manual-testing.md`. Before this merge, the local run on 29 Oct 2026 passed lint, build, 136 Node, 101 frontend and 2,240 Vitest tests, and 120 Playwright tests.
+
 ## Current SPM-88 state (26 October 2026)
 
 The local code now has a separate `Preparation` status and an assigned-Coordinator `start_preparation` action. The action records the status change and sends one in-app notice to each assigned Venue or Technical Support Staff member in the same transaction. **Update, 27 October 2026:** it now requires the safety approval recorded by SPM-92 (see the SPM-66/91/92 section below), which replaced the fail-closed verifier. Confirmed events from before SPM-91 have no approval, so they cannot start preparation until reviewed.
 
-Staff preparation sections are editable only in Preparation. Completion requires Preparation and an ended event. Direct cancellation and approved Organiser cancellation requests work before a Preparation event starts, with the existing reservation release. Cancelling an approved venue booking returns Preparation to Planning. Attendees can read eligible Confirmed and Preparation events, but registration itself is still SPM-19 scope. Significant section edits in Preparation return 409 without writing until SPM-87 supplies the required re-review and safety invalidation path. **Update, 27 October 2026:** Confirm now requires the SPM-91/92 safety approval, so the safety-before-Confirmed sequence exists locally.
+Staff preparation sections are editable only in Preparation. Completion requires Preparation and an ended event. Direct cancellation and approved Organiser cancellation requests work before a Preparation event starts, with the existing reservation release. Cancelling an approved venue booking returns Preparation to Planning. Attendees can read eligible Confirmed and Preparation events, but registration itself is still SPM-19 scope. Significant section edits in Preparation return 409 without writing until SPM-87 supplies the required re-review and safety invalidation path. **Update, 29 October 2026:** SPM-87 now returns such an edit to Planning for re-review instead (see above). **Update, 27 October 2026:** Confirm now requires the SPM-91/92 safety approval, so the safety-before-Confirmed sequence exists locally.
 
 SPM-88 is **In Progress / not Done** in the Product Backlog. Local tests cover the implemented parts; no live Firebase verification or human acceptance has been performed. See `docs/testing/spm-88-manual-testing.md`. The earlier dated sections below describe their historical increments and may mention SPM-48's old temporary preparation gate.
 
@@ -87,7 +99,7 @@ At the original September checkpoint, tracked application routes included:
 - `/register`
 - protected `/profile`
 
-The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. The [CI workflow](.github/workflows/ci.yml) defines three independent jobs on every push and on pull requests into `main`: code checks and build, seven local Firestore emulator transaction suites, and the full Playwright E2E suite. The opt-in live API harness is not part of CI. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for commands, artifacts, and verification boundaries.
+The root package is an npm workspace over `frontend`, `backend` and `shared`; it provides development, build, lint, and test commands (`test`, `test:existing`, `test:spm1`, `test:spm2`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`). The frontend package keeps its own build, lint and Vitest commands. The [CI workflow](.github/workflows/ci.yml) defines three independent jobs on every push and on pull requests into `main`: code checks and build, ten local Firestore emulator transaction suites, and the full Playwright E2E suite. The opt-in live API harness is not part of CI. See the [CI pipeline guide](docs/testing/ci-pipeline.md) for commands, artifacts, and verification boundaries.
 
 ## Independently Observed Implementation State (September checkpoint)
 
@@ -899,6 +911,16 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Status:** implemented locally, not Done. Human acceptance and peer review are pending; the backlog workbook was not updated.
 - **Local verification (29 Oct 2026, macOS):** see `docs/evidence/spm-69-traceability.md`.
 - **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No emulator or live-project check; Firestore rules were neither edited nor deployed.
+
+## SPM-39 waiting list — 29 October 2026
+
+- **Built:** on a full event with registration open, an Attendee is offered "Join waiting list", confirms, and is told their position, which "My registrations" also shows. Closed, not-yet-open or disabled registration, a free place, or an existing registration or entry refuses joining. Order is first come, first served by a counter on the registration lock. The Organiser and Coordinator see how many are waiting.
+- **Code:** `canJoinWaitingList`, `waitingListPosition`, `buildWaitlistEntry` (`shared/registration.js`); `joinWaitingList` and `POST /api/requests/:id/waiting-list` (`registrationService.js`, `requestRoutes.js`). Summarised in AGENTS.md §6.
+- **Backlog change:** SPM-39 AC4 (withdrawal invites the next person) moved to SPM-59 on 29 Oct 2026; it duplicated SPM-59 AC3.
+- **Team decisions (29 Oct 2026, pending PO confirmation):** W1–W5 in effective-requirements.md §4.18.
+- **Built tests-first** from the three criteria (`docs/evidence/spm-39-traceability.md`).
+- **Status:** In Progress, Sprint 4; human acceptance and peer review pending. Local verification (29 Oct 2026, macOS): lint and build passed; Node 136, frontend 101, root Vitest 2,176 (56 skipped) and Playwright 119/119 passed. The emulator test runs in CI only (no Java locally).
+- **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No live-project check; Firestore rules were neither edited nor deployed. The E2E spec shares SPM-19's 25 Nov 2026 date risk.
 
 ## SPM-84 notify on assignment and reassignment — 30 October 2026
 

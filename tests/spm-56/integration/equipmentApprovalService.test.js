@@ -185,10 +185,15 @@ describe('SPM-56 re-confirm after a significant change cleared the sign-off', ()
     theEvent().arrangementApprovals = { venue: { decision: 'approved', byUid: 'v1', at: 'earlier' } }
     await approve(created.id)
 
-    // SPM-10, through the real route: a significant change at Planning clears both sign-offs.
+    // SPM-10 with SPM-87, through the real routes: a significant change at Planning keeps the sign-off and marks it;
+    // the Coordinator then sends the technical sign-off back for re-approval.
     const patched = await request(app()).patch('/api/requests/event').set('Authorization', 'Bearer test:c').send({ core: { expectedAttendees: 150 } })
     expect(patched.status).toBe(200)
-    expect(theEvent().arrangementApprovals).toEqual({})
+    expect(theEvent().arrangementApprovals.technical).toMatchObject({ decision: 'approved' })
+    expect((await listEventEquipmentRequests('event', tech, db)).requests[0].actions).toEqual([RESERVE_EQUIPMENT])
+    const sentBack = await request(app()).post('/api/requests/event/sign-off-review').set('Authorization', 'Bearer test:c').send({ reapprove: ['technical'] })
+    expect(sentBack.status).toBe(200)
+    expect(theEvent().arrangementApprovals.technical).toBeUndefined()
     expect(stored(created.id).status).toBe('approved')
     // SPM-62 adds Reserve, which an Approved request also offers.
     expect((await listEventEquipmentRequests('event', tech, db)).requests[0].actions).toEqual([RECONFIRM_EQUIPMENT_APPROVAL, RESERVE_EQUIPMENT])

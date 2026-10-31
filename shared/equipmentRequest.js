@@ -229,7 +229,9 @@ export function equipmentDecision(user, event, request, action) {
     return { allowed: false, reason: REQUEST_NOT_PENDING_REVIEW }
   }
   if (action === RECONFIRM_EQUIPMENT_APPROVAL) {
-    if (request.status !== EQUIPMENT_REQUEST_STATUS.APPROVED) return { allowed: false, reason: REQUEST_NOT_APPROVED }
+    // SPM-87: once the Coordinator sends the technical sign-off back for re-approval, a Reserved request is
+    // re-confirmed the same way as an Approved one; its reservation stays.
+    if (![EQUIPMENT_REQUEST_STATUS.APPROVED, EQUIPMENT_REQUEST_STATUS.RESERVED].includes(request.status)) return { allowed: false, reason: REQUEST_NOT_APPROVED }
     if (arrangementDecision(event, TECHNICAL_ARRANGEMENT) === ARRANGEMENT_APPROVED) return { allowed: false, reason: SIGN_OFF_ALREADY_APPROVED }
   }
   return { allowed: true }

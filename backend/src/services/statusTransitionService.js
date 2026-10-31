@@ -8,7 +8,7 @@
 // entry in one transaction, so the state that was checked is the state that is changed.
 //
 // Submit and resubmit go through submitDraftEventRequest(), which also validates mandatory fields and
-// assigns the Coordinator (SPM-3, SPM-8); there is one path for them, not two.
+// queues a first submission for Lead assignment (SPM-3, SPM-68); there is one path for them, not two.
 
 import {
   ARRANGEMENT_NOT_REQUIRED,
@@ -50,8 +50,10 @@ import {
 } from '../../../shared/requestActions.js'
 import {
   APPROVE_CANCELLATION,
+  APPROVE,
   ARRANGEMENTS_NOT_APPROVED,
   PRIMARY_VENUE_REQUIRED,
+  SIGN_OFF_REVIEW_UNDECIDED,
   CANCEL,
   CONFIRM,
   COMPLETE,
@@ -69,7 +71,8 @@ import {
   WRONG_STATUS,
   canTransition,
 } from '../../../shared/statusTransitions.js'
-import { cancellationNotifications, preparationStartedNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
+import { NO_SIGN_OFF_REVIEW } from '../../../shared/signOffReview.js'
+import { cancellationNotifications, eventStaffAssignedNotifications, preparationStartedNotifications, statusChangeNotifications } from '../../../shared/notifications.js'
 import {
   ARRANGEMENTS_NOT_READY,
   NOT_AWAITING_SAFETY_REVIEW,
@@ -96,6 +99,7 @@ import { primaryVenueFromBooking } from '../../../shared/primaryVenue.js'
 import { recordPrimaryVenueChange } from './primaryVenueHistory.js'
 import { prepareEquipmentRequestClose } from './equipmentRequestService.js'
 import { USERS_COLLECTION } from './assignedCoordinatorService.js'
+import { assignEventStaffInTransaction, EVENT_STAFF_ASSIGNED } from './eventStaffAssignmentService.js'
 
 export const REASON_REQUIRED = 'reason_required'
 export const REASON_INVALID = 'reason_invalid'
@@ -114,6 +118,8 @@ const MESSAGES = Object.freeze({
   [NOT_PERMITTED]: 'You are not permitted to perform this action on this request.',
   [ARRANGEMENTS_NOT_APPROVED]: 'All mandatory venue and technical arrangements must be approved before confirmation.',
   [PRIMARY_VENUE_REQUIRED]: 'Choose one current approved primary venue before confirming this event.',
+  [SIGN_OFF_REVIEW_UNDECIDED]: 'Sign-offs have changed since approval. Choose which need re-approval, or record that none do, first.',
+  [NO_SIGN_OFF_REVIEW]: 'There are no sign-offs changed since approval to decide on.',
   [EVENT_NOT_ENDED]: 'An event can be marked complete only after it has taken place.',
   [INSUFFICIENT_INFORMATION]: 'The request is missing required details or has invalid ones. Complete them, or return it for clarification.',
   [SAFETY_APPROVAL_REQUIRED]: 'A valid safety approval from the Safety Officer is required first.',
@@ -269,6 +275,15 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
       refuse(decision)
       const reason = reasonFor()
       update = { status: decision.to, updatedAt: at }
+      if (action === APPROVE) {
+        const assignment = await assignEventStaffInTransaction(tx, db, existing, at)
+        Object.assign(update, assignment.update)
+        for (const { role, staff } of assignment.assignments) {
+          addActivity(tx, docRef, { type: EVENT_STAFF_ASSIGNED, role, staffUid: staff.uid,
+            actor: { type: 'system', name: 'System', role: null }, at })
+        }
+        addNotifications(tx, db, eventStaffAssignedNotifications(existing, assignment.assignments, at))
+      }
       if (action === CONFIRM && bookingState.primaryVenueReadiness.automaticBooking) {
         update.primaryVenue = primaryVenueFromBooking(bookingState.primaryVenueReadiness.automaticBooking,
           bookingState.primaryVenueReadiness.automaticBooking.venueLocation)
@@ -349,7 +364,9 @@ export async function transitionEventRequest(id, action, user, db = getAdminDb()
 }
 
 async function assignedPreparationRecipients(tx, db, request, actor) {
-  const uids = [...new Set(request.assignedStaffUids ?? [])].filter((uid) => uid && uid !== actor.uid)
+  const canonical = [request.assignedVenueStaffUid, request.assignedTechnicalStaffUid].filter(Boolean)
+  const uids = [...new Set(canonical.length ? canonical : request.assignedStaffUids ?? [])]
+    .filter((uid) => uid && uid !== actor.uid)
   const profiles = await Promise.all(uids.map((uid) => tx.get(db.collection(USERS_COLLECTION).doc(uid))))
   return uids.filter((_uid, index) => profiles[index].exists &&
     rolesOf(profiles[index].data()).some((role) => role === VENUE_STAFF || role === TECHNICAL_STAFF))

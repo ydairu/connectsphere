@@ -13,6 +13,8 @@ function fieldDefinition(path) {
 /** "Event details · Title" for core.title; the raw path for a field the page does not define. */
 export function fieldLabel(path) {
   if (path === 'primaryVenue') return 'Primary venue'
+  // SPM-87: the Coordinator's choice after a significant change (old value: what changed; new: what went back).
+  if (path === 'signOffReapproval') return 'Sign-offs sent back for re-approval'
   const { section, definition } = fieldDefinition(path)
   return definition ? `${sectionTitle(section)} · ${definition.shortLabel ?? definition.label}` : String(path)
 }

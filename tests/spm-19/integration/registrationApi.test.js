@@ -240,6 +240,8 @@ describe('SPM-19 AC4 / D3 — registration details for the Organiser and Coordin
       expect(response.json).toEqual({
         registeredCount: 1,
         capacity: 2,
+        // SPM-39: the waiting-list count is part of the same response.
+        waitingListCount: 0,
         registrations: [{ name: attendee.name, email: attendee.email, status: REGISTERED, registeredAt: expect.any(String) }],
       })
       expect((await api.view(account, SMALL_ID)).json.canViewRegistrations).toBe(true)

@@ -1,8 +1,9 @@
-// SPM-10 end-to-end in Chromium: on the seeded Confirmed event (both sign-offs approved), its Coordinator
-// changes the expected attendance, confirms the in-page warning, and sees the event back in Planning with
-// both sign-offs Awaiting approval and the history entry marked Significant. The assigned Venue Staff then
-// see the in-app notification and a read-only Venue preparation card. Firebase is the in-memory double; the
-// API and app are real.
+// SPM-10 with SPM-87 end-to-end in Chromium: on the seeded Confirmed event (technical sign-off approved), its
+// Coordinator changes the expected attendance, confirms the in-page warning, and sees the event back in Planning
+// with the technical sign-off kept but marked Changed since approval, and the history entry marked Significant.
+// The Coordinator sends the technical sign-off back for re-approval. The assigned Venue Staff then see the
+// in-app notification and a read-only Venue preparation card. Firebase is the in-memory double; the API and app
+// are real.
 
 import { SEED_ACCOUNTS, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
 import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test } from '../../shared/e2e/fixtures.js'
@@ -33,12 +34,20 @@ test.describe('SPM-10 — Edit event information and flag significant changes fo
     await page.getByRole('button', { name: 'Save changes' }).click()
 
     const dialog = page.getByRole('alertdialog', { name: 'Confirm significant change' })
-    await expect(dialog).toContainText('moves the event back to Planning')
-    await dialog.getByRole('button', { name: 'Save and reset sign-offs' }).click()
+    await expect(dialog).toContainText('moves back from Confirmed to Planning')
+    await expect(dialog).toContainText('marks them Changed since approval')
+    await dialog.getByRole('button', { name: 'Save significant change' }).click()
 
     await expect(page.getByText('Changes saved.')).toBeVisible()
     await expect(statusPill(page)).toHaveText('Planning')
     await expect(arrangement(page, 'Venue arrangement')).toHaveText('Awaiting approval')
+    // SPM-87: kept, and marked for the Coordinator to decide.
+    await expect(arrangement(page, 'Technical arrangement')).toHaveText('Approved')
+    const review = page.getByRole('group', { name: 'Choose sign-offs to send back' })
+    await review.getByLabel('Technical arrangement — Changed since approval').check()
+    await review.getByRole('button', { name: 'Send selected back for re-approval' }).click()
+    await expect(page.getByText('The selected sign-offs were sent back for re-approval.')).toBeVisible()
+    await expect(page.getByText('Sent back for re-approval: Technical arrangement')).toBeVisible()
     await expect(arrangement(page, 'Technical arrangement')).toHaveText('Awaiting approval')
     await page.getByRole('tab', { name: 'Change Log' }).click()
     const row = page.getByRole('list', { name: 'Change history entries' }).getByRole('listitem', { name: 'Event details · Expected attendees' })

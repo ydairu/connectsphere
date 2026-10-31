@@ -163,7 +163,7 @@ export function StatusNotices({ cancellation, rejection, completion }) {
   </>
 }
 
-function StatusActions({ status, actions, arrangements, cancellationRequest, primaryVenueRequired = false, safetyReviewStatus = null, busy, onAction }) {
+function StatusActions({ status, actions, arrangements, cancellationRequest, primaryVenueRequired = false, safetyReviewStatus = null, signOffReviewPending = false, busy, onAction }) {
   const [pending, setPending] = useState(null)
   const [reason, setReason] = useState('')
 
@@ -239,10 +239,13 @@ function StatusActions({ status, actions, arrangements, cancellationRequest, pri
               ? 'Choose a current approved primary venue before confirming the event.'
               : 'The event can be confirmed once all mandatory venue and technical arrangements are approved.'}</p>
           )}
-          {confirmBlocked && !primaryVenueRequired && !awaitingSafety && (
+          {confirmBlocked && signOffReviewPending && (
+            <p className="form-note">Sign-offs have changed since approval. Choose which need re-approval, or record that none do, before the safety check or confirmation.</p>
+          )}
+          {confirmBlocked && !signOffReviewPending && !primaryVenueRequired && !awaitingSafety && (
             <p className="form-note">The event can be confirmed once all mandatory venue and technical arrangements are approved.</p>
           )}
-          {confirmBlocked && !primaryVenueRequired && awaitingSafety && (
+          {confirmBlocked && !signOffReviewPending && !primaryVenueRequired && awaitingSafety && (
             <p className="form-note">The arrangements are approved. The event can be confirmed once it passes its safety check.</p>
           )}
           {approveCancellationBlocked && (

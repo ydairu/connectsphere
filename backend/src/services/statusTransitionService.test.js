@@ -99,7 +99,9 @@ function readyRequest(status, overrides = {}) {
 function fakeDb(request) {
   return createFakeFirestore({
     eventRequests: { 'request-1': request },
-    users: { [assigned.uid]: { roles: [COORDINATOR] }, [otherCoordinator.uid]: { roles: [COORDINATOR] } },
+    users: { [assigned.uid]: { roles: [COORDINATOR] }, [otherCoordinator.uid]: { roles: [COORDINATOR] },
+      'venue-1': { roles: [VENUE_STAFF], name: 'Venue One' },
+      'technical-1': { roles: [TECHNICAL_STAFF], name: 'Technical One' } },
   })
 }
 

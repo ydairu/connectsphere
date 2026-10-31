@@ -3,8 +3,9 @@
 // Pure functions: no Firebase, no I/O. PATCH /api/requests/:id validates and normalises the significant
 // fields of a patch with normaliseSignificantPatch(), refuses a significant change while a cancellation
 // request is open (significantChangeBlocked), and, inside the transaction that saves the edit, applies
-// significantChangeEffects(): sign-offs cleared at Planning/Confirmed, Confirmed back to Planning, and the
-// assigned staff notified. shared/changeHistory.js marks the field_changed entries of these fields.
+// significantChangeEffects(): recorded sign-offs marked "Changed since approval" for the Coordinator to review
+// (SPM-87, shared/signOffReview.js), Confirmed and Preparation back to Planning, the safety approval withdrawn,
+// and the assigned staff notified. shared/changeHistory.js marks the field_changed entries of these fields.
 //
 // "Significant date/time, duration, attendance, venue/layout, or equipment changes trigger formal re-review
 // and may alter Planning/confirmation status." — effective-requirements.md §7 (Customer-confirmed).
@@ -16,7 +17,8 @@
 import { hasOpenCancellation } from './cancellationRequests.js'
 import { SIGNIFICANT_CHANGE_NOTICE, significantChangeNotifications } from './notifications.js'
 import { INVALIDATED_BY_SIGNIFICANT_CHANGE, safetyReviewInvalidation } from './safetyReviewState.js'
-import { CONFIRMED, DRAFT, PLANNING } from './status.js'
+import { MARKING_STATUSES, signOffReviewOnChange } from './signOffReview.js'
+import { CONFIRMED, DRAFT, PLANNING, PREPARATION } from './status.js'
 
 // --- Classification -------------------------------------------------------------------------------
 
@@ -199,45 +201,50 @@ export function significantChanges(before, after) {
 export const SIGNIFICANT_CHANGE = 'significant_change'
 
 // [Team decision, 8 Oct 2026 — SPM-10 AC7] An open cancellation request (pending or returned) can only be
-// decided while the event is Confirmed (shared/cancellationRequests.js, APPROVE_CANCELLATION), so a
-// significant change that moved the event back to Planning would leave it undecidable.
+// decided while the event is Confirmed or in Preparation (shared/cancellationRequests.js, APPROVE_CANCELLATION),
+// so a significant change that moved the event back to Planning would leave it undecidable.
 export const CANCELLATION_REQUEST_OPEN = 'cancellation_request_open'
 export const CANCELLATION_REQUEST_OPEN_MESSAGE =
   'This event has an open cancellation request. Decide the cancellation request before changing the date, time, duration, attendance, venue or equipment. Other details can still be edited.'
 
-/** Is a significant change to this request refused right now? Confirmed with an open cancellation request. */
+/** Is a significant change to this request refused right now? Confirmed or Preparation with an open cancellation request. */
 export function significantChangeBlocked(request) {
-  return request?.status === CONFIRMED && hasOpenCancellation(request)
+  return [CONFIRMED, PREPARATION].includes(request?.status) && hasOpenCancellation(request)
 }
 
-// Statuses at which a significant change resets the venue and technical sign-off.
-const RESET_STATUSES = Object.freeze([PLANNING, CONFIRMED])
+// Statuses at which a significant change has effects beyond the edit (SPM-87 AC1, AC3).
+const RESET_STATUSES = MARKING_STATUSES
+// Statuses a significant change moves back to Planning (SPM-10, SPM-87 AC3).
+const RETURN_TO_PLANNING_STATUSES = Object.freeze([CONFIRMED, PREPARATION])
 
 /**
- * What a saved edit sets off, given the record before and after it:
+ * What a saved edit sets off at Planning, Confirmed or Preparation, given the record before and after it and
+ * the event's venue bookings (`bookings`, read before the save):
  *   { significantFields, metadata, statusChange, notifications }
- * - metadata: top-level fields to write with the edit — `arrangementApprovals: {}` (recorded decisions
- *   cleared; "Not required" is derived from the equipment fields, so it is unaffected), at Confirmed
- *   `status: 'planning'`, and `safetyReview` when a safety approval or a pending safety check is withdrawn
- *   (SPM-91 AC6: "its safety approval is invalidated and another safety check is required"). Empty when
- *   nothing changes.
+ * - metadata: top-level fields to write with the edit — `signOffReview` marking the recorded sign-offs
+ *   "Changed since approval" (SPM-87 AC1; they are kept, not cleared — CL3 G8!C51), `status: 'planning'` from
+ *   Confirmed or Preparation (SPM-87 AC3), and `safetyReview` when a safety approval or a pending safety check
+ *   is withdrawn (SPM-91 AC6). Empty when nothing changes.
  * - statusChange: { fromStatus, toStatus, fields } for the status_changed entry, or null.
  * - notifications: one per assigned staff member in `staffRecipientUids` (already filtered to Venue and
  *   Technical Support Staff), never to `user`.
- * Confirmed → Planning is an effect of the edit only; it is not an action in shared/statusTransitions.js.
+ * Confirmed or Preparation → Planning is an effect of the edit only; it is not an action in
+ * shared/statusTransitions.js.
  */
-export function significantChangeEffects(user, before, after, { at, staffRecipientUids = [] } = {}) {
+export function significantChangeEffects(user, before, after, { at, staffRecipientUids = [], bookings = [] } = {}) {
   const significantFields = significantChanges(before, after)
   const none = { significantFields, metadata: {}, statusChange: null, notifications: [] }
   if (significantFields.length === 0 || !RESET_STATUSES.includes(before?.status)) return none
 
-  const metadata = { arrangementApprovals: {} }
+  const metadata = {}
+  const signOffReview = signOffReviewOnChange(before, bookings, { fields: significantFields, at: at ?? null })
+  if (signOffReview) metadata.signOffReview = signOffReview
   const safetyReview = safetyReviewInvalidation(before, INVALIDATED_BY_SIGNIFICANT_CHANGE, at ?? null)
   if (safetyReview) metadata.safetyReview = safetyReview
   let statusChange = null
-  if (before.status === CONFIRMED) {
+  if (RETURN_TO_PLANNING_STATUSES.includes(before.status)) {
     metadata.status = PLANNING
-    statusChange = { fromStatus: CONFIRMED, toStatus: PLANNING, fields: significantFields }
+    statusChange = { fromStatus: before.status, toStatus: PLANNING, fields: significantFields }
   }
   const notifications = significantChangeNotifications(before, user, {
     recipientUids: staffRecipientUids,
@@ -248,7 +255,7 @@ export function significantChangeEffects(user, before, after, { at, staffRecipie
   return { significantFields, metadata, statusChange, notifications }
 }
 
-/** Whether saving this patch could need the staff recipients: Planning/Confirmed and a significant field in it. */
+/** Whether saving this patch could need the staff recipients: Planning, Confirmed or Preparation and a significant field in it. */
 export function mayNotifyStaff(request, patch) {
   return RESET_STATUSES.includes(request?.status) && significantFieldsIn(patch).length > 0 && (request.assignedStaffUids ?? []).length > 0
 }

@@ -141,15 +141,19 @@ export async function submitEquipmentRequest(eventId, input, user, db = getAdmin
     if (hasErrors(typeErrors)) throw new EquipmentRequestValidationError(typeErrors)
 
     const users = rows(await tx.get(db.collection('users'))).map((profile) => ({ ...profile, uid: profile.id }))
-    let assignee = technicalStaffToReuse(event, requests, users)
+    let assignee = event.assignedTechnicalStaffUid
+      ? users.find((profile) => profile.uid === event.assignedTechnicalStaffUid && rolesOf(profile).includes(TECHNICAL_STAFF))
+      : technicalStaffToReuse(event, requests, users)
     let lockRef = null
-    if (!assignee) {
+    if (!assignee && !event.assignedTechnicalStaffUid) {
       lockRef = db.collection('systemLocks').doc(STAFF_ASSIGNMENT_LOCKS[TECHNICAL_STAFF])
       const lock = await tx.get(lockRef)
       const pending = rows(await tx.get(db.collection(EQUIPMENT_REQUESTS_COLLECTION).where('status', '==', EQUIPMENT_REQUEST_STATUS.PENDING_REVIEW)))
       assignee = chooseStaff(users, TECHNICAL_STAFF, pending.map((request) => request.assignedTechnicalStaffUid), lock.data()?.lastUid)
     }
-    if (!assignee) throw new EquipmentRequestError(409, 'No Technical Support Staff account is available. The request has not been submitted.')
+    if (!assignee) throw new EquipmentRequestError(409, event.assignedTechnicalStaffUid
+      ? 'The event’s assigned Technical Support Staff account is unavailable. The request has not been submitted.'
+      : 'No Technical Support Staff account is available. The request has not been submitted.')
 
     const replaced = rejectedRequestToReplace(requests)
     const ref = db.collection(EQUIPMENT_REQUESTS_COLLECTION).doc()
@@ -333,7 +337,9 @@ export async function decideEquipmentRequest(eventId, equipmentRequestId, action
     tx.update(requestRef, requestUpdate)
     tx.update(eventRef, {
       arrangementApprovals: { ...event.arrangementApprovals, [TECHNICAL_ARRANGEMENT]: { decision: ARRANGEMENT_APPROVED, byUid: user.uid, at } },
-      currentEquipmentRequest: equipmentRequestSummary(equipmentRequestId, EQUIPMENT_REQUEST_STATUS.APPROVED),
+      // A re-confirmed Reserved request stays Reserved (SPM-87).
+      currentEquipmentRequest: equipmentRequestSummary(equipmentRequestId,
+        request.status === EQUIPMENT_REQUEST_STATUS.RESERVED ? EQUIPMENT_REQUEST_STATUS.RESERVED : EQUIPMENT_REQUEST_STATUS.APPROVED),
       updatedAt: at,
     })
     const activity = eventRef.collection(ACTIVITY_SUBCOLLECTION)

@@ -111,10 +111,14 @@ describe('SPM-61 — the Organiser is notified of each status change (API, in-me
   it('spm61_only_the_owning_organiser_is_notified', async () => {
     await expectSaved(coordinator, APPROVE, UNDER_REVIEW_ID)
     await expectSaved(coordinator, REJECT, PLANNING_ID, REASON)
+    // SPM-71 also notifies the newly assigned staff on Approve. This assertion
+    // concerns the SPM-61 Organiser status notices only.
+    const statusTypes = new Set([REQUEST_APPROVED_NOTICE, REQUEST_REJECTED_NOTICE])
     for (const account of [organiserA2, organiserB1, coordinator, coordinator2, venueStaff, technicalStaff, venueTechnicalStaff, attendee]) {
-      expect(await api.notificationsOf(account), account.uid).toEqual([])
+      expect((await api.notificationsOf(account)).filter((notice) => statusTypes.has(notice.type)), account.uid).toEqual([])
     }
-    expect(api.allNotifications().map((notice) => notice.recipientUid)).toEqual([organiserA1.uid, organiserA1.uid])
+    expect(api.allNotifications().filter((notice) => statusTypes.has(notice.type)).map((notice) => notice.recipientUid))
+      .toEqual([organiserA1.uid, organiserA1.uid])
   })
 
   it('spm61_starting_review_notifies_no_one', async () => {

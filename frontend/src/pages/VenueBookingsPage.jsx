@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_CANCELLED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_EXPIRED, capacityWarning, venueBookingStatusLabel } from '../../../shared/venueBooking.js'
+import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_CANCELLED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_EXPIRED, capacityWarning, venueBookingLabel, venueBookingStatusLabel } from '../../../shared/venueBooking.js'
 import { COORDINATOR } from '../../../shared/permissions.js'
 import { eventPeriod } from '../../../shared/venueSuitability.js'
 import { approveVenueBooking, cancelVenueBooking, getRequest, getVenueBookings, getVenueBookingQueue, listVenues, rejectVenueBooking, submitVenueBooking } from '../services/api.js'
@@ -231,7 +231,7 @@ export default function VenueBookingsPage() {
     {(!id || detailView || activeTab === 'requests') && bookings?.length === 0 && <Card className="request-form-section"><p>{detailView ? 'This booking request is unavailable or you do not have access to it.' : id ? 'No booking requests.' : 'No pending booking requests.'}</p></Card>}
     {(!id || detailView || activeTab === 'requests') && bookings?.map((booking) => <Card className="request-form-section booking-card" key={booking.id}>
       <details open={!id || detailView ? true : undefined}>
-      <summary><span>{!id ? `${booking.eventTitle} — ${booking.venueName}` : booking.venueName}</span><span>{venueBookingStatusLabel(booking.status)}</span></summary>
+      <summary><span>{!id ? `${booking.eventTitle} — ${booking.venueName}` : booking.venueName}</span><span>{venueBookingLabel(booking)}</span></summary>
       {!id ? <>
         <BookingRow label="Requested venue">{booking.venueName}</BookingRow>
         <BookingRow label="Starts">{displayTime(booking.startsAt)}</BookingRow>
@@ -245,7 +245,9 @@ export default function VenueBookingsPage() {
         <BookingRow label="Attendees using this venue">{booking.attendeeCount ?? booking.expectedAttendees ?? 'Not set'}</BookingRow>
         <BookingRow label="Venue requirements">{booking.requirements}</BookingRow>
         <BookingRow label="Special requests">{booking.specialRequests || 'None'}</BookingRow>
-        <BookingRow label="Status">{booking.status === BOOKING_APPROVED ? 'Approved — venue confirmed' : venueBookingStatusLabel(booking.status)}</BookingRow>
+        <BookingRow label="Status">{booking.awaitingReapproval
+          ? 'Awaiting re-approval — sent back by the Coordinator after a significant change; the venue stays reserved until you decide'
+          : booking.status === BOOKING_APPROVED ? 'Approved — venue confirmed' : venueBookingStatusLabel(booking.status)}</BookingRow>
         {booking.approvedAt && <BookingRow label="Approved at">{displayTime(booking.approvedAt)}</BookingRow>}
         {booking.cancelledAt && <BookingRow label="Cancelled at">{displayTime(booking.cancelledAt)}</BookingRow>}
         {booking.status === BOOKING_REJECTED && <>
@@ -258,7 +260,7 @@ export default function VenueBookingsPage() {
           <BookingRow label="Hold expiry">{displayTime(booking.holdExpiresAt)}{Date.parse(booking.holdExpiresAt) <= Date.now() ? ' (expired)' : ''}</BookingRow>}
         {booking.status === BOOKING_EXPIRED && <p role="note">This hold expired. The venue is available for other requests. Submit a new request while the event is in Planning.</p>}
         {booking.capacityWarning && !booking.suitability && <p role="note">{booking.capacityWarning}</p>}
-        {booking.status === BOOKING_PENDING && approvingId !== booking.id && <Suitability suitability={booking.suitability} />}
+        {(booking.status === BOOKING_PENDING || booking.awaitingReapproval) && approvingId !== booking.id && <Suitability suitability={booking.suitability} />}
         {booking.status === BOOKING_APPROVED && booking.approvalWarnings?.length > 0 && <section><h3>Warnings recorded at approval</h3>{booking.approvalWarnings.map((warning, index) => <p key={index}>{warning.message}</p>)}</section>}
         {detailView && booking.canApprove && rejectingId !== booking.id && <div className="booking-actions">
           {approvingId !== booking.id ? <button className="button button-primary" type="button" disabled={busy || refreshing || !!refreshFailure || staleDecision} onClick={() => refreshDecision(booking, 'approve')}>Approve booking</button> :
