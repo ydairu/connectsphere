@@ -9,11 +9,11 @@
 //   stateGateOpen(user, request)   may it be edited right now, by this user?
 //   editableSections(roles)        which sections may these roles ever edit?
 //
-// Request shape assumed here (the event-request model does not exist yet — SPM-7):
+// Event request shape:
 //   { id, status, ownerUid, organisationId, organisationName, assignedStaffUids: string[],
 //     assignedCoordinatorUid (SPM-8), core: {...}, venue: {...}, equipment: {...},
 //     registration: { enabled, ... }, internal: {...},
-//     venuePreparation: { status, notes }, equipmentPreparation: { status, notes } (SPM-48) }
+//     venuePreparation: { status, notes } (legacy SPM-48), equipmentPreparation: { status, notes } }
 // Section data lives under its section key, so a field's section is its top-level key.
 
 import { DRAFT, RETURNED, PREPARATION, COMPLETED, CANCELLED, REJECTED, registrationEligibleStatus } from './status.js'
@@ -55,7 +55,8 @@ export const VENUE = 'venue'
 export const EQUIPMENT = 'equipment'
 export const REGISTRATION = 'registration'
 export const INTERNAL = 'internal'
-// SPM-48: venue and equipment preparation, defined in shared/preparation.js.
+// SPM-89 keeps the legacy venue section recognised so direct edits can be refused; active venue
+// preparation lives on approved booking documents. Equipment preparation remains event-level.
 export const SECTIONS = Object.freeze([CORE, VENUE, EQUIPMENT, REGISTRATION, INTERNAL, VENUE_PREPARATION, EQUIPMENT_PREPARATION])
 
 // Role capability — plan, "Role capability — sections".
@@ -65,14 +66,15 @@ const SECTION_ACCESS = Object.freeze({
   // "Coordinators can edit event details" — Clarification 1. "Event Coordinators edit main event
   // details" — Clarification 2. Every section on an event the coordinator may see is the team's SPM-42
   // implementation; which events they may see is record scope, isAssignedCoordinator() (SPM-65).
-  // SPM-48: the Coordinator views both preparation sections but does not edit them.
-  [COORDINATOR]: { view: SECTIONS, edit: [CORE, VENUE, EQUIPMENT, REGISTRATION, INTERNAL] },
+  // SPM-89: the Coordinator sees per-booking venue preparation through the booking API and
+  // event-level equipment preparation here. The legacy venue section is never projected.
+  [COORDINATOR]: { view: SECTIONS.filter((section) => section !== VENUE_PREPARATION), edit: [CORE, VENUE, EQUIPMENT, REGISTRATION, INTERNAL] },
   // "Venue staff: venue details only. Technical staff: technical equipment details only."
   // — Clarification 1, User Roles & Access Control. A view restriction, not just edit.
   // SPM-48 [Team decision, 7 Oct 2026, pending PO confirmation]: staff view the Organiser's requested venue
-  // or equipment but no longer edit it; each edits only its own preparation section, and only while
-  // PREPARATION_CONDITIONS allows (SECTION_CONDITIONS below). Neither sees the other's preparation.
-  [VENUE_STAFF]: { view: [CORE, VENUE, VENUE_PREPARATION], edit: [VENUE_PREPARATION] },
+  // or equipment but no longer edit it. Venue Staff edit assigned booking preparation through
+  // the booking API; Technical Staff edit event-level equipment preparation here.
+  [VENUE_STAFF]: { view: [CORE, VENUE], edit: [] },
   [TECHNICAL_STAFF]: { view: [CORE, EQUIPMENT, EQUIPMENT_PREPARATION], edit: [EQUIPMENT_PREPARATION] },
   // Attendee: event information available to them; never internal planning information.
   // — customer-rulings.md, Roles and access

@@ -130,7 +130,7 @@ describe('SPM-28 — what an edit records', () => {
 
   it.each([
     ['the owner at Returned', owner, RETURNED, 'core', ORGANISER],
-    ['venue staff at Preparation', venue, PREPARATION, 'venuePreparation', VENUE_STAFF],
+    ['legacy venue preparation is no longer an event edit', venue, PREPARATION, 'venuePreparation', null],
     ['technical staff at Preparation', technical, PREPARATION, 'equipmentPreparation', TECHNICAL_STAFF],
     ['the coordinator on internal planning', coordinator, PLANNING, 'internal', COORDINATOR],
   ])('actor role: %s', (_label, user, status, section, role) => {
@@ -140,7 +140,7 @@ describe('SPM-28 — what an edit records', () => {
   it('actor role for a multi-role user is the role that permits that section', () => {
     const organiserVenue = { uid: owner.uid, name: 'Both', roles: [ORGANISER, VENUE_STAFF], organisationId: 'ORG-A' }
     const preparation = request({ status: PREPARATION, assignedStaffUids: [owner.uid] })
-    expect(editingRole(organiserVenue, preparation, 'venuePreparation')).toBe(VENUE_STAFF)
+    expect(editingRole(organiserVenue, preparation, 'venuePreparation')).toBeNull()
     expect(editingRole(organiserVenue, request({ status: RETURNED }), 'core')).toBe(ORGANISER)
     expect(editingRole(venue, preparation, 'core')).toBeNull()
   })

@@ -81,8 +81,8 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     it('Venue staff GETs an assigned event — equipment section absent', async () => {
       const response = await get('venueStaff', A1_PLANNING)
       expect(response.status).toBe(200)
-      // SPM-48: venue preparation is theirs to view; equipment preparation is absent like equipment.
-      expect(Object.keys(response.json.request).sort()).toEqual(['core', 'id', 'status', 'venue', 'venuePreparation'])
+      // SPM-89: venue preparation is projected through assigned booking records, not the event section.
+      expect(Object.keys(response.json.request).sort()).toEqual(['core', 'id', 'status', 'venue'])
       expect(!response.text.includes('projector'), 'equipment values absent from the raw body').toBeTruthy()
       // SPM-48: the requested venue is read-only, and venue preparation waits for the venue sign-off.
       expect(response.json.editableSections).toEqual([])
@@ -170,24 +170,21 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
       expect(response.json.forbiddenFields).toEqual(['status'])
     })
 
-    it('Venue+technical dual-role account PATCHes a venue field and an equipment field', async () => {
-      // SPM-88: staff preparation sections unlock only in Preparation.
+    it('Venue+technical dual-role account PATCHes equipment preparation; event-level venue preparation is refused', async () => {
       const preparationId = 'seed-req-a1-confirmed-past'
+      expect((await patch('venueTechnicalStaff', preparationId, { venuePreparation: { status: 'in_progress' } })).status).toBe(403)
       const response = await patch('venueTechnicalStaff', preparationId, {
-        venuePreparation: { status: 'in_progress' },
         equipmentPreparation: { notes: 'Projector tested' },
       })
       expect(response.status).toBe(200)
-      expect(response.json.request.venuePreparation.status).toBe('in_progress')
+      expect(response.json.request).not.toHaveProperty('venuePreparation')
       expect(response.json.request.equipmentPreparation.notes).toBe('Projector tested')
-      expect(response.json.editableSections).toEqual(['venuePreparation', 'equipmentPreparation'])
+      expect(response.json.editableSections).toEqual(['equipmentPreparation'])
 
       const persisted = await get('coordinator', preparationId)
-      expect(persisted.json.request.venuePreparation.status, 'venue preparation persisted').toBe('in_progress')
       expect(persisted.json.request.equipmentPreparation.notes, 'equipment preparation persisted').toBe('Projector tested')
 
       const restored = await patch('venueTechnicalStaff', preparationId, {
-        venuePreparation: { status: 'not_started', notes: '' },
         equipmentPreparation: { status: 'not_started', notes: '' },
       })
       expect(restored.status, 'seeded (default) values restored').toBe(200)

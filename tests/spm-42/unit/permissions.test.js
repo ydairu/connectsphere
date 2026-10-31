@@ -124,7 +124,7 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     // SPM-48: Venue Staff edit venue preparation only; the requested venue and equipment are read-only.
     const planning = request({ status: PREPARATION, ...bothSignOffsApproved })
     const patch = { venuePreparation: { status: 'in_progress' }, equipment: { projector: false } }
-    expect(forbiddenFields(venueStaff, planning, patch)).toEqual(['equipment.projector'])
+    expect(forbiddenFields(venueStaff, planning, patch)).toEqual(['venuePreparation.status', 'equipment.projector'])
   })
 
   it('Attendee GETs a confirmed event — body carries no internal fields', () => {
@@ -136,10 +136,10 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
   })
 
   it('Venue+technical dual-role account PATCHes a venue field and an equipment field', () => {
-    // SPM-48: the combined roles edit both preparation sections.
+    // SPM-89: venue preparation is on a booking; equipment remains an event section.
     const planning = request({ status: PREPARATION, ...bothSignOffsApproved })
     const patch = { venuePreparation: { status: 'ready' }, equipmentPreparation: { notes: 'Projector tested' } }
-    expect(forbiddenFields(dualStaff, planning, patch)).toEqual([])
+    expect(forbiddenFields(dualStaff, planning, patch)).toEqual(['venuePreparation.status'])
   })
 
   it('Organiser+venue-staff dual-role account edits only preparation while it is in Preparation', () => {
@@ -156,9 +156,8 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
       ...bothSignOffsApproved,
     })
     expect(canEdit(organiserVenueStaff, ownPlanning, CORE), 'the venue role must not unlock core').toBe(false)
-    // SPM-48: the venue role's section is venue preparation.
-    expect(canEdit(organiserVenueStaff, ownPlanning, VENUE_PREPARATION), 'the venue role still edits venue preparation').toBe(true)
-    expect(forbiddenFields(organiserVenueStaff, ownPlanning, { core: { title: 'Renamed' }, venuePreparation: { status: 'ready' } })).toEqual(['core.title'])
+    expect(canEdit(organiserVenueStaff, ownPlanning, VENUE_PREPARATION)).toBe(false)
+    expect(forbiddenFields(organiserVenueStaff, ownPlanning, { core: { title: 'Renamed' }, venuePreparation: { status: 'ready' } })).toEqual(['core.title', 'venuePreparation.status'])
   })
 
   it('Venue staff GETs an assigned event — equipment section absent', () => {
@@ -196,7 +195,7 @@ describe("SPM-42 — View and Edit Information According to My Role's Permission
     }
     const confirmed = request({ status: CONFIRMED, assignedStaffUids: [venueStaff.uid], ...bothSignOffsApproved })
     expect(canEdit(venueStaff, confirmed, VENUE_PREPARATION), 'Confirmed stays read-only for preparation').toBe(false)
-    expect(canEdit(venueStaff, { ...confirmed, status: PREPARATION }, VENUE_PREPARATION)).toBe(true)
+    expect(canEdit(venueStaff, { ...confirmed, status: PREPARATION }, VENUE_PREPARATION)).toBe(false)
   })
 
   // Attendees see confirmed events only. Team decision, proposed by Shaun (14 Sep 2026) and ratified

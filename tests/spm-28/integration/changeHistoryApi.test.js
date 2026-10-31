@@ -12,7 +12,7 @@ import { createAuthenticate } from '../../../backend/src/middleware/authenticate
 import { StaleWriteError } from '../../../backend/src/services/eventRequestStore.js'
 import { createFakeFirestore } from '../../../backend/src/testing/fakeFirestore.js'
 import { FIELD_CHANGED } from '../../../shared/changeHistory.js'
-import { COORDINATOR, ORGANISER, VENUE_STAFF } from '../../../shared/permissions.js'
+import { COORDINATOR, ORGANISER } from '../../../shared/permissions.js'
 import { createFakeFirestoreEventRequestStore } from '../../shared/firebase-double/fakeFirestoreEventRequestStore.js'
 
 const TOKEN_PREFIX = 'test-token:'
@@ -101,11 +101,9 @@ describe('SPM-28 AC1/AC2 — an entry per changed field, after submission', () =
     ])
   })
 
-  it('Venue Staff at Preparation, on their section', async () => {
-    expect((await patch(venueStaff, PREPARATION_ID, { venuePreparation: { status: 'in_progress' } })).status).toBe(200)
-    expect(recorded(PREPARATION_ID)).toEqual([
-      expect.objectContaining({ field: 'venuePreparation.status', oldValue: 'not_started', newValue: 'in_progress', actor: expect.objectContaining({ role: VENUE_STAFF }) }),
-    ])
+  it('legacy event-level venue preparation writes are refused after SPM-89', async () => {
+    expect((await patch(venueStaff, PREPARATION_ID, { venuePreparation: { status: 'in_progress' } })).status).toBe(403)
+    expect(recorded(PREPARATION_ID)).toEqual([])
   })
 
   it('the Coordinator\'s internal planning edit is recorded', async () => {

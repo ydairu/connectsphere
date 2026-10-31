@@ -31,7 +31,7 @@ import { sendEventRequestError } from './eventRequestController.js'
 import { EventRequestValidationError } from '../services/eventRequestService.js'
 import { STATUS_CHANGED, userActor } from '../services/statusHistory.js'
 import { StatusTransitionError, requireRequestScope } from '../services/statusTransitionService.js'
-import { loadEventVenueBookings, loadVenueBookingReadiness } from '../services/venueBookingService.js'
+import { loadEventPreparationReadiness, loadEventVenueBookings, loadVenueBookingReadiness } from '../services/venueBookingService.js'
 
 // SPM-20, SPM-40: activity entry types.
 export const CHANGE_REQUESTED = 'change_requested'
@@ -95,7 +95,8 @@ export function createRequestController(store, loadCoordinatorName, loadOwnerNam
     const coordinatorName = await loadCoordinatorName(req.user, request)
     const ownerNames = await loadOwnerNames(req.user, [request])
     const venueBookingReadiness = getDb ? await loadVenueBookingReadiness(req.params.id, getDb()) : null
-    return presentRequest(req.user, request, { coordinatorName, ownerNames, venueBookingReadiness })
+    const eventPreparationReadiness = getDb ? await loadEventPreparationReadiness(req.params.id, request, getDb()) : null
+    return presentRequest(req.user, request, { coordinatorName, ownerNames, venueBookingReadiness, eventPreparationReadiness })
   }
 
   // A refused or stale change request action: the same responses as the event's other actions.

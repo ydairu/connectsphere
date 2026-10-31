@@ -2,7 +2,7 @@
 // Preparation stage. Safety approval is supplied by the test double until SPM-91/92 is implemented.
 
 import { SEED_ACCOUNTS, SEED_REQUESTS } from '../../../backend/scripts/seedData.js'
-import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, logout, test } from '../../shared/e2e/fixtures.js'
+import { DOUBLE_ORIGIN, ROLE_USERS, expect, loginAs, test } from '../../shared/e2e/fixtures.js'
 
 async function signIn(page, account) {
   await loginAs(page, account)
@@ -16,10 +16,8 @@ const planning = byId('seed-req-a1-planning')
 // the test registers the account until the next reset.
 const COORDINATOR = SEED_ACCOUNTS.coordinator3
 
-const historyRows = (page) => page.getByRole('list', { name: 'Change history entries' }).getByRole('listitem')
-
-test.describe('SPM-48 — Venue and Technical Support Staff update preparation status (E2E)', () => {
-  test('spm48_venue_staff_update_venue_preparation_and_the_coordinator_sees_it', async ({ page, request }) => {
+test.describe('SPM-48 — equipment preparation and SPM-89 venue boundary (E2E)', () => {
+  test('spm48_venue_staff_use_booking_preparation_instead_of_the_event_form', async ({ page, request }) => {
     expect(confirmed.assignedCoordinatorUid).toBe(COORDINATOR.uid)
     expect((await request.post(`${DOUBLE_ORIGIN}/__double__/accounts/coordinator3`)).ok()).toBeTruthy()
     expect(confirmed.arrangementApprovals.venue.decision).toBe('approved')
@@ -32,28 +30,12 @@ test.describe('SPM-48 — Venue and Technical Support Staff update preparation s
     await signIn(page, ROLE_USERS.venueStaff)
     await page.goto(`/requests/${confirmed.id}`)
     await page.getByRole('tab', { name: 'Venue Details' }).click()
-    await expect(page.getByRole('heading', { name: 'Venue preparation' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Venue preparation' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Equipment preparation' })).toHaveCount(0)
-    await expect(page.getByLabel('Venue preparation status')).toHaveValue('not_started')
-
-    await page.getByLabel('Venue preparation status').selectOption('in_progress')
-    await page.getByLabel('Venue preparation notes').fill('Chairs ordered for theatre layout')
-    await page.getByRole('button', { name: 'Save changes' }).click()
-    await expect(page.getByRole('alert')).toHaveText('Changes saved.')
-
-    await logout(page)
-    await signIn(page, COORDINATOR)
-    await page.goto(`/requests/${confirmed.id}`)
-    await page.getByRole('tab', { name: 'Venue Details' }).click()
-    const card = page.locator('.request-form-section', { has: page.getByRole('heading', { name: 'Venue preparation' }) })
-    await expect(card.getByText('Read only')).toBeVisible()
-    await expect(card.getByText('In Progress')).toBeVisible()
-    await expect(card.getByText('Chairs ordered for theatre layout')).toBeVisible()
-    await expect(page.getByLabel('Venue preparation status')).toHaveCount(0)
-
-    await page.getByRole('tab', { name: 'Change Log' }).click()
-    await expect(historyRows(page).filter({ hasText: 'Not Started → In Progress' })).toHaveCount(1)
-    await expect(historyRows(page).filter({ hasText: `${ROLE_USERS.venueStaff.name}` }).first()).toBeVisible()
+    const refused = await request.patch(`${DOUBLE_ORIGIN}/api/requests/${confirmed.id}`, {
+      headers: { Authorization: `Bearer test-token:${ROLE_USERS.venueStaff.uid}` }, data: { venuePreparation: { status: 'ready' } },
+    })
+    expect(refused.status()).toBe(403)
   })
 
   test('spm48_technical_staff_see_a_read_only_card_before_preparation', async ({ page }) => {

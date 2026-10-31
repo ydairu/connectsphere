@@ -87,10 +87,10 @@ describe('Seed data — SPM-42 / SPM-24 demonstration coverage', () => {
     expect(canEdit(organiserA1, byId['seed-req-a1-submitted'], CORE)).toBe(false)
   })
 
-  it('Demonstrable on the seed: venue+technical account edits venue and equipment where venue-only staff cannot', () => {
+  it('Demonstrable on the seed: the dual-role account edits equipment preparation; venue preparation uses bookings', () => {
     // SPM-88: the staff sections open at Preparation, not on approval alone.
     const preparation = byId['seed-req-a1-confirmed-past']
-    expect(canEdit(venueTechnicalStaff, preparation, VENUE_PREPARATION)).toBe(true)
+    expect(canEdit(venueTechnicalStaff, preparation, VENUE_PREPARATION)).toBe(false)
     expect(canEdit(venueTechnicalStaff, preparation, EQUIPMENT_PREPARATION)).toBe(true)
     expect(canEdit(venueTechnicalStaff, byId['seed-req-a1-confirmed'], VENUE_PREPARATION)).toBe(false)
     const planning = byId['seed-req-b1-planning']

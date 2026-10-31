@@ -67,10 +67,10 @@ describe('SPM-65 — coordinator record scope', () => {
 
   it('A coordinator holding a second role keeps that role\'s scope (SPM-42 union)', () => {
     const coordinatorStaff = { uid: 'u-coord-staff', roles: [COORDINATOR, VENUE_STAFF] }
-    // SPM-88: the venue role's section is editable in Preparation.
+    // SPM-89: a Venue Staff member can still see the event through that role; preparation writes use bookings.
     const staffAssigned = request({ status: PREPARATION, assignedStaffUids: [coordinatorStaff.uid] })
     expect(inScope(coordinatorStaff, staffAssigned), 'in scope as venue staff').toBe(true)
-    expect(canEdit(coordinatorStaff, staffAssigned, 'venuePreparation')).toBe(true)
+    expect(canEdit(coordinatorStaff, staffAssigned, 'venuePreparation')).toBe(false)
     expect(canEdit(coordinatorStaff, staffAssigned, 'internal'), 'not as coordinator: not assigned').toBe(false)
 
     const coordinatorOrganiser = { uid: 'u-coord-org', roles: [COORDINATOR, ORGANISER], organisationId: 'org-1' }

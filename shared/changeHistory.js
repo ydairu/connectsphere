@@ -187,13 +187,14 @@ export function visibleChangeHistory(user, request, entries) {
     .filter((entry) => entry.type === FIELD_CHANGED && typeof entry.field === 'string')
     .filter((entry) => all || (asOrganiser && organiserMaySee(entry)) || (asSafetyOfficer && safetyOfficerMaySee(entry)))
     .sort(newestFirst)
-    .map(({ id, field, oldValue, newValue, actor, at, significant }) => ({
+    .map(({ id, field, oldValue, newValue, actor, at, significant, bookingId, venueName }) => ({
       id: id ?? null,
       field,
       oldValue: field === PRIMARY_VENUE_FIELD ? publicPrimaryVenue(oldValue, true) : jsonSafe(oldValue),
       newValue: field === PRIMARY_VENUE_FIELD ? publicPrimaryVenue(newValue, true) : jsonSafe(newValue),
       actor: { type: actor?.type ?? 'user', name: actor?.name ?? null, role: actor?.role ?? null },
       at: at ?? null,
+      ...(field.startsWith('venuePreparation.') && bookingId && venueName ? { bookingId, venueName } : {}),
       // SPM-10: only on significant entries, for every viewer who may see the entry.
       ...(significant === true ? { significant: true } : {}),
     }))

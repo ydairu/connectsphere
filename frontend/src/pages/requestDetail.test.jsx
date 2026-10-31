@@ -24,10 +24,9 @@ const venueStaffResponse = {
     status: 'planning',
     core: { title: 'A1 planning', purpose: 'Partners', description: null, preferredDateTime: null, durationHours: 4, expectedAttendees: 80 },
     venue: { layoutPreference: 'theatre', accessibilityRequired: true, accessibilityNeeds: null },
-    venuePreparation: { status: 'not_started', notes: '' },
   },
-  // SPM-48: Venue Staff edit venue preparation only; the requested venue is read-only to them.
-  editableSections: ['venuePreparation'],
+  // SPM-89: venue preparation is edited on each approved booking, not on this event form.
+  editableSections: [],
 }
 
 // `response` null means the caller has already set up getRequest's rejection.
@@ -49,26 +48,25 @@ function showRequest(response, roles = ['venue_staff']) {
 describe('SPM-42 — viewing a request by role', () => {
   it('groups sections in the requested tab order and keeps edits while switching tabs', async () => {
     const user = showRequest({ request: { ...venueStaffResponse.request, equipment: { requirements: ['projector'] }, registration: { enabled: false }, internal: { planningNotes: '' } },
-      editableSections: ['core', 'venue', 'equipment', 'registration', 'internal', 'venuePreparation'] }, ['coordinator'])
+      editableSections: ['core', 'venue', 'equipment', 'registration', 'internal'] }, ['coordinator'])
     expect((await screen.findAllByRole('tab')).map((tab) => tab.textContent)).toEqual(['Event Status', 'Venue Details', 'Equipment Required', 'Change Log'])
     await user.clear(screen.getByLabelText('Title'))
     await user.type(screen.getByLabelText('Title'), 'Updated event')
     await user.click(screen.getByRole('tab', { name: 'Venue Details' }))
-    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Venue', 'Venue preparation', 'Venue bookings', 'Venue booking requests'])
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Venue', 'Venue bookings', 'Venue booking requests'])
     await user.click(screen.getByRole('tab', { name: 'Equipment Required' }))
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Equipment and technical support', 'Registration', 'Equipment requests'])
     await user.click(screen.getByRole('tab', { name: 'Event Status' }))
     expect(screen.getByLabelText('Title').value).toBe('Updated event')
   })
 
-  it('Venue staff see the venue section and edit venue preparation, and the equipment section is absent', async () => {
+  it('Venue staff see the venue section but no event-level preparation editor', async () => {
     showRequest(venueStaffResponse)
     await screen.findByText('Event details')
     await userEvent.click(screen.getByRole('tab', { name: 'Venue Details' }))
     expect(screen.getByRole('heading', { name: 'Venue' })).toBeTruthy()
     expect(screen.queryByText('Equipment and technical support')).toBeNull()
-    // SPM-48: their own section is venue preparation; the requested venue and main details are read-only.
-    expect(screen.getByLabelText('Venue preparation status')).toBeTruthy()
+    expect(screen.queryByLabelText('Venue preparation status')).toBeNull()
     expect(screen.queryByLabelText('Layout preference')).toBeNull()
     expect(screen.queryByLabelText('Title')).toBeNull()
     await userEvent.click(screen.getByRole('tab', { name: 'Event Status' }))
@@ -95,31 +93,27 @@ describe('SPM-42 — viewing a request by role', () => {
 
 describe('SPM-42 #7 — a rejected field is named', () => {
   it('Saving sends only the changed field and reports the fields the API rejected', async () => {
-    // SPM-48: Venue Staff's editable field is in venue preparation.
-    const user = showRequest(venueStaffResponse)
-    await user.click(await screen.findByRole('tab', { name: 'Venue Details' }))
-    const notes = await screen.findByLabelText('Venue preparation notes')
-    await user.type(notes, 'Chairs booked')
+    const user = showRequest({ ...venueStaffResponse, editableSections: ['core'] }, ['coordinator'])
+    await screen.findByLabelText('Purpose')
+    await user.type(screen.getByLabelText('Purpose'), ' updated')
 
     updateRequest.mockRejectedValueOnce(
-      new ApiRequestError('API_REQUEST_FAILED', { status: 403, details: { forbiddenFields: ['venuePreparation.notes'] } }),
+      new ApiRequestError('API_REQUEST_FAILED', { status: 403, details: { forbiddenFields: ['core.purpose'] } }),
     )
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() => expect(updateRequest).toHaveBeenCalled())
-    expect(updateRequest.mock.calls[0][2]).toEqual({ venuePreparation: { notes: 'Chairs booked' } })
-    expect(await screen.findByText('You are not allowed to change: venuePreparation.notes')).toBeTruthy()
+    expect(updateRequest.mock.calls[0][2]).toEqual({ core: { purpose: 'Partners updated' } })
+    expect(await screen.findByText('You are not allowed to change: core.purpose')).toBeTruthy()
   })
 
   it('A successful save reports the change', async () => {
-    // SPM-48: Venue Staff's editable field is in venue preparation.
-    const user = showRequest(venueStaffResponse)
-    await user.click(await screen.findByRole('tab', { name: 'Venue Details' }))
-    await user.selectOptions(await screen.findByLabelText('Venue preparation status'), 'in_progress')
+    const user = showRequest({ ...venueStaffResponse, editableSections: ['core'] }, ['coordinator'])
+    await user.type(await screen.findByLabelText('Purpose'), ' updated')
 
     updateRequest.mockResolvedValueOnce({
-      request: { ...venueStaffResponse.request, venuePreparation: { status: 'in_progress', notes: '' } },
-      editableSections: ['venuePreparation'],
+      request: { ...venueStaffResponse.request, core: { ...venueStaffResponse.request.core, purpose: 'Partners updated' } },
+      editableSections: ['core'],
     })
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     expect(await screen.findByText('Changes saved.')).toBeTruthy()

@@ -146,6 +146,8 @@ describe('SPM-20 / SPM-40 — the Coordinator decides', () => {
     expect((await view(coordinator.uid)).body.changeRequest.significant).toBe(false)
     const response = await decide('accept')
     expect(response.status).toBe(200)
+    expect(response.body.eventPreparationReadiness).toMatchObject({ ready: false, equipmentReady: false })
+    expect(response.body.eventPreparationReadiness.venues).toHaveLength(1)
     expect(event()).toMatchObject({ status: CONFIRMED, core: { description: 'New wording' }, safetyReview: { status: SAFETY_APPROVED } })
     expect(event().signOffReview).toBeUndefined()
     expect(activity()).toContainEqual(expect.objectContaining({ type: 'field_changed', field: 'core.description', actor: expect.objectContaining({ uid: coordinator.uid }) }))

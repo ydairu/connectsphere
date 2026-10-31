@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { BOOKING_APPROVED, currentVenueBookingGroups, venueBookingLabel, venueBookingNextStep, venueBookingStatusLabel } from '../../../shared/venueBooking.js'
 import { getVenueBookings, setPrimaryVenue } from '../services/api.js'
 import Card from './Card.jsx'
+import { PREPARATION_STATUS_LABELS } from '../../../shared/preparation.js'
 
 const displayTime = (value) => !value || Number.isNaN(Date.parse(value)) ? 'Not set'
   : new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
@@ -59,6 +60,7 @@ export default function VenueBookingOverview({ user, eventId, eventStatus, canMa
       <h3>{current.venueName} {primaryVenue?.bookingId === current.id && <span className="significant-badge">Primary venue</span>}</h3>
       <p><strong>{venueBookingLabel(current)}</strong> · {displayTime(current.startsAt)}–{displayTime(current.endsAt)}</p>
       <p>Next step: {venueBookingNextStep(current, eventStatus)}</p>
+      {current.preparation && <p>Venue preparation: {PREPARATION_STATUS_LABELS[current.preparation.status]}{current.preparation.notes ? ` · ${current.preparation.notes}` : ''}</p>}
       {canManage && <Link to={`/requests/${eventId}/venue-bookings?bookingId=${encodeURIComponent(current.id)}`}>Manage this booking</Link>}
       {canSetPrimary && current.status === BOOKING_APPROVED && primaryVenue?.bookingId !== current.id &&
         <button type="button" className="button button-secondary button-small" disabled={selectingId !== null}

@@ -135,9 +135,9 @@ describe('SPM-88 — preparation editing follows status only', () => {
 })
 
 describe('SPM-48 AC1/AC6/AC7 — who may edit which section (shared/permissions.js)', () => {
-  it('Venue Staff edit venue preparation only', () => {
+  it('Venue Staff use the per-booking route, not an event-level section edit', () => {
     const approved = request()
-    expect(canEdit(venue, approved, VENUE_PREPARATION)).toBe(true)
+    expect(canEdit(venue, approved, VENUE_PREPARATION)).toBe(false)
     for (const section of [CORE, VENUE, EQUIPMENT, EQUIPMENT_PREPARATION]) expect(canEdit(venue, approved, section), section).toBe(false)
   })
 
@@ -147,13 +147,13 @@ describe('SPM-48 AC1/AC6/AC7 — who may edit which section (shared/permissions.
     for (const section of [CORE, VENUE, EQUIPMENT, VENUE_PREPARATION]) expect(canEdit(technical, approved, section), section).toBe(false)
   })
 
-  it('a staff member holding both roles edits both preparation sections, and still not the requested venue or equipment', () => {
+  it('a staff member holding both roles edits equipment preparation, and not event-level venue preparation', () => {
     expect(forbiddenFields(both, request(), {
       venuePreparation: { status: 'ready' },
       equipmentPreparation: { status: 'ready' },
       venue: { layoutPreference: 'banquet' },
       equipment: { requirements: [] },
-    })).toEqual(['venue.layoutPreference', 'equipment.requirements'])
+    })).toEqual(['venuePreparation.status', 'venue.layoutPreference', 'equipment.requirements'])
   })
 
   it('staff not assigned to the event edit nothing', () => {
@@ -182,15 +182,15 @@ describe('SPM-48 AC8 — preparation is projected out for Organisers and Attende
     expect(body).not.toHaveProperty(EQUIPMENT_PREPARATION)
   })
 
-  it('Venue Staff receive venue preparation only; Technical Support Staff equipment preparation only', () => {
-    expect(projectRequest(venue, withPreparation)).toHaveProperty(VENUE_PREPARATION, { status: 'ready', notes: 'n' })
+  it('legacy venue preparation is absent; Technical Support Staff receive equipment preparation only', () => {
+    expect(projectRequest(venue, withPreparation)).not.toHaveProperty(VENUE_PREPARATION)
     expect(projectRequest(venue, withPreparation)).not.toHaveProperty(EQUIPMENT_PREPARATION)
     expect(projectRequest(technical, withPreparation)).toHaveProperty(EQUIPMENT_PREPARATION, DEFAULT_PREPARATION)
     expect(projectRequest(technical, withPreparation)).not.toHaveProperty(VENUE_PREPARATION)
   })
 
-  it('the Coordinator receives both; before Planning, nobody receives either', () => {
-    expect(projectRequest(coordinator, withPreparation)).toHaveProperty(VENUE_PREPARATION)
+  it('the Coordinator receives equipment preparation but not the legacy venue section', () => {
+    expect(projectRequest(coordinator, withPreparation)).not.toHaveProperty(VENUE_PREPARATION)
     expect(projectRequest(coordinator, withPreparation)).toHaveProperty(EQUIPMENT_PREPARATION)
     for (const status of [SUBMITTED, UNDER_REVIEW, RETURNED]) {
       expect(projectRequest(coordinator, request({ status })), status).not.toHaveProperty(VENUE_PREPARATION)
@@ -201,12 +201,11 @@ describe('SPM-48 AC8 — preparation is projected out for Organisers and Attende
 
 describe('SPM-48 — what the page is told (preparationEditing)', () => {
   it('each staff role gets its own section, editable or with the reason', () => {
-    expect(preparationEditing(venue, request())).toEqual({ venuePreparation: { editable: true, readOnlyReason: null } })
+    expect(preparationEditing(venue, request())).toBeNull()
     expect(preparationEditing(technical, request({ status: CONFIRMED, reserved: false }))).toEqual({
       equipmentPreparation: { editable: false, readOnlyReason: PREPARATION_NOT_STARTED_YET },
     })
     expect(preparationEditing(both, request({ status: COMPLETED }))).toEqual({
-      venuePreparation: { editable: false, readOnlyReason: PREPARATION_EVENT_CLOSED },
       equipmentPreparation: { editable: false, readOnlyReason: PREPARATION_EVENT_CLOSED },
     })
   })
@@ -244,11 +243,11 @@ describe('SPM-48 — validation of preparation values', () => {
 })
 
 describe('SPM-48 AC9 — history entries, and the SPM-28 filter for Organisers', () => {
-  it('a first edit records the change from the default values', () => {
+  it('a first equipment edit records the change from the default values', () => {
     const before = request()
-    const after = { ...before, venuePreparation: { status: 'in_progress' } }
-    expect(historyEntriesForEdit(venue, before, after)).toEqual([
-      expect.objectContaining({ type: FIELD_CHANGED, field: 'venuePreparation.status', oldValue: 'not_started', newValue: 'in_progress', actor: expect.objectContaining({ uid: venue.uid, role: VENUE_STAFF }) }),
+    const after = { ...before, equipmentPreparation: { status: 'in_progress' } }
+    expect(historyEntriesForEdit(technical, before, after)).toEqual([
+      expect.objectContaining({ type: FIELD_CHANGED, field: 'equipmentPreparation.status', oldValue: 'not_started', newValue: 'in_progress', actor: expect.objectContaining({ uid: technical.uid, role: TECHNICAL_STAFF }) }),
     ])
   })
 

@@ -1,6 +1,12 @@
 # ConnectSphere Project Context
 
-Last reviewed: 31 October 2026 (SPM-20/SPM-40 change requests; SPM-71 and SPM-84 merged with SPM-68/69/85/87/39/41; older implementation sections retain their historical dates)
+Last reviewed: 31 October 2026 (SPM-89 local implementation; SPM-20/SPM-40 change requests; SPM-71 and SPM-84 merged with SPM-68/69/85/87/39/41; older implementation sections retain their historical dates)
+
+## Current SPM-89 state (31 October 2026)
+
+SPM-89 is implemented locally and remains **In Progress / not Done**. Each current approved `venueBookingRequests` record reads a default Not Started preparation value and stores its own status and notes after an assigned Venue Staff member saves through `PATCH /api/requests/:id/venue-bookings/:bookingId/preparation` during Preparation. The service re-reads the event and booking in one transaction, updates only that booking, and adds venue-named field history under the event. The Coordinator sees per-venue preparation and a separate aggregate that becomes Ready when at least one current approved booking exists, every such booking is Ready, and equipment preparation is Ready. Pending, cancelled, replaced and awaiting-re-approval attempts are excluded from this aggregate. The indicator does not gate Completed. Organisers and Attendees receive no preparation details. Event-level `venuePreparation` is retained only as legacy data and its PATCH path is forbidden.
+
+`backend/scripts/backfillVenuePreparation.js` defaults to a dry run. It copies an existing event-wide value only when exactly one current approved booking exists and that booking has no preparation; ambiguous multi-venue values are left in place for review. The script has not been run against the live project. See `docs/evidence/spm-89-traceability.md` and `docs/testing/spm-89-manual-testing.md`. Human acceptance, peer review, live-project migration and live API verification remain pending; Firestore rules were not changed or deployed.
 
 ## Current implementation map (27 October 2026)
 

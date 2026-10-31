@@ -3,7 +3,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { BOOKING_PENDING, BOOKING_APPROVED, BOOKING_CANCELLED, BOOKING_REJECTED, BOOKING_REPLACED, BOOKING_EXPIRED, capacityWarning, venueBookingLabel, venueBookingStatusLabel } from '../../../shared/venueBooking.js'
 import { COORDINATOR } from '../../../shared/permissions.js'
 import { eventPeriod } from '../../../shared/venueSuitability.js'
-import { approveVenueBooking, cancelVenueBooking, getRequest, getVenueBookings, getVenueBookingQueue, listVenues, rejectVenueBooking, submitVenueBooking } from '../services/api.js'
+import { approveVenueBooking, cancelVenueBooking, getRequest, getVenueBookings, getVenueBookingQueue, listVenues, rejectVenueBooking, submitVenueBooking, updateVenueBookingPreparation } from '../services/api.js'
+import { PREPARATION_NOTES_MAX_LENGTH, PREPARATION_STATUSES, PREPARATION_STATUS_LABELS } from '../../../shared/preparation.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { venueBookingRequirements } from '../utils/venueBookingRequirements.js'
 import Navbar from '../components/Navbar.jsx'
@@ -29,6 +30,38 @@ function Suitability({ suitability }) {
 
 function BookingRow({ label, children }) {
   return <div className="profile-row booking-row"><span>{label}</span><strong>{children}</strong></div>
+}
+
+function VenuePreparationEditor({ user, eventId, booking, onSaved }) {
+  const [status, setStatus] = useState(booking.preparation.status)
+  const [notes, setNotes] = useState(booking.preparation.notes)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState(null)
+  const editable = booking.canUpdatePreparation === true
+  async function save(event) {
+    event.preventDefault()
+    setBusy(true); setMessage(null)
+    try {
+      await updateVenueBookingPreparation(user, eventId, booking.id, { status, notes })
+      await onSaved()
+      setMessage('Venue preparation saved.')
+    } catch (error) {
+      setMessage(error.details?.message ?? 'Venue preparation could not be saved. Reload and try again.')
+    } finally { setBusy(false) }
+  }
+  return <section aria-label={`Venue preparation for ${booking.venueName}`}>
+    <h3>Venue preparation</h3>
+    {editable ? <form onSubmit={save}>
+      <div className="field"><label htmlFor={`preparation-status-${booking.id}`}>Venue preparation status for {booking.venueName}</label>
+        <select id={`preparation-status-${booking.id}`} value={status} onChange={(event) => setStatus(event.target.value)}>
+          {PREPARATION_STATUSES.map((value) => <option key={value} value={value}>{PREPARATION_STATUS_LABELS[value]}</option>)}
+        </select></div>
+      <div className="field"><label htmlFor={`preparation-notes-${booking.id}`}>Venue preparation notes for {booking.venueName}</label>
+        <textarea id={`preparation-notes-${booking.id}`} maxLength={PREPARATION_NOTES_MAX_LENGTH} value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
+      <button className="button button-primary" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save venue preparation'}</button>
+    </form> : <><p>Status: {PREPARATION_STATUS_LABELS[booking.preparation.status]}</p><p>Notes: {booking.preparation.notes || 'None'}</p></>}
+    {message && <p role="status">{message}</p>}
+  </section>
 }
 
 export default function VenueBookingsPage() {
@@ -255,6 +288,8 @@ export default function VenueBookingsPage() {
           {booking.suggestedAlternative && <BookingRow label="Suggested alternative">{booking.suggestedAlternative}</BookingRow>}
         </>}
         <BookingRow label="Assigned Venue Staff">{booking.assignedVenueStaffName}</BookingRow>
+        {booking.preparation && <VenuePreparationEditor user={user} eventId={id} booking={booking}
+          onSaved={async () => setData(await getVenueBookings(user, id))} />}
         {booking.status === BOOKING_APPROVED ? <BookingRow label="Reservation">Confirmed for the booked period</BookingRow> :
           [BOOKING_REJECTED, BOOKING_CANCELLED, BOOKING_REPLACED, BOOKING_EXPIRED].includes(booking.status) ? <BookingRow label="Reservation">Released</BookingRow> :
           <BookingRow label="Hold expiry">{displayTime(booking.holdExpiresAt)}{Date.parse(booking.holdExpiresAt) <= Date.now() ? ' (expired)' : ''}</BookingRow>}
