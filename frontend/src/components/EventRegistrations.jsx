@@ -37,6 +37,8 @@ function EventRegistrations({ user, requestId, canView }) {
             </p>
             {/* SPM-39: how many Attendees are waiting for a place. */}
             {data.waitingListCount > 0 && <p className="form-note">{data.waitingListCount} on the waiting list</p>}
+            {/* SPM-59: places held while an invited Attendee decides. */}
+            {data.invitedCount > 0 && <p className="form-note">{data.invitedCount === 1 ? '1 place held for an invitation' : `${data.invitedCount} places held for invitations`}</p>}
             {data.registrations.length === 0 ? (
               <p className="form-note">No one has registered yet.</p>
             ) : (

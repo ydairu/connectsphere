@@ -348,6 +348,23 @@ export function joinWaitingList(user, eventId) {
   return authenticatedRequest(user, `/api/requests/${eventId}/waiting-list`, { method: 'POST' })
 }
 
+// SPM-59 — withdraw a registration, leave the waiting list, and answer an invitation to a freed place.
+export function withdrawRegistration(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/registrations/withdraw`, { method: 'POST' })
+}
+
+export function leaveWaitingList(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/waiting-list/leave`, { method: 'POST' })
+}
+
+export function acceptInvitation(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/invitation/accept`, { method: 'POST' })
+}
+
+export function declineInvitation(user, eventId) {
+  return authenticatedRequest(user, `/api/requests/${eventId}/invitation/decline`, { method: 'POST' })
+}
+
 export function listEventRegistrations(user, eventId) {
   return authenticatedRequest(user, `/api/requests/${eventId}/registrations`)
 }

@@ -937,3 +937,13 @@ Branch `feature/SPM-36-reject-equipment`, four commits:
 - **Status:** implemented locally, not Done. Human acceptance and peer review are pending; the backlog workbook was not updated.
 - **Local verification (30 Oct 2026, macOS):** see `docs/evidence/spm-84-traceability.md`.
 - **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No emulator or live-project check; Firestore rules were neither edited nor deployed.
+
+## SPM-59 withdraw and release the place — 31 October 2026
+
+- **Built:** where the Organiser allows it (and before their cut-off and the event start), a registered Attendee withdraws after confirming; it shows as Withdrawn and the registered count drops by one. The freed place goes to the next person on the waiting list by invitation (48 hours, shorter if registration closes or the event starts), held for them; they accept or decline, or it lapses and passes on; with no one waiting the place reopens. Waitlisted Attendees can leave the list. The Organiser and Coordinator see places held for invitations.
+- **Code:** `canWithdraw`, `canRespondToInvitation`, `settleWaitingList`, `placesHeld` (`shared/registration.js`); `registrationTransaction` and `settleEventRegistrations` with withdraw/leave/accept/decline (`registrationService.js`); routes under `/api/requests/:id/` (`registrations/withdraw`, `waiting-list/leave`, `invitation/accept`, `invitation/decline`). Summarised in AGENTS.md §6.
+- **Team decisions (31 Oct 2026, pending PO confirmation):** X1–X8 in effective-requirements.md §4.18. This closes SPM-39's capacity-rise gap and delivers SPM-39's former AC4.
+- **Built tests-first** from the criteria (`docs/evidence/spm-59-traceability.md`).
+- **Gaps:** expiry is checked on reads and changes only (X5), so an untouched event passes a lapsed invitation on only when next read.
+- **Status:** In Progress, Sprint 4; human acceptance and peer review pending. Local verification (31 Oct 2026, macOS, after merging SPM-84): lint and build passed; Node 147, frontend 101, root Vitest 2,348 (58 skipped) and Playwright 124/124 passed. The emulator test runs in CI only (no Java locally).
+- **Not verified:** API tests use mocked identity and in-memory persistence; browser tests use the Firebase double. No live-project check; Firestore rules were neither edited nor deployed. The E2E spec shares SPM-19's 25 Nov 2026 date risk.

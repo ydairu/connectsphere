@@ -1,4 +1,4 @@
-import { CLOSED, NOT_OPEN_YET, REGISTERED, UNAVAILABLE_MESSAGES, WAITLISTED } from '../../../shared/registration.js'
+import { CLOSED, DECLINED, INVITATION_EXPIRED, INVITED, NOT_OPEN_YET, REGISTERED, UNAVAILABLE_MESSAGES, WAITLISTED, WITHDRAWN } from '../../../shared/registration.js'
 import { CANCELLED, COMPLETED, PLANNING, REJECTED } from '../../../shared/status.js'
 
 // SPM-19 — how registration times, reasons and statuses read on the pages. The rules are in
@@ -16,12 +16,25 @@ export function unavailableText(summary) {
   return UNAVAILABLE_MESSAGES[summary?.reason] ?? 'Registration is not available.'
 }
 
-const STATUS_LABELS = Object.freeze({ [REGISTERED]: 'Registered', [WAITLISTED]: 'Waitlisted' })
+const STATUS_LABELS = Object.freeze({
+  [REGISTERED]: 'Registered',
+  [WAITLISTED]: 'Waitlisted',
+  // SPM-59 AC4: a withdrawn registration shows as Withdrawn.
+  [WITHDRAWN]: 'Withdrawn',
+  [INVITED]: 'Invited',
+  [DECLINED]: 'Declined',
+  [INVITATION_EXPIRED]: 'Invitation expired',
+})
 
-/** "Registered", or (SPM-39) "Waitlisted, position N" when the position is known. */
-export function registrationStatusLabel(status, waitingListPosition = null) {
+/**
+ * "Registered"; (SPM-39) "Waitlisted, position N" when the position is known; (SPM-59) "Invited, accept by …" with
+ * the invitation deadline.
+ */
+export function registrationStatusLabel(status, waitingListPosition = null, invitationExpiresAt = null) {
   const label = STATUS_LABELS[status] ?? status
-  return status === WAITLISTED && waitingListPosition ? `${label}, position ${waitingListPosition}` : label
+  if (status === WAITLISTED && waitingListPosition) return `${label}, position ${waitingListPosition}`
+  if (status === INVITED && displayDateTime(invitationExpiresAt)) return `${label}, accept by ${displayDateTime(invitationExpiresAt)}`
+  return label
 }
 
 /** "Venue A, Venue B", or null when no venue is known yet. */

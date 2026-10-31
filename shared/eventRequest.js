@@ -58,10 +58,19 @@ function collect(errors, path, result) {
 
 // SPM-19: the registration period and capacity, set by the Organiser. How they relate to each other, the event
 // start and the venue capacity is checked by registrationSettingsErrors() in shared/registration.js.
+function booleanStrict(value) {
+  if (value === undefined || value === null) return { value: false }
+  if (typeof value !== 'boolean') return { error: 'Must be true or false.' }
+  return { value }
+}
+
 const REGISTRATION_SETTINGS = Object.freeze({
   opensAt: dateTimeOrNull,
   closesAt: dateTimeOrNull,
   capacity: positiveIntegerOrNull,
+  // SPM-59 (X1): whether Attendees may withdraw, and until when (by the event start).
+  withdrawalAllowed: booleanStrict,
+  withdrawalClosesAt: dateTimeOrNull,
 })
 
 /**
@@ -83,7 +92,7 @@ export function normaliseEventRequestInput(input = {}) {
   const venueInput = input.venue ?? {}
   const equipmentInput = input.equipment ?? {}
   const registrationInput = input.registration ?? {}
-  const registrationSettings = normaliseRegistrationSettings({ opensAt: null, closesAt: null, capacity: null, ...registrationInput })
+  const registrationSettings = normaliseRegistrationSettings({ opensAt: null, closesAt: null, capacity: null, withdrawalAllowed: false, withdrawalClosesAt: null, ...registrationInput })
   Object.assign(errors, registrationSettings.errors)
 
   const eventRequest = {

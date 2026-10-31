@@ -86,7 +86,9 @@
     "test:spm69": "vitest run tests/spm-69/ && playwright test tests/spm-69/",
     "test:spm84": "vitest run tests/spm-84/ && playwright test tests/spm-84/",
     "test:spm39": "vitest run tests/spm-39/ && playwright test tests/spm-39/",
-    "test:spm39:emulator": "node tests/spm-39/runEmulatorTests.js"
+    "test:spm39:emulator": "node tests/spm-39/runEmulatorTests.js",
+    "test:spm59": "vitest run tests/spm-59/ && playwright test tests/spm-59/",
+    "test:spm59:emulator": "node tests/spm-59/runEmulatorTests.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

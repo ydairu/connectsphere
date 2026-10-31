@@ -25,6 +25,8 @@ const initialForm = {
   registrationOpensAt: '',
   registrationClosesAt: '',
   registrationCapacity: '',
+  registrationWithdrawalAllowed: false,
+  registrationWithdrawalClosesAt: '',
   registrationNotes: '',
 }
 
@@ -52,6 +54,8 @@ function toPayload(form) {
       opensAt: form.registrationOpensAt,
       closesAt: form.registrationClosesAt,
       capacity: form.registrationCapacity,
+      withdrawalAllowed: form.registrationWithdrawalAllowed,
+      withdrawalClosesAt: form.registrationWithdrawalClosesAt,
       notes: form.registrationNotes,
     },
   }
@@ -79,6 +83,8 @@ function toForm(eventRequest) {
     registrationOpensAt: eventRequest.registration?.opensAt ?? '',
     registrationClosesAt: eventRequest.registration?.closesAt ?? '',
     registrationCapacity: eventRequest.registration?.capacity?.toString() ?? '',
+    registrationWithdrawalAllowed: eventRequest.registration?.withdrawalAllowed ?? false,
+    registrationWithdrawalClosesAt: eventRequest.registration?.withdrawalClosesAt ?? '',
     registrationNotes: eventRequest.registration?.notes ?? '',
   }
 }
@@ -341,6 +347,9 @@ function CreateEventRequestPage() {
             <Input id="registrationOpensAt" name="registrationOpensAt" label="Registration opens" type="datetime-local" value={form.registrationOpensAt} onChange={updateField} error={fieldError(errors, 'registration.opensAt')} />
             <Input id="registrationClosesAt" name="registrationClosesAt" label="Registration closes" type="datetime-local" value={form.registrationClosesAt} onChange={updateField} error={fieldError(errors, 'registration.closesAt')} />
             <Input id="registrationCapacity" name="registrationCapacity" label="Registration capacity" type="number" min="1" value={form.registrationCapacity} onChange={updateField} error={fieldError(errors, 'registration.capacity')} />
+            {/* SPM-59: whether registered Attendees may withdraw, and until when (the event start when left empty). */}
+            <Checkbox id="registrationWithdrawalAllowed" name="registrationWithdrawalAllowed" label="Attendees may withdraw" checked={form.registrationWithdrawalAllowed} onChange={updateField} />
+            <Input id="registrationWithdrawalClosesAt" name="registrationWithdrawalClosesAt" label="Withdrawal closes" type="datetime-local" value={form.registrationWithdrawalClosesAt} onChange={updateField} error={fieldError(errors, 'registration.withdrawalClosesAt')} />
             <TextArea id="registrationNotes" name="registrationNotes" label="Registration needs" value={form.registrationNotes} onChange={updateField} error={fieldError(errors, 'registration.notes')} rows="3" />
           </Card>
 
